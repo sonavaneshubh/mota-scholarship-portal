@@ -1,10 +1,10 @@
-import { HOW_TO_APPLY_PHASES } from '../../data/mockData';
+import { DEFICIENCY_NOTE, HOW_TO_APPLY_PHASES } from '../../data/mockData';
 
 export function HowToApply() {
   return (
     <div className="lg:col-span-8 space-y-4">
       <div className="border-b border-slate-200 pb-2">
-        <span className="text-xs font-bold text-gov-saffron uppercase">Scholar Journey</span>
+        <span className="text-xs font-bold text-gov-saffron uppercase">Applicant Journey</span>
         <h3 className="text-lg font-bold text-gov-blue-dark">How to Apply on the Unified Portal</h3>
       </div>
 
@@ -20,6 +20,17 @@ export function HowToApply() {
             </div>
           </div>
         ))}
+      </div>
+
+      <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-300 rounded">
+        <svg className="w-4 h-4 text-gov-saffron mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+          <path
+            clipRule="evenodd"
+            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+            fillRule="evenodd"
+          />
+        </svg>
+        <p className="text-xs text-slate-700 leading-relaxed">{DEFICIENCY_NOTE}</p>
       </div>
     </div>
   );

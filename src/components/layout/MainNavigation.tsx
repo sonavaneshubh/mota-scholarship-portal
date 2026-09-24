@@ -38,11 +38,11 @@ export function MainNavigation() {
         </ul>
 
         <div className="hidden lg:flex items-center space-x-2 py-1.5">
-          <Button variant="accent" size="sm" href={SECTION_IDS.REGISTER}>
-            New Student Registration
+          <Button variant="ghost" size="sm" href={SECTION_IDS.OFFICER_ACCESS}>
+            Login
           </Button>
-          <Button variant="success" size="sm" href={SECTION_IDS.DIGILOCKER}>
-            DigiLocker Access
+          <Button variant="accent" size="sm" href={SECTION_IDS.HOW_TO_APPLY}>
+            New Registration
           </Button>
         </div>
 
@@ -91,11 +91,11 @@ export function MainNavigation() {
             )}
           </ul>
           <div className="px-2 py-3 flex flex-col gap-2 border-t border-blue-900">
-            <Button variant="accent" size="sm" href={SECTION_IDS.REGISTER} className="justify-center">
-              New Student Registration
+            <Button variant="ghost" size="sm" href={SECTION_IDS.OFFICER_ACCESS} className="justify-center">
+              Login
             </Button>
-            <Button variant="success" size="sm" href={SECTION_IDS.DIGILOCKER} className="justify-center">
-              DigiLocker Access
+            <Button variant="accent" size="sm" href={SECTION_IDS.HOW_TO_APPLY} className="justify-center">
+              New Registration
             </Button>
           </div>
         </div>

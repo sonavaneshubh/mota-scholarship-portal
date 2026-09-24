@@ -46,14 +46,14 @@ export function Masthead() {
 
         <div className="hidden lg:flex items-center gap-6 px-4 border-x border-slate-200">
           <div className="text-center">
-            <div className="text-xs font-bold text-gov-saffron">{SITE.nationalInitiativeTitle}</div>
-            <div className="text-sm font-black text-slate-800 tracking-wide">
-              {SITE.nationalInitiativeSubtitle}
+            <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider bg-amber-100 border border-amber-300 text-amber-800 px-2 py-0.5 rounded">
+              <span className="w-1.5 h-1.5 rounded-full bg-gov-saffron" />
+              {SITE.prototypeLabel}
+            </span>
+            <div className="text-sm font-black text-slate-800 tracking-wide mt-1">
+              {SITE.mastheadLine}
             </div>
-            <div className="text-[10px] text-gov-green font-semibold">
-              {SITE.nationalTagline}
-              <span aria-hidden="true">, Sabka Prayas</span>
-            </div>
+            <div className="text-[10px] text-gov-green font-semibold">{SITE.mastheadSubline}</div>
           </div>
         </div>
 
@@ -64,8 +64,8 @@ export function Masthead() {
             <div className="text-[10px] text-slate-500">{SITE.helpdeskHours}</div>
           </div>
           <div className="flex flex-col gap-1">
-            <Button variant="primary" size="md" href={SECTION_IDS.QUICK_LOGIN}>
-              Portal Sign In
+            <Button variant="primary" size="md" href={SECTION_IDS.OFFICER_ACCESS}>
+              Login
             </Button>
             <Button variant="outline" size="sm" href={SECTION_IDS.TRACK}>
               Track Application

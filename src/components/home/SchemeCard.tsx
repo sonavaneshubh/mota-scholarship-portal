@@ -15,12 +15,17 @@ export function SchemeCard({ scheme }: SchemeCardProps) {
   return (
     <div className="bg-white border border-slate-200 rounded-lg p-4 flex flex-col justify-between shadow-sm hover:border-gov-blue transition">
       <div>
-        <div className="flex items-center justify-between mb-2 gap-2">
+        <div className="flex flex-wrap items-center gap-1.5 mb-2">
           <span
             className={`text-[10px] font-bold px-2 py-0.5 rounded ${badgeToneClass[scheme.badgeTone]}`}
           >
             {scheme.categoryLabel}
           </span>
+          {scheme.demo ? (
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-300">
+              DEMO / Prototype
+            </span>
+          ) : null}
           <span
             className={`text-[10px] font-semibold flex items-center gap-1 ${
               scheme.statusActive ? 'text-emerald-700' : 'text-slate-600'
@@ -55,8 +60,8 @@ export function SchemeCard({ scheme }: SchemeCardProps) {
       </div>
 
       <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
-        <a className="text-xs font-semibold text-gov-blue hover:underline" href="#guidelines">
-          Guidelines (PDF)
+        <a className="text-xs font-semibold text-gov-blue hover:underline" href="#guidelines-draft">
+          Guidelines (Draft)
         </a>
         <a
           className="px-3 py-1 bg-gov-blue hover:bg-gov-blue-dark text-white text-xs font-semibold rounded transition"

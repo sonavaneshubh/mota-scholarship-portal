@@ -19,17 +19,17 @@ export function SchemeDirectory() {
         <div className="flex flex-col md:flex-row md:items-end justify-between mb-6 gap-3">
           <div>
             <span className="text-xs font-bold text-gov-saffron uppercase tracking-wider">
-              MoTA Scholarship Portfolio
+              MoTA Prototype Portfolio
             </span>
             <h2 className="text-xl md:text-2xl font-bold text-gov-blue-dark">
-              Available Central Schemes &amp; Fellowships
+              Scholarships &amp; Fellowships
             </h2>
             <p className="text-xs md:text-sm text-slate-600 mt-1">
-              Direct online application, verified by DigiLocker and Institutional Nodal Cells.
+              Sample scheme configurations for the prototype workflow — submission, validation and
+              verification are demonstrated end to end.
             </p>
             <p className="text-[11px] text-slate-500 italic mt-1">
-              Prototype listing — scheme details are sample content, not official eligibility
-              criteria.
+              Demo listing — these are NOT official schemes or eligibility criteria.
             </p>
           </div>
 

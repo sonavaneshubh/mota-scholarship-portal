@@ -1,27 +1,30 @@
-import { WORKFLOW_STEPS } from '../../data/mockData';
+import { AI_RESPONSIBILITY, WORKFLOW_STEPS } from '../../data/mockData';
 import type { WorkflowStep, WorkflowTone } from '../../types';
-import { Button } from '../ui/Button';
 
-const toneStyles: Record<WorkflowTone, { border: string; circle: string; note: string }> = {
+const toneStyles: Record<WorkflowTone, { border: string; circle: string; note: string; bullet: string }> = {
   blue: {
     border: 'border-2 border-slate-200',
     circle: 'bg-gov-blue text-white',
     note: 'text-blue-800 bg-blue-50',
+    bullet: 'bg-gov-blue',
   },
   saffron: {
     border: 'border-2 border-amber-300',
     circle: 'bg-gov-saffron text-white',
     note: 'text-amber-800 bg-amber-50',
+    bullet: 'bg-gov-saffron',
   },
   slate: {
     border: 'border-2 border-slate-200',
     circle: 'bg-slate-500 text-white',
     note: 'text-slate-700 bg-slate-100',
+    bullet: 'bg-slate-500',
   },
   green: {
     border: 'border-2 border-gov-green',
     circle: 'bg-gov-green text-white',
     note: 'text-emerald-800 bg-emerald-50',
+    bullet: 'bg-gov-green',
   },
 };
 
@@ -31,19 +34,31 @@ function StepCard({ step }: { step: WorkflowStep }) {
   return (
     <div className={`bg-white ${styles.border} rounded-lg p-4 relative shadow-sm`}>
       <div
-        className={`w-8 h-8 rounded-full ${styles.circle} flex items-center justify-center font-bold text-sm mb-3`}
+        className={`w-8 h-8 rounded-full ${styles.circle} flex items-center justify-center font-bold text-sm mb-2`}
       >
         {step.id}
       </div>
-      <div className="flex items-center gap-1.5">
-        <h4 className="font-bold text-sm text-slate-900">{step.title}</h4>
+      <div className="text-[10px] uppercase tracking-wider font-bold text-slate-500">
+        {step.stage}
+      </div>
+      <div className="flex items-center gap-1.5 mt-0.5">
+        <h4 className="font-bold text-sm text-slate-900">{step.label}</h4>
         {step.tone === 'saffron' ? (
           <span className="bg-amber-100 text-amber-800 text-[9px] font-bold px-1.5 py-0.2 rounded">
             Assistance Only
           </span>
         ) : null}
       </div>
-      <p className="text-xs text-slate-600 mt-1">{step.detail}</p>
+      <ul className="text-xs text-slate-600 mt-2 space-y-1">
+        {step.points.map((point) => (
+          <li key={point} className="flex items-start gap-1.5">
+            <span
+              className={`mt-1.5 inline-block w-1.5 h-1.5 rounded-full ${styles.bullet} flex-shrink-0`}
+            />
+            <span>{point}</span>
+          </li>
+        ))}
+      </ul>
       <div className={`mt-3 text-[10px] font-semibold ${styles.note} p-1.5 rounded`}>
         {step.note}
       </div>
@@ -55,20 +70,20 @@ export function GovernanceWorkflow() {
   return (
     <section
       className="max-w-7xl mx-auto px-4 py-12"
-      data-purpose="ai-assisted-governance-workflow"
-      id="verification-workflow"
+      data-purpose="application-processing-workflow"
+      id="how-it-works"
     >
       <div className="text-center max-w-3xl mx-auto mb-8">
         <span className="text-xs font-bold text-gov-blue uppercase tracking-wider bg-blue-50 border border-blue-200 px-2.5 py-1 rounded">
-          Public Governance &amp; Responsible Technology
+          End-to-End Digital Workflow
         </span>
         <h2 className="text-2xl font-bold text-slate-900 mt-2">
-          AI-Assisted Document Processing &amp; Multi-Tier Human Verification
+          How Your Application Is Processed
         </h2>
         <p className="text-xs md:text-sm text-slate-600 mt-1">
-          Accelerating verification while safeguarding affirmative rights: AI assists in optical
-          scanning and extraction, while <strong>every final sanction is evaluated strictly by
-          authorized public officers</strong>.
+          From scheme discovery to the final authorized decision — AI assists with extraction and
+          checks, while <strong>authorized officers verify and remain responsible for every final
+          decision</strong>.
         </p>
       </div>
 
@@ -78,9 +93,9 @@ export function GovernanceWorkflow() {
         ))}
       </div>
 
-      <div className="mt-6 bg-slate-50 border border-slate-300 rounded-lg p-4 flex flex-col md:flex-row items-center justify-between gap-4">
+      <div className="mt-6 bg-emerald-50 border border-gov-green/40 rounded-lg p-4 flex flex-col md:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-gov-blue text-white flex-shrink-0 flex items-center justify-center">
+          <div className="w-10 h-10 rounded-full bg-gov-green text-white flex-shrink-0 flex items-center justify-center">
             <svg
               className="w-5 h-5"
               fill="none"
@@ -97,25 +112,15 @@ export function GovernanceWorkflow() {
             </svg>
           </div>
           <div>
-            <h5 className="text-xs font-bold text-slate-900 uppercase">
-              National Data Governance &amp; AI Ethics Compliance
+            <h5 className="text-xs font-bold text-gov-green-dark uppercase tracking-wide">
+              {AI_RESPONSIBILITY.title}
             </h5>
-            <p className="text-xs text-slate-600">
-              Pursuant to Government of India guidelines,{' '}
-              <strong>no candidate is rejected automatically by algorithmic or AI systems</strong>.
-              Any discrepancy identified during preliminary OCR parsing triggers mandatory human
-              officer review and opportunity for applicant clarification.
-            </p>
+            <p className="text-xs text-slate-700">{AI_RESPONSIBILITY.text}</p>
           </div>
         </div>
-        <Button
-          variant="outline"
-          size="md"
-          href="#compliance-policy"
-          className="whitespace-nowrap border-slate-300 text-gov-blue hover:bg-white flex-shrink-0"
-        >
-          Read Transparency Standard
-        </Button>
+        <div className="text-[10px] font-bold text-emerald-800 bg-white border border-emerald-200 px-2.5 py-1 rounded flex-shrink-0 text-center">
+          No fully automated scholarship decisions
+        </div>
       </div>
     </section>
   );

@@ -104,7 +104,7 @@ export function TopAccessibilityBar() {
                 fillRule="evenodd"
               />
             </svg>
-            <span className="font-semibold text-slate-700">MeriPehchan / DigiLocker Verified</span>
+            <span className="font-semibold text-slate-700">Accessible • Keyboard &amp; Screen-Reader Friendly</span>
           </div>
 
           <div className="border-l border-slate-300 pl-3">

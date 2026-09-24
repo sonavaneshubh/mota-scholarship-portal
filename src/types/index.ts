@@ -38,9 +38,16 @@ export interface QuickAction {
   href: string;
   ctaLabel: string;
   hasInlineInput?: boolean;
+  anchorId?: string;
 }
 
-export type SchemeCategory = 'all' | 'doctoral' | 'overseas' | 'topclass' | 'research';
+export type SchemeCategory =
+  | 'all'
+  | 'scholarship'
+  | 'fellowship'
+  | 'higher-education'
+  | 'research'
+  | 'overseas';
 
 export type SchemeBadgeTone = 'blue' | 'purple' | 'green' | 'amber';
 
@@ -59,6 +66,7 @@ export interface Scheme {
   badgeTone: SchemeBadgeTone;
   statusLabel: string;
   statusActive?: boolean;
+  demo?: boolean;
   description: string;
   stats: SchemeStat[];
   applyHref: string;
@@ -68,10 +76,11 @@ export type WorkflowTone = 'blue' | 'saffron' | 'slate' | 'green';
 
 export interface WorkflowStep {
   id: number;
-  title: string;
-  detail: string;
-  note: string;
+  stage: string;
+  label: string;
+  points: string[];
   tone: WorkflowTone;
+  note: string;
 }
 
 export interface HowToApplyPhase {
@@ -80,10 +89,17 @@ export interface HowToApplyPhase {
   description: string;
 }
 
+export interface AtGlanceItem {
+  id: string;
+  number: string;
+  title: string;
+}
+
 export interface GovernmentInitiative {
   id: string;
   name: string;
   dotClass: string;
+  status: string;
 }
 
 export interface CircularItem {
@@ -92,10 +108,15 @@ export interface CircularItem {
   meta: string;
 }
 
+export interface FooterLink {
+  label: string;
+  href: string;
+}
+
 export interface FooterLinkColumn {
   id: string;
   heading: string;
-  links: string[];
+  links: FooterLink[];
 }
 
 export interface MinistryStat {

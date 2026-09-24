@@ -5,19 +5,17 @@ export const SITE = {
   nameHi: 'जनजातीय कार्य मंत्रालय',
   govtLineHi: 'भारत सरकार',
   govtLineEn: 'Government of India',
-  portalName: 'National Tribal Scholarship & Fellowship Management System (NTSFMS)',
-  helpdeskLabel: 'Citizen & Scholar Helpdesk (Toll Free)',
-  helpdeskPhone: '1800-11-7777',
+  portalName: 'AI-Enabled Scholarship & Fellowship Management System',
+  prototypeLabel: 'Prototype / Demo',
+  mastheadLine: 'Scholarship & Fellowship Management',
+  mastheadSubline: 'Discover • Apply • Verify • Decide',
+  helpdeskLabel: 'Helpdesk (Demo)',
+  helpdeskPhone: '1800-11-0000 (Demo)',
   helpdeskHours: 'Working Days: 9:30 AM – 5:30 PM IST',
-  dbtHelpdeskLabel: 'Canara Bank Scholar DBT Desk',
-  dbtHelpdeskPhone: '1800-425-0018',
-  email: 'fellowship-mota@gov.in',
-  addressLine1: 'Shastri Bhawan, New Delhi - 110001',
-  portalVersion: '3.8.4 (AI Pre-Screening Enabled)',
-  lastUpdated: '24 September 2025',
-  nationalInitiativeTitle: '75th Azadi Ka Amrit Mahotsav',
-  nationalInitiativeSubtitle: 'VIKSIT BHARAT @2047',
-  nationalTagline: 'Sabka Saath, Sabka Vikas, Sabka Vishwas',
+  email: 'scholarship-prototype@tribal.gov.in',
+  addressLine1: 'Prototype build — contact/address details are sample placeholders',
+  portalVersion: 'Prototype v0.2',
+  lastUpdated: '24 September 2026',
   sealMotto: 'सत्यमेव जयते',
 } as const;
 
@@ -56,43 +54,38 @@ export const ROUTES = {
 export const ANCHORS = {
   top: 'top',
   mainContent: 'main-content',
-  quickLogin: 'quick-login',
-  trackStatus: 'track-status',
-  aboutSchemes: 'about-schemes',
-  schemesList: 'schemes-list',
-  verificationWorkflow: 'verification-workflow',
-  universities: 'universities',
-  notices: 'notices',
-  grievances: 'grievances',
+  about: 'about-mota',
+  schemes: 'scholarships-fellowships',
   eligibility: 'eligibility-check',
-  register: 'register',
-  digilocker: 'digilocker',
+  howItWorks: 'how-it-works',
+  howToApply: 'how-to-apply',
+  notices: 'notices',
+  helpGrievance: 'help-grievance',
+  officerAccess: 'officer-access',
+  track: 'track-application',
 } as const;
 
 export const SECTION_IDS = {
   TOP: '#top',
   MAIN_CONTENT: '#main-content',
-  ABOUT: '#about-schemes',
-  SCHEMES: '#schemes-list',
+  ABOUT: '#about-mota',
+  SCHEMES: '#scholarships-fellowships',
   ELIGIBILITY: '#eligibility-check',
-  VERIFICATION: '#verification-workflow',
-  UNIVERSITIES: '#universities',
+  HOW_IT_WORKS: '#how-it-works',
+  HOW_TO_APPLY: '#how-to-apply',
   NOTICES: '#notices',
-  GRIEVANCES: '#grievances',
-  TRACK: '#track-status',
-  QUICK_LOGIN: '#quick-login',
-  REGISTER: '#register',
-  DIGILOCKER: '#digilocker',
+  HELP_GRIEVANCE: '#help-grievance',
+  OFFICER_ACCESS: '#officer-access',
+  TRACK: '#track-application',
 } as const;
 
 export const NAVIGATION_ITEMS: NavigationItem[] = [
   { id: 'home', label: 'Home', href: ROUTES.home, active: true },
-  { id: 'about', label: 'About MoTA Schemes', href: SECTION_IDS.ABOUT },
+  { id: 'about', label: 'About MoTA', href: SECTION_IDS.ABOUT },
   { id: 'schemes', label: 'Scholarships & Fellowships', href: SECTION_IDS.SCHEMES },
-  { id: 'ai', label: 'AI-Assisted Verification', href: SECTION_IDS.VERIFICATION },
-  { id: 'universities', label: 'Institutes & Universities', href: SECTION_IDS.UNIVERSITIES },
-  { id: 'notices', label: 'Circulars & Notices', href: SECTION_IDS.NOTICES },
-  { id: 'grievance', label: 'Grievance (CPGRAMS)', href: SECTION_IDS.GRIEVANCES },
+  { id: 'how-it-works', label: 'How It Works', href: SECTION_IDS.HOW_IT_WORKS },
+  { id: 'notices', label: 'Guidelines & Notices', href: SECTION_IDS.NOTICES },
+  { id: 'help', label: 'Help / Grievance', href: SECTION_IDS.HELP_GRIEVANCE },
 ];
 
 export const LANGUAGES: LanguageOption[] = [
@@ -106,31 +99,48 @@ export const LANGUAGES: LanguageOption[] = [
 
 export const FOOTER_LINK_COLUMNS: FooterLinkColumn[] = [
   {
-    id: 'policies',
-    heading: 'Website Policies',
+    id: 'portal',
+    heading: 'Portal',
     links: [
-      'Terms & Conditions',
-      'Privacy & Data Protection Policy',
-      'Copyright Policy',
-      'Hyperlinking Policy',
-      'Accessibility Statement',
-      'AI Usage & Decision Fairness Norms',
+      { label: 'Home', href: ROUTES.home },
+      { label: 'Scholarships & Fellowships', href: SECTION_IDS.SCHEMES },
+      { label: 'How It Works', href: SECTION_IDS.HOW_IT_WORKS },
+      { label: 'Guidelines & Notices', href: SECTION_IDS.NOTICES },
+      { label: 'Help', href: SECTION_IDS.HELP_GRIEVANCE },
     ],
   },
   {
-    id: 'important',
-    heading: 'Important Links',
+    id: 'applicant',
+    heading: 'Applicant',
     links: [
-      'Ministry of Tribal Affairs Official Site',
-      'National Commission for Scheduled Tribes (NCST)',
-      'University Grants Commission (UGC)',
-      'Central Public Grievance Portal (CPGRAMS)',
-      'MeriPehchan National SSO',
+      { label: 'Login', href: SECTION_IDS.OFFICER_ACCESS },
+      { label: 'New Registration', href: SECTION_IDS.HOW_TO_APPLY },
+      { label: 'Track Application', href: SECTION_IDS.TRACK },
+      { label: 'Check Eligibility', href: SECTION_IDS.ELIGIBILITY },
+    ],
+  },
+  {
+    id: 'support',
+    heading: 'Support',
+    links: [
+      { label: 'Help & Grievance', href: SECTION_IDS.HELP_GRIEVANCE },
+      { label: 'Officer / Administrator Access', href: SECTION_IDS.OFFICER_ACCESS },
+      { label: 'Contact (Prototype)', href: '#prototype-contact' },
+    ],
+  },
+  {
+    id: 'legal',
+    heading: 'Legal / Information',
+    links: [
+      { label: 'Privacy Policy (Draft)', href: '#privacy-draft' },
+      { label: 'Terms of Use (Draft)', href: '#terms-draft' },
+      { label: 'Accessibility Statement', href: '#accessibility-statement' },
+      { label: 'Prototype Disclaimer', href: '#prototype-disclaimer' },
     ],
   },
 ];
 
-export const FOOTER_SECURITY_SEALS = ['STQC Certified', 'WCAG 2.0 (Level AA)'] as const;
+export const FOOTER_SECURITY_SEALS = ['Prototype', 'UI Milestone'] as const;
 
 export const DEFAULT_FONT_SCALE = 1;
 export const FONT_SCALE_MIN = 0.85;

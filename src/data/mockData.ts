@@ -1,6 +1,7 @@
-import { SECTION_IDS, SITE } from '../lib/constants';
+import { SECTION_IDS } from '../lib/constants';
 import type {
   Announcement,
+  AtGlanceItem,
   CircularItem,
   GovernmentInitiative,
   HowToApplyPhase,
@@ -12,275 +13,350 @@ import type {
 
 /*
  * MOCK / DEMO DATA — sample content only.
- * All values below are prototype placeholders lifted from the Stitch design
- * and are NOT official eligibility criteria, statistics, or government claims.
+ * These are prototype placeholders for the AI-Enabled Scholarship & Fellowship
+ * Management System. They are NOT official scheme configurations, eligibility
+ * criteria, statistics, deadlines, or government notifications.
  * Replace every entry with real API responses in later phases.
  */
 
 export const ANNOUNCEMENTS: Announcement[] = [
   {
     id: 'ann-1',
-    mark: 'Notice',
-    text: 'Online application verification for National Fellowship for ST Candidates (NFST 2025-26) at University/Institute level is extended up to 31/12/2025 (5:00 PM IST).',
+    mark: 'Demo',
+    text: 'DEMO NOTICE: Scholarship application workflow preview for prototype evaluation.',
   },
   {
     id: 'ann-2',
-    mark: 'Advisory',
-    text: 'Mandatory Aadhaar and Canara Bank DBT Linking integration for selected candidates 2025-26 cycle.',
+    mark: 'Demo',
+    text: 'DEMO NOTICE: Document verification workflow available for prototype evaluation.',
   },
   {
     id: 'ann-3',
-    mark: 'Update',
-    text: 'Merit List provisional allocation published under Top Class Education Scheme for ST Students.',
+    mark: 'Demo',
+    text: 'DEMO NOTICE: Scheme information shown for demonstration only — not official.',
   },
   {
     id: 'ann-4',
-    mark: 'Notice',
-    text: 'SAMPLE FEED: University verification desk demo window for nodal officer UI walkthrough is now open.',
+    mark: 'Demo',
+    text: 'DEMO NOTICE: Eligibility pre-check and deficiency/resubmission concepts are UI previews.',
   },
 ];
 
 export const QUICK_ACTIONS: QuickAction[] = [
   {
-    id: 'find-scheme',
-    title: 'Find Scheme',
-    description: 'M.Phil, Ph.D, Overseas & Top-Class',
+    id: 'explore',
+    title: 'Explore Scholarships & Fellowships',
+    description: 'Browse available scholarship and fellowship schemes.',
     icon: 'scheme',
     accent: 'blue',
     href: SECTION_IDS.SCHEMES,
-    ctaLabel: 'Filter by Qualification',
+    ctaLabel: 'View Schemes',
   },
   {
     id: 'eligibility',
     title: 'Check Eligibility',
-    description: '2-Minute Criteria Diagnostic',
+    description: 'Perform a preliminary eligibility assessment before applying.',
     icon: 'eligibility',
     accent: 'saffron',
     href: SECTION_IDS.ELIGIBILITY,
-    ctaLabel: 'Self Assessment Tool',
+    ctaLabel: 'Check Eligibility',
   },
   {
     id: 'track',
     title: 'Track Application',
-    description: 'Aadhaar / Application No.',
+    description: 'Track your application using your Application ID.',
     icon: 'track',
     accent: 'green',
     href: SECTION_IDS.TRACK,
     ctaLabel: 'Go',
     hasInlineInput: true,
+    anchorId: 'track-application',
   },
   {
-    id: 'grievance',
-    title: 'Grievance & Appeals',
-    description: 'CPGRAMS Integrated Resolution',
+    id: 'help',
+    title: 'Help & Grievance',
+    description: 'Get help or submit and track a grievance.',
     icon: 'grievance',
     accent: 'purple',
-    href: SECTION_IDS.GRIEVANCES,
-    ctaLabel: 'Register / Track Grievance',
+    href: SECTION_IDS.HELP_GRIEVANCE,
+    ctaLabel: 'Get Support',
+    anchorId: 'help-grievance',
   },
+];
+
+export const APPLICATION_GLANCE: AtGlanceItem[] = [
+  { id: 'glance-1', number: '01', title: 'Explore Scheme' },
+  { id: 'glance-2', number: '02', title: 'Check Eligibility' },
+  { id: 'glance-3', number: '03', title: 'Submit Application' },
+  { id: 'glance-4', number: '04', title: 'Document Verification' },
+  { id: 'glance-5', number: '05', title: 'Track Decision' },
 ];
 
 export const SCHEMES: Scheme[] = [
   {
-    id: 'nfst',
-    name: 'National Fellowship for Higher Education of ST Students (NFST)',
-    shortName: 'NFST',
-    category: 'doctoral',
-    categoryLabel: 'Doctoral Fellowship',
+    id: 'demo-higher-ed',
+    name: 'Demo — Higher Education Scholarship (ST Students)',
+    shortName: 'HE Scholarship',
+    category: 'higher-education',
+    categoryLabel: 'Higher Education',
     badgeTone: 'blue',
-    statusLabel: 'DigiLocker Active',
+    statusLabel: 'Prototype Listing',
     statusActive: true,
+    demo: true,
     description:
-      'Financial support to ST scholars pursuing regular M.Phil and Ph.D. degrees in Sciences, Humanities, Engineering, and Social Sciences.',
+      'Sample configuration for an undergraduate/postgraduate scholarship with tuition assistance. Shown for prototype illustration only.',
     stats: [
-      { label: 'Total Slots', value: '750 / Year' },
-      { label: 'Stipend Rate', value: '₹37,000 - ₹42,000/mo', emphasize: true },
-      { label: 'Annual Contingency', value: '₹20,600 / yr' },
+      { label: 'Level', value: 'UG / PG (sample)' },
+      { label: 'Coverage', value: 'Tuition & maintenance (sample)', emphasize: true },
+      { label: 'Applicants', value: 'As per rules (demo)' },
     ],
-    applyHref: '#apply-nfst',
+    applyHref: '#apply-placeholder',
   },
   {
-    id: 'nos',
-    name: 'National Overseas Scholarship for ST Students (NOS)',
-    shortName: 'NOS',
-    category: 'overseas',
-    categoryLabel: 'Overseas Study',
-    badgeTone: 'purple',
-    statusLabel: 'Global Universities',
+    id: 'demo-fellowship',
+    name: 'Demo — Research Fellowship (ST Researchers)',
+    shortName: 'Research Fellowship',
+    category: 'fellowship',
+    categoryLabel: 'Fellowship',
+    badgeTone: 'blue',
+    statusLabel: 'Prototype Listing',
     statusActive: true,
+    demo: true,
     description:
-      'Provides financial assistance to selected tribal candidates for pursuing Master\'s and Ph.D. abroad in prestigious global institutions.',
+      'Sample configuration for a research fellowship supporting ST researchers in full-time M.Phil / Ph.D programmes. Illustration only.',
     stats: [
-      { label: 'Total Slots', value: '20 Candidates / Year' },
-      { label: 'Tuition Coverage', value: '100% Actual Fees', emphasize: true },
-      { label: 'Living Allowance', value: 'USD/GBP per norms' },
+      { label: 'Level', value: 'M.Phil / Ph.D (sample)' },
+      { label: 'Support', value: 'Fellowship + contingency (sample)', emphasize: true },
+      { label: 'Duration', value: 'Up to 5 years (sample)' },
     ],
-    applyHref: '#apply-nos',
+    applyHref: '#apply-placeholder',
   },
   {
-    id: 'topclass',
-    name: 'Top Class Education for Scheduled Tribe (ST) Students',
-    shortName: 'Top Class',
-    category: 'topclass',
-    categoryLabel: 'Premier Institutes',
-    badgeTone: 'green',
-    statusLabel: 'Undergraduate & PG',
-    description:
-      'Funding for meritorious ST students securing admissions in IITs, IIMs, NITs, AIIMS, and National Law Universities across India.',
-    stats: [
-      { label: 'Total Slots', value: '1000 Fresh / Year' },
-      { label: 'Full Tuition', value: 'Reimbursed Directly', emphasize: true },
-      { label: 'Living Expenses', value: '₹3,000 / month' },
-    ],
-    applyHref: '#apply-topclass',
-  },
-  {
-    id: 'research',
-    name: 'Post-Doctoral Tribal Research Fellowship & Grants',
-    shortName: 'Tribal Research',
-    category: 'research',
-    categoryLabel: 'Research Grants',
+    id: 'demo-post-matric',
+    name: 'Demo — Post-Matric Scholarship',
+    shortName: 'Post-Matric',
+    category: 'scholarship',
+    categoryLabel: 'Scholarship',
     badgeTone: 'amber',
-    statusLabel: 'Tribal Studies',
+    statusLabel: 'Prototype Listing',
+    statusActive: true,
+    demo: true,
     description:
-      'Tailored research grants targeting indigenous languages, folklore preservation, traditional tribal medicine, and forest rights legal research.',
+      'Sample configuration for a post-matric scholarship covering late school and college stages. Prototype illustration, not an official scheme detail.',
     stats: [
-      { label: 'Duration', value: 'Up to 3 Years' },
-      { label: 'Grant Value', value: '₹47,000/mo + HRA', emphasize: true },
-      { label: 'Eligibility', value: 'Ph.D in Relevant Field' },
+      { label: 'Level', value: 'Class 11 – PG (sample)' },
+      { label: 'Coverage', value: 'Tuition & maintenance (sample)', emphasize: true },
+      { label: 'Mode', value: 'Web-based application (demo)' },
     ],
-    applyHref: '#apply-research',
+    applyHref: '#apply-placeholder',
+  },
+  {
+    id: 'demo-research',
+    name: 'Demo — Tribal Research Grant',
+    shortName: 'Research Grant',
+    category: 'research',
+    categoryLabel: 'Research',
+    badgeTone: 'purple',
+    statusLabel: 'Prototype Listing',
+    statusActive: true,
+    demo: true,
+    description:
+      'Sample configuration for research grants focused on tribal studies and related themes. Prototype illustration only.',
+    stats: [
+      { label: 'Focus', value: 'Tribal studies (sample)' },
+      { label: 'Duration', value: 'Up to 3 years (sample)' },
+      { label: 'Deliverable', value: 'Report / publication (sample)' },
+    ],
+    applyHref: '#apply-placeholder',
+  },
+  {
+    id: 'demo-overseas',
+    name: 'Demo — Overseas Study Support',
+    shortName: 'Overseas Support',
+    category: 'overseas',
+    categoryLabel: 'Overseas',
+    badgeTone: 'green',
+    statusLabel: 'Prototype Listing',
+    statusActive: true,
+    demo: true,
+    description:
+      'Sample configuration for support to candidates pursuing study abroad. Prototype illustration, not an official programme.',
+    stats: [
+      { label: 'Level', value: 'PG / Ph.D abroad (sample)' },
+      { label: 'Support', value: 'Tuition + living (sample)', emphasize: true },
+      { label: 'Intake', value: 'As per notification (demo)' },
+    ],
+    applyHref: '#apply-placeholder',
   },
 ];
 
-export const SCHEME_FILTERS: { id: 'all' | 'doctoral' | 'topclass' | 'overseas'; label: string }[] = [
-  { id: 'all', label: 'All Schemes' },
-  { id: 'doctoral', label: 'Doctoral (NFST)' },
-  { id: 'topclass', label: 'Top Class (Graduation)' },
-  { id: 'overseas', label: 'Overseas Studies' },
+export const SCHEME_FILTERS: { id: Exclude<import('../types').SchemeCategory, 'all'> | 'all'; label: string }[] = [
+  { id: 'all', label: 'All' },
+  { id: 'scholarship', label: 'Scholarship' },
+  { id: 'fellowship', label: 'Fellowship' },
+  { id: 'higher-education', label: 'Higher Education' },
+  { id: 'research', label: 'Research' },
+  { id: 'overseas', label: 'Overseas' },
 ];
 
 export const WORKFLOW_STEPS: WorkflowStep[] = [
   {
     id: 1,
-    title: 'DigiLocker Integration',
-    detail:
-      'Applicant signs in via MeriPehchan. Verified Caste Certificate, Income Certificate & Marksheets are fetched directly from issuing State/Central authorities.',
-    note: '100% Cryptographically Signed',
+    stage: 'Stage 1',
+    label: 'Applicant Submission',
+    points: [
+      'Registration & Scheme Selection',
+      'Eligibility Pre-check',
+      'Application Submission',
+      'Document Upload',
+    ],
+    note: 'Applicant completes and submits the application docket.',
     tone: 'blue',
   },
   {
     id: 2,
-    title: 'AI Pre-Screening',
-    detail:
-      'Automated OCR parses scanned enclosures, checks duplicate submissions, and flags illegible documents or missing mandatory stamp seals for institutional ease.',
-    note: 'Parsing & Anomaly Detection Only',
+    stage: 'Stage 2',
+    label: 'AI-Assisted Processing',
+    points: [
+      'AI-Assisted Document Extraction',
+      'Completeness & Consistency Check',
+      'Preliminary Rule Evaluation',
+    ],
+    note: 'Assistance Only — AI never decides.',
     tone: 'saffron',
   },
   {
     id: 3,
-    title: 'University Nodal Officer',
-    detail:
-      'Designated Institutional Registrar / Dean reviews AI extraction against admission rolls, confirms Ph.D guide allocation, and signs off on verification docket.',
-    note: 'Mandatory Human Verification',
+    stage: 'Stage 3',
+    label: 'Human Verification',
+    points: [
+      'Officer Document Verification',
+      'Review of AI Extraction Results',
+    ],
+    note: 'Mandatory Human Verification.',
     tone: 'blue',
   },
   {
     id: 4,
-    title: 'Ministry Sanction & DBT',
-    detail:
-      'MoTA Competent Sanctioning Authority issues formal award letters. PFMS directly credits fellowship amount into student\'s Aadhaar-seeded bank account.',
-    note: 'Direct Benefit Transfer (Zero Leakage)',
+    stage: 'Stage 4',
+    label: 'Final Authorized Decision',
+    points: [
+      'Rule / Eligibility Evaluation',
+      'Final Authorized Decision',
+      'Audit Trail Recorded',
+    ],
+    note: 'Authorized officers remain responsible for final decisions.',
     tone: 'green',
   },
 ];
 
+export const AI_RESPONSIBILITY = {
+  title: 'AI-Assisted, Human-Verified',
+  text: 'AI assists with document classification, OCR/extraction, completeness checks and preliminary rule evaluation. Authorized officers review the results and remain responsible for verification and final decisions.',
+};
+
 export const HOW_TO_APPLY_PHASES: HowToApplyPhase[] = [
   {
-    phase: 'Phase 1',
-    title: 'One Time Registration (OTR) with DigiLocker / Aadhaar',
-    description:
-      'Use your active mobile number linked with Aadhaar. DigiLocker will populate demographic details and confirmed Scheduled Tribe certificate.',
+    phase: 'Step 1',
+    title: 'Create Account',
+    description: 'Register with your basic profile to start the scholarship/fellowship journey.',
   },
   {
-    phase: 'Phase 2',
-    title: 'Select Scheme & Upload Research Enclosures',
-    description:
-      'Specify University, Department, Ph.D registration details, guide nomination letter, and synopsis. Scanned copies are pre-checked by automated parser.',
+    phase: 'Step 2',
+    title: 'Explore Scheme & Check Eligibility',
+    description: 'Browse the sample schemes and run a preliminary eligibility pre-check.',
   },
   {
-    phase: 'Phase 3',
-    title: 'University Verification & State Level Countersign',
-    description:
-      'Your affiliated Institute Nodal Officer (INO) logs into the portal to review admission validity. System sends automated SMS alerts to candidates at each checkpoint.',
+    phase: 'Step 3',
+    title: 'Complete Application',
+    description: 'Fill in the application form for your chosen scheme with accurate details.',
   },
   {
-    phase: 'Phase 4',
-    title: 'Merit Publication & Monthly Claim Processing',
-    description:
-      'Once approved, download your official award letter. Monthly fellowship claims, HRA, and contingencies are claimed digitally through the university-integrated portal.',
+    phase: 'Step 4',
+    title: 'Upload Required Documents',
+    description: 'Upload the supporting documents required by the selected scheme.',
+  },
+  {
+    phase: 'Step 5',
+    title: 'Review & Submit',
+    description: 'Review all entered details and documents, then submit the application.',
+  },
+  {
+    phase: 'Step 6',
+    title: 'Track Verification & Decision',
+    description: 'Follow your application through verification and the final authorized decision.',
   },
 ];
 
+export const DEFICIENCY_NOTE =
+  'If required information is missing or inconsistent, a deficiency notice is raised and the applicant may submit the corrected or missing document (resubmission).';
+
 export const MINISTRY_STATS: MinistryStat[] = [
-  { id: 'stat-1', value: '750+', label: 'Fresh NFST Slots / Year', valueClass: 'text-gov-blue' },
-  { id: 'stat-2', value: '100%', label: 'Direct DBT into Bank Account', valueClass: 'text-gov-green' },
-  { id: 'stat-3', value: '650+', label: 'Verified Partner Universities', valueClass: 'text-gov-saffron' },
+  {
+    id: 'stat-1',
+    value: 'Unified Portal',
+    label: 'Schemes, applications & documents in one workflow',
+    valueClass: 'text-gov-blue',
+  },
+  {
+    id: 'stat-2',
+    value: 'AI-Assisted',
+    label: 'Assistive document extraction & completeness checks',
+    valueClass: 'text-gov-green',
+  },
+  {
+    id: 'stat-3',
+    value: 'Human-Verified',
+    label: 'Final decisions by authorized officers only',
+    valueClass: 'text-gov-saffron',
+  },
 ];
 
 export const CIRCULARS: CircularItem[] = [
   {
     id: 'circ-1',
-    title: 'Selection of Merit List - NFST Cycle 2025-26',
-    meta: 'Published: 24 Sep 2025 | Size: 1.4 MB',
+    title: 'DEMO: Scholarship application workflow preview',
+    meta: 'Prototype notice — not an official notification',
   },
   {
     id: 'circ-2',
-    title: 'Extension Notice: University Verification Portal Closing Date',
-    meta: 'Valid till: 31 Dec 2025 | Ref: MoTA/EDU/2025/11',
+    title: 'DEMO: Document verification workflow walkthrough',
+    meta: 'Prototype notice — not an official notification',
   },
   {
     id: 'circ-3',
-    title: 'Advisory for Canara Bank Scholar Portal Account Seeding',
-    meta: 'DBT Cell Guidelines | Size: 450 KB',
+    title: 'DEMO: Eligibility pre-check module overview',
+    meta: 'Prototype notice — not an official notification',
   },
   {
     id: 'circ-4',
-    title: 'Annexures & Proforma for Ph.D Scholars (HRA/Contingency Claim)',
-    meta: 'Standard MoTA Templates | Size: 620 KB',
+    title: 'DEMO: Deficiency & resubmission concept note',
+    meta: 'Prototype notice — not an official notification',
   },
 ];
 
 export const GOVERNMENT_INITIATIVES: GovernmentInitiative[] = [
-  { id: 'digital-india', name: 'Digital India', dotClass: 'bg-blue-600' },
-  { id: 'pm-janman', name: 'PM-JANMAN', dotClass: 'bg-amber-500' },
-  { id: 'dbt-bharat', name: 'DBT Bharat', dotClass: 'bg-emerald-600' },
-  { id: 'nsp', name: 'National Scholarship Portal (NSP)', dotClass: 'bg-indigo-600' },
-  { id: 'pfms', name: 'PFMS / Canara Bank', dotClass: 'bg-red-600' },
-  { id: 'mygov', name: 'MyGov India', dotClass: 'bg-orange-600' },
+  { id: 'digilocker', name: 'DigiLocker', dotClass: 'bg-blue-600', status: 'Future Integration' },
+  { id: 'doc-services', name: 'Document Services', dotClass: 'bg-slate-500', status: 'Planned' },
+  { id: 'notifications', name: 'Notifications', dotClass: 'bg-amber-500', status: 'Planned' },
+  { id: 'grievance', name: 'Grievance Desk', dotClass: 'bg-red-500', status: 'Planned' },
+  { id: 'ecosystem', name: 'Citizen Ecosystem Portals', dotClass: 'bg-emerald-600', status: 'Reference' },
 ];
 
 export const OFFICER_RESOURCES = [
-  'Download INO Verification User Manual (v4.2)',
-  'Canara Bank Portal Integration SOP',
-  'Guidelines for Continuation Certificate',
+  'Application Review Desk (Prototype)',
+  'AI Extraction Review Guide (Sample)',
+  'Rules Configuration Overview (Draft)',
 ];
 
-export const LEADERS = [
-  {
-    id: 'minister',
-    name: 'Sh. Jual Oram',
-    role: 'Hon\'ble Union Minister',
-    department: 'Ministry of Tribal Affairs',
-    frameClass: 'border-2 border-amber-500',
-  },
-  {
-    id: 'minister-state',
-    name: 'Sh. Durgadas Uikey',
-    role: 'Hon\'ble Minister of State',
-    department: 'Ministry of Tribal Affairs',
-    frameClass: 'border-2 border-slate-400',
-  },
-];
-
-export { SITE };
+export const ELIGIBILITY_COPY = {
+  eyebrow: 'Prototype Module',
+  title: 'Check Eligibility Before You Apply',
+  description:
+    'Get a preliminary assessment based on the scheme\u2019s configured criteria, comparing your profile against sample parameters before you apply.',
+  disclaimer:
+    'This is not the final eligibility decision. Final eligibility is subject to document verification and authorized review.',
+  featurePoints: ['Profile-based pre-check', 'Per-scheme criteria summary', 'Preliminary outcome only'],
+  actionLabel: 'Check Eligibility',
+  actionHint: 'UI placeholder for this milestone — full tool opens in a later phase.',
+} as const;

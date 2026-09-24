@@ -1,4 +1,4 @@
-import { LEADERS } from '../../data/mockData';
+import { APPLICATION_GLANCE } from '../../data/mockData';
 import { SECTION_IDS } from '../../lib/constants';
 import { Button } from '../ui/Button';
 
@@ -18,71 +18,76 @@ export function HeroBanner() {
         <div className="lg:col-span-8 space-y-4">
           <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 backdrop-blur rounded-full text-xs text-amber-300 border border-amber-400/40">
             <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
-              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+              <path
+                clipRule="evenodd"
+                d="M10 1.944A11.954 11.954 0 012.166 5H2a1 1 0 00-1 1v4a1 1 0 001 1h1a1 1 0 001-1V6h.941a13.28 13.28 0 003.412 8.315L9 15.5a1 1 0 001.25 1.5l1.75-.5a1 1 0 00.75-1V15l.5-1a1 1 0 001.5 1v1a1 1 0 001 1v1a1 1 0 001 1c.552 0 1 .724 1 2a1 1 0 001 1h3a1 1 0 001-1v-1a1 1 0 00-1-1h-3a1 1 0 00-1-1v-1a1 1 0 00-1-1h-1a1 1 0 00-1-1v-1a1 1 0 00-1-1h-1a1 1 0 000-2h1a1 1 0 001-1v-1a1 1 0 011-1h1a1 1 0 011-1h1a1 1 0 001-1h1a1 1 0 001-1V6a1 1 0 00-1-1H10z"
+                fillRule="evenodd"
+              />
             </svg>
-            Janjatiya Gaurav &amp; Higher Education Vision
+            AI-Enabled • Human-Verified Workflow
           </div>
 
           <h2 className="text-2xl md:text-4xl font-extrabold tracking-tight leading-tight">
-            JANJATIYA GARIMA UTSAV 2026
+            Scholarship &amp; Fellowship Management Portal
           </h2>
 
           <div className="text-lg md:text-xl font-medium text-amber-200">
-            Empowering Tribal Youth Through Higher Education &amp; Research Fellowships
+            A Unified Digital Platform for Tribal Students &amp; Researchers
           </div>
 
           <p className="text-slate-200 text-sm md:text-base leading-relaxed max-w-2xl">
-            A unified, transparent portal offering seamless DigiLocker integration, automated
-            document parsing, and institutional multi-tier verification for NFST, Top-Class
-            Education, and Overseas Fellowships.
+            A unified digital platform for discovering schemes, checking eligibility, submitting
+            applications, managing documents, and tracking application verification and decisions.
           </p>
 
           <div className="pt-2 flex flex-wrap gap-3">
             <Button variant="accent" size="lg" href={SECTION_IDS.SCHEMES}>
-              Explore Central Schemes
+              Explore Scholarships &amp; Fellowships
               <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M14 5l7 7m0 0l-7 7m7-7H3" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </Button>
-            <Button variant="ghost" size="lg" href={SECTION_IDS.TRACK}>
-              Check Application Status
+            <Button variant="ghost" size="lg" href={SECTION_IDS.ELIGIBILITY}>
+              Check Eligibility
             </Button>
-            <Button variant="emerald" size="lg" href={SECTION_IDS.VERIFICATION}>
-              <svg className="w-4 h-4 text-emerald-300" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
-                <path
-                  clipRule="evenodd"
-                  d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                  fillRule="evenodd"
-                />
-              </svg>
-              AI-Assisted Workflow Info
+            <Button variant="ghost" size="lg" href={SECTION_IDS.TRACK}>
+              Track Application
+            </Button>
+            <Button variant="emerald" size="lg" href={SECTION_IDS.OFFICER_ACCESS}>
+              Login / Register
             </Button>
           </div>
+
+          <p className="text-[11px] text-slate-300 italic pt-1">
+            Prototype interface — sample content pending final government/state review.
+          </p>
         </div>
 
         <div className="lg:col-span-4 bg-white/95 text-slate-900 p-4 rounded-lg shadow-lg border border-slate-200">
-          <div className="text-xs uppercase tracking-wider font-bold text-gov-blue border-b pb-1.5 mb-3 text-center">
-            Leadership &amp; Governance
+          <div className="flex items-center justify-between border-b pb-1.5 mb-2">
+            <span className="text-xs uppercase tracking-wider font-bold text-gov-blue">
+              Application at a Glance
+            </span>
+            <span className="text-[10px] font-bold text-amber-800 bg-amber-100 border border-amber-300 px-1.5 py-0.5 rounded">
+              Prototype
+            </span>
           </div>
-          <div className="grid grid-cols-2 gap-3 text-center">
-            {LEADERS.map((leader) => (
-              <div key={leader.id} className="flex flex-col items-center">
-                <div
-                  className={`w-20 h-24 bg-slate-200 ${leader.frameClass} rounded p-1 mb-1.5 shadow-sm flex items-center justify-center overflow-hidden`}
-                >
-                  <svg className="w-14 h-14 text-slate-400" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
-                  </svg>
-                </div>
-                <div className="text-xs font-bold text-slate-900 leading-tight">{leader.name}</div>
-                <div className="text-[11px] text-gov-blue font-semibold">{leader.role}</div>
-                <div className="text-[10px] text-slate-600">{leader.department}</div>
-              </div>
+          <p className="text-[11px] text-slate-500 mb-2">
+            How the portal works — from discovery to decision.
+          </p>
+          <ol className="divide-y divide-slate-100">
+            {APPLICATION_GLANCE.map((item) => (
+              <li key={item.id} className="flex items-center gap-2.5 py-1.5">
+                <span className="w-7 h-7 rounded-full bg-gov-blue text-white text-[11px] font-bold flex items-center justify-center flex-shrink-0">
+                  {item.number}
+                </span>
+                <span className="text-xs font-semibold text-slate-800">{item.title}</span>
+              </li>
             ))}
-          </div>
-          <div className="mt-3 pt-2 border-t border-slate-200 text-center">
+          </ol>
+          <div className="mt-2 pt-2 border-t border-slate-200 text-center">
             <span className="text-[11px] text-slate-600 italic">
-              &quot;Sabka Saath, Sabka Vikas, Sabka Vishwas, Sabka Prayas&quot;
+              AI assists. Authorized officers verify and decide.
             </span>
           </div>
         </div>

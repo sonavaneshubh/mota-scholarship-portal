@@ -70,7 +70,7 @@ function TrackInput() {
   return (
     <div className="mt-2.5 flex items-center gap-1">
       <input
-        aria-label="Enter Application Number"
+        aria-label="Enter Application ID"
         className="w-full text-xs py-1 px-2 border rounded border-slate-300 focus:ring-1 focus:ring-gov-green focus:border-gov-green"
         placeholder="Application ID"
         type="text"
@@ -92,7 +92,7 @@ export function QuickAccessTiles() {
         {QUICK_ACTIONS.map((action: QuickAction) => (
           <div
             key={action.id}
-            id={action.id === 'track' ? 'track-status' : undefined}
+            id={action.anchorId}
             className={`bg-white border-t-4 ${accentTopClass[action.accent]} rounded shadow-md p-4 hover:shadow-lg transition`}
           >
             <div className="flex items-center gap-3">
