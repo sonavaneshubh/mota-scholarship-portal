@@ -1,0 +1,70 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply font-sans text-slate-800 bg-gov-slate-bg antialiased;
+  }
+
+  :focus-visible {
+    outline: 2px solid #c2610c;
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  /* 4px Indian tricolor strip (Saffron / White / Green) */
+  .tricolor-strip {
+    background: linear-gradient(
+      90deg,
+      #ff9933 33.33%,
+      #ffffff 33.33%,
+      #ffffff 66.66%,
+      #138808 66.66%
+    );
+    height: 4px;
+  }
+
+  .gov-link {
+    color: #0b3b75;
+    text-decoration: underline;
+  }
+
+  .gov-link:hover {
+    color: #c2610c;
+  }
+}
+
+/* Announcement ticker marquee — two copies translated by -50% */
+.marquee-track {
+  display: flex;
+  width: max-content;
+  animation: marquee 45s linear infinite;
+}
+
+.marquee-track:hover {
+  animation-play-state: paused;
+}
+
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marquee-track {
+    animation: none;
+  }
+  html {
+    scroll-behavior: auto;
+  }
+}

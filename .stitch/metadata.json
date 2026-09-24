@@ -1,0 +1,13 @@
+{
+  "projectId": "11437332502158775876",
+  "projectName": "Tribal Scholarship Management Portal",
+  "projectType": "TEXT_TO_UI_PRO",
+  "canonicalScreenId": "125adf3111df4fcb84d125927bcc6245",
+  "canonicalScreenName": "MoTA - AI-Enabled Scholarship & Fellowship Management System (Home)",
+  "canonicalScreenDims": { "width": 2560, "height": 6396, "deviceType": "DESKTOP" },
+  "designSystemAsset": "assets/6dc4c9bb468e42d7a69aaff28524fbde",
+  "designSystemName": "Rashtriya Janjatiya Seva",
+  "sourceHtmlUrl": "https://contribution.usercontent.google.com/download?c=CgthaWRhX2NvZGVmeBJ8Eh1hcHBfY29tcGFuaW9uX2dlbmVyYXRlZF9maWxlcxpbCiVodG1sXzAwMDY1YzM3YWJhYWNjZjMwNzNhZTRhMjFlMThjMDVjEgsSBxC88Lu2sh8YAZIBJAoKcHJvamVjdF9pZBIWQhQxMTQzNzMzMjUwMjE1ODc3NTg3Ng&filename=&opi=89354086",
+  "status": "READ_ONLY_REFERENCE — the Stitch design is the visual source of truth and must NOT be modified",
+  "conversionRule": "STITCH DESIGN -> REACT IMPLEMENTATION"
+}
