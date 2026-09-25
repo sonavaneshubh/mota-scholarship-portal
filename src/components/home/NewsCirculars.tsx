@@ -5,7 +5,7 @@ import { Badge } from '../ui/Badge';
 
 export function NewsCirculars() {
   return (
-    <div className="lg:col-span-4 bg-white border border-slate-200 rounded-lg p-4 sm:p-5 shadow-sm" id="notices">
+    <div className="lg:col-span-4 bg-white border border-slate-200 rounded-lg p-5 shadow-sm" id="notices">
       <div className="flex items-center justify-between border-b border-slate-200 pb-2 mb-3">
         <h3 className="text-sm font-bold text-gov-blue-dark uppercase tracking-wide flex items-center gap-1.5">
           <span className="w-2.5 h-2.5 bg-red-600 rounded-full animate-ping" />
@@ -31,7 +31,6 @@ export function NewsCirculars() {
           </li>
         ))}
       </ul>
-
     </div>
   );
 }

@@ -1,39 +1,20 @@
-import { MINISTRY_STATS } from '../../data/mockData';
 import { Link } from 'react-router-dom';
+import { MINISTRY_STATS } from '../../data/mockData';
 import { ROUTES } from '../../lib/constants';
 
 export function AboutMinistry() {
   return (
-    <div className="lg:col-span-8 bg-white border border-slate-200 rounded-lg p-4 sm:p-6 shadow-sm">
+    <div className="lg:col-span-8 bg-white border border-slate-200 rounded-lg p-6 shadow-sm">
       <div className="border-b border-slate-200 pb-3 mb-4">
         <span className="text-xs font-bold text-gov-saffron uppercase tracking-wider">
-          About MoTA
-        </span>
-        <h2 className="text-xl font-bold text-gov-blue-dark">Ministry of Tribal Affairs</h2>
-      </div>
-
-      <p className="text-sm text-slate-700 leading-relaxed mb-5">
-        The Ministry of Tribal Affairs (MoTA) was set up in 1999 to provide a more focused approach
-        towards the integrated socio-economic development of Scheduled Tribes (STs).
-      </p>
-
-      <Link
-        to={ROUTES.aboutMota}
-        className="inline-flex items-center gap-1 text-sm font-bold text-gov-blue hover:text-gov-saffron"
-      >
-        Read More <span aria-hidden="true">→</span>
-      </Link>
-
-      <div className="border-b border-slate-200 pb-3 mb-4 mt-6">
-        <span className="text-[11px] sm:text-xs font-bold text-gov-saffron uppercase tracking-wider">
           About the Portal &amp; its Purpose
         </span>
-        <h2 className="text-lg sm:text-xl font-bold text-gov-blue-dark">
+        <h2 className="text-xl font-bold text-gov-blue-dark">
           About the Ministry of Tribal Affairs (MoTA)
         </h2>
       </div>
 
-      <p className="text-[13px] sm:text-sm text-slate-700 leading-relaxed mb-4">
+      <p className="text-sm text-slate-700 leading-relaxed mb-4">
         The Ministry was set up in 1999 after the bifurcation of the Ministry of Social Justice and
         Empowerment with the objective of providing a more focused approach towards integrated
         socio-economic development of the Scheduled Tribes (STs). Its programmes are intended to
@@ -42,29 +23,36 @@ export function AboutMinistry() {
       </p>
 
       <div className="bg-blue-50/70 border-l-4 border-gov-blue p-4 rounded-r mb-4">
-        <h3 className="text-[13px] sm:text-sm font-bold text-gov-blue-dark mb-1">
+        <h3 className="text-sm font-bold text-gov-blue-dark mb-1">
           About the Scholarship &amp; Fellowship Management Portal
         </h3>
-        <p className="text-xs sm:text-xs text-slate-700 leading-relaxed">
+        <p className="text-xs text-slate-700 leading-relaxed">
           This proposed platform aims to provide a unified digital workflow for scheme discovery,
           eligibility pre-check, application submission, document management, AI-assisted
           extraction, officer verification, status tracking, and the final decision workflow. AI is
           used only in an assistive role; authorized officers remain responsible for verification
           and final decisions.
         </p>
-        <p className="text-[10px] sm:text-[11px] text-slate-500 italic mt-2">
+        <p className="text-[11px] text-slate-500 italic mt-2">
           Prototype interface — this is not yet a deployed MoTA system.
         </p>
       </div>
 
-      <div className="grid grid-cols-3 gap-2 sm:gap-3 text-center pt-2">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-center">
         {MINISTRY_STATS.map((stat) => (
-          <div key={stat.id} className="bg-slate-50 border border-slate-200 rounded p-2 sm:p-2.5">
-            <div className={`text-[13px] md:text-lg font-black ${stat.valueClass}`}>{stat.value}</div>
-            <div className="text-[10px] sm:text-[11px] text-slate-600 font-medium leading-tight">{stat.label}</div>
+          <div key={stat.id} className="bg-slate-50 border border-slate-200 rounded p-2.5">
+            <div className={`text-sm md:text-lg font-black ${stat.valueClass}`}>{stat.value}</div>
+            <div className="text-[11px] text-slate-600 font-medium">{stat.label}</div>
           </div>
         ))}
       </div>
+
+      <Link
+        to={ROUTES.aboutMota}
+        className="inline-flex items-center gap-1 text-sm font-bold text-gov-blue hover:text-gov-saffron mt-4"
+      >
+        Read More <span aria-hidden="true">→</span>
+      </Link>
     </div>
   );
 }
