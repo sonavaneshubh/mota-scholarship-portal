@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FormEvent, RefObject } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useApplicantAuth } from '../../context/useApplicantAuth';
+import { useAdminAuth } from '../../context/useAdminAuth';
 import { ROUTES } from '../../lib/constants';
 import type { HomeAuthMode, HomeAuthNavigationState } from '../../types';
 import { Button } from '../ui/Button';
@@ -275,6 +276,9 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
   const navigate = useNavigate();
   const { signIn, signUp, signOut, resetPassword } = useApplicantAuth();
   const requestedMode = getRequestedHomeAuthMode(location.state, location.pathname);
+  const { signIn } = useApplicantAuth();
+  const { signIn: signInAdmin } = useAdminAuth();
+  const requestedMode = getRequestedHomeAuthMode(location.state);
   const [mode, setMode] = useState<HomeAuthMode>(() => requestedMode ?? 'applicant');
   const [loginUsername, setLoginUsername] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
@@ -287,6 +291,7 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
   const [registrationErrors, setRegistrationErrors] = useState<RegistrationErrors>({});
   const [status, setStatus] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const loginUsernameRef = useRef<HTMLInputElement>(null);
   const loginPasswordRef = useRef<HTMLInputElement>(null);
@@ -444,6 +449,25 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
           setStatus('This account is not authorized for admin access.');
           return;
         }
+    if (isAdmin) {
+      setIsAuthenticating(true);
+      setStatus('Checking admin credentials…');
+
+      try {
+        const result = await signInAdmin(loginUsername, loginPassword, true);
+
+        if (!result.ok) {
+          setStatus(result.message ?? 'The admin ID or password is incorrect.');
+          return;
+        }
+
+        navigate(ROUTES.admin.dashboard);
+      } finally {
+        setIsAuthenticating(false);
+      }
+
+      return;
+    }
 
         setStatus('Admin identity verified. The admin workspace will be connected in a later phase.');
         return;
@@ -936,6 +960,8 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
 
           <Button className="w-full justify-center rounded" disabled={isSubmitting} size="md" type="submit">
             {isSubmitting ? 'Please wait…' : loginLabel}
+          <Button className="w-full justify-center rounded" disabled={isAuthenticating} size="md" type="submit">
+            {isAuthenticating ? 'Signing in…' : loginLabel}
           </Button>
 
           <div className="flex flex-wrap items-center justify-between gap-1 text-[11px]">

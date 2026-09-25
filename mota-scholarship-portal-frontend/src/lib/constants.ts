@@ -19,7 +19,6 @@ export const SITE = {
   sealMotto: 'सत्यमेव जयते',
 } as const;
 
-/** Future route groups — declared now, implemented in later milestones. */
 export const ROUTES = {
   home: '/',
   aboutMota: '/about-mota',
@@ -49,13 +48,18 @@ export const ROUTES = {
     dashboard: '/admin/dashboard',
     applications: '/admin/applications',
     applicationDetail: '/admin/applications/:id',
-    documents: '/admin/documents',
+    documentVerification: '/admin/document-verification',
+    scholarships: '/admin/scholarships',
+    reports: '/admin/reports',
+    users: '/admin/users',
+    notifications: '/admin/notifications',
+    settings: '/admin/settings',
+    documents: '/admin/document-verification',
     aiVerification: '/admin/ai-verification',
     rules: '/admin/rules',
     deficiencies: '/admin/deficiencies',
     verification: '/admin/verification',
     decisions: '/admin/decisions',
-    reports: '/admin/reports',
     audit: '/admin/audit',
   },
 } as const;
@@ -65,11 +69,15 @@ export function applicantSchemePath(schemeId: string) {
 }
 
 export function applicantApplicationPath(applicationId: string) {
-  return `${ROUTES.applicant.applications}/${encodeURIComponent(applicationId)}`;
+  return ROUTES.applicant.application.replace(':id', encodeURIComponent(applicationId));
 }
 
 export function applicantStatusPath(applicationId: string) {
   return `${ROUTES.applicant.status}/${encodeURIComponent(applicationId)}`;
+}
+
+export function adminApplicationPath(applicationId: string) {
+  return `${ROUTES.admin.applications}/${encodeURIComponent(applicationId)}`;
 }
 
 /** In-page anchors used by the Home navigation. */
