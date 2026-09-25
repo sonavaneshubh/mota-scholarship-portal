@@ -42,6 +42,10 @@ interface CaptchaFieldsProps {
   onRefresh: () => void;
 }
 
+interface HomeLoginCardProps {
+  onModeChange?: (mode: HomeAuthMode) => void;
+}
+
 const captchaAlphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const usernamePattern = /^[A-Za-z][A-Za-z0-9._]{3,31}$/;
@@ -256,7 +260,7 @@ function CaptchaFields({
   );
 }
 
-export function HomeLoginCard() {
+export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
   const location = useLocation();
   const navigate = useNavigate();
   const { signIn } = useApplicantAuth();
@@ -290,6 +294,18 @@ export function HomeLoginCard() {
   const usernameLabel = isAdmin ? 'Admin Username / Email' : 'Username / Email';
   const loginLabel = isAdmin ? 'Admin Login' : 'Login Here';
   const passwordStrength = getPasswordStrength(registrationValues.password);
+  const showUsernameGuidance =
+    registrationValues.username.trim().length > 0 && Boolean(getRegistrationUsernameError(registrationValues.username));
+  const showPasswordGuidance = registrationValues.password.length > 0 && passwordStrength.score < 4;
+  const cardClassName = `bg-white/95 text-slate-900 rounded-lg shadow-lg border border-slate-200 scroll-mt-24 ${
+    isRegistration
+      ? 'p-3 lg:col-span-6 lg:h-auto lg:overflow-visible lg:flex lg:flex-col'
+      : 'p-4 lg:col-span-4 lg:h-[34rem] lg:overflow-hidden lg:flex lg:flex-col'
+  }`;
+
+  useEffect(() => {
+    onModeChange?.(mode);
+  }, [mode, onModeChange]);
 
   const resetCard = useCallback((nextMode: HomeAuthMode) => {
     setMode(nextMode);
@@ -473,10 +489,10 @@ export function HomeLoginCard() {
   return (
     <div
       id="home-login"
-      className="lg:col-span-4 lg:h-[34rem] lg:overflow-hidden lg:flex lg:flex-col bg-white/95 text-slate-900 p-4 rounded-lg shadow-lg border border-slate-200 scroll-mt-24"
+      className={cardClassName}
       data-purpose="home-login-card"
     >
-      <div className="flex items-center justify-between gap-3 border-b border-slate-200 pb-1.5 mb-3 lg:shrink-0">
+      <div className="flex items-center justify-between gap-3 border-b border-slate-200 pb-1.5 mb-2 lg:shrink-0">
         <h3
           ref={headingRef}
           id="home-authentication-card-heading"
@@ -492,12 +508,12 @@ export function HomeLoginCard() {
 
       {isRegistration ? (
         <form
-          className="space-y-3 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-1"
+          className="grid gap-2 md:grid-cols-2 lg:min-h-0 lg:overflow-visible"
           aria-labelledby="home-authentication-card-heading"
           noValidate
           onSubmit={handleRegistrationSubmit}
         >
-          <p className="rounded border border-amber-300 bg-amber-50 px-2.5 py-2 text-[11px] leading-relaxed text-amber-900">
+          <p className="rounded border border-amber-300 bg-amber-50 px-2 py-1.5 text-[10px] leading-snug text-amber-900 md:col-span-2">
             This frontend scaffold cannot create accounts or check usernames. It cannot send email or mobile verification. Use test data only.
           </p>
 
@@ -541,17 +557,19 @@ export function HomeLoginCard() {
               autoCapitalize="none"
               spellCheck={false}
               required
-              aria-invalid={Boolean(registrationErrors.username)}
+              aria-invalid={Boolean(registrationErrors.username) || showUsernameGuidance}
               aria-describedby={describeIds(
-                'home-registration-username-help',
+                showUsernameGuidance ? 'home-registration-username-help' : undefined,
                 registrationErrors.username ? 'home-registration-username-error' : undefined,
               )}
               onChange={(event) => updateRegistrationField('username', event.target.value)}
-              className={getInputClass(Boolean(registrationErrors.username))}
+              className={getInputClass(Boolean(registrationErrors.username) || showUsernameGuidance)}
             />
-            <p className="mt-1 text-[11px] leading-relaxed text-slate-500" id="home-registration-username-help">
-              Use 4–32 characters. The registration service will check availability after it connects.
-            </p>
+            {showUsernameGuidance ? (
+              <p className="mt-1 text-[11px] leading-relaxed text-slate-500" id="home-registration-username-help">
+                Use 4–32 characters. The registration service will check availability after it connects.
+              </p>
+            ) : null}
             {registrationErrors.username ? (
               <p className="mt-1 text-[11px] font-medium text-red-700" id="home-registration-username-error">
                 {registrationErrors.username}
@@ -573,13 +591,13 @@ export function HomeLoginCard() {
                 placeholder="Create a secure password"
                 autoComplete="new-password"
                 required
-                aria-invalid={Boolean(registrationErrors.password)}
+                aria-invalid={Boolean(registrationErrors.password) || showPasswordGuidance}
                 aria-describedby={describeIds(
-                  'home-registration-password-help',
+                  showPasswordGuidance ? 'home-registration-password-help' : undefined,
                   registrationErrors.password ? 'home-registration-password-error' : undefined,
                 )}
                 onChange={(event) => updateRegistrationField('password', event.target.value)}
-                className={getInputClass(Boolean(registrationErrors.password), 'pr-20')}
+                className={getInputClass(Boolean(registrationErrors.password) || showPasswordGuidance, 'pr-20')}
               />
               <button
                 type="button"
@@ -591,29 +609,31 @@ export function HomeLoginCard() {
                 {showRegistrationPassword ? 'Hide' : 'Show'}
               </button>
             </div>
-            <div className="mt-1.5" aria-live="polite">
-              <div className="flex items-center justify-between text-[11px] font-semibold">
-                <span className={passwordStrength.textClass}>{passwordStrength.label}</span>
-                <span className="text-slate-500">{passwordStrength.score}/4</span>
-              </div>
-              <div
-                className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-200"
-                role="meter"
-                aria-label="Password strength"
-                aria-valuemin={0}
-                aria-valuemax={4}
-                aria-valuenow={passwordStrength.score}
-                aria-valuetext={passwordStrength.label}
-              >
+            {showPasswordGuidance ? (
+              <div className="mt-1.5" aria-live="polite">
+                <div className="flex items-center justify-between text-[11px] font-semibold">
+                  <span className={passwordStrength.textClass}>{passwordStrength.label}</span>
+                  <span className="text-slate-500">{passwordStrength.score}/4</span>
+                </div>
                 <div
-                  className={`h-full rounded-full ${passwordStrength.barClass}`}
-                  style={{ width: `${passwordStrength.score * 25}%` }}
-                />
+                  className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-200"
+                  role="meter"
+                  aria-label="Password strength"
+                  aria-valuemin={0}
+                  aria-valuemax={4}
+                  aria-valuenow={passwordStrength.score}
+                  aria-valuetext={passwordStrength.label}
+                >
+                  <div
+                    className={`h-full rounded-full ${passwordStrength.barClass}`}
+                    style={{ width: `${passwordStrength.score * 25}%` }}
+                  />
+                </div>
+                <p className="mt-1 text-[11px] leading-relaxed text-slate-500" id="home-registration-password-help">
+                  Use 10 or more characters. Include uppercase, lowercase, number, and symbol.
+                </p>
               </div>
-              <p className="mt-1 text-[11px] leading-relaxed text-slate-500" id="home-registration-password-help">
-                Use 10 or more characters. Include uppercase, lowercase, number, and symbol.
-              </p>
-            </div>
+            ) : null}
             {registrationErrors.password ? (
               <p className="mt-1 text-[11px] font-medium text-red-700" id="home-registration-password-error">
                 {registrationErrors.password}
@@ -724,24 +744,26 @@ export function HomeLoginCard() {
             ) : null}
           </div>
 
-          <CaptchaFields
-            code={captchaCode}
-            value={captchaInput}
-            codeId="home-registration-captcha-code"
-            inputId="home-registration-captcha"
-            error={registrationErrors.captcha}
-            inputRef={captchaRef}
-            onChange={updateCaptcha}
-            onRefresh={refreshCaptcha}
-          />
+          <div className="grid gap-3 md:col-span-2 md:grid-cols-2">
+            <CaptchaFields
+              code={captchaCode}
+              value={captchaInput}
+              codeId="home-registration-captcha-code"
+              inputId="home-registration-captcha"
+              error={registrationErrors.captcha}
+              inputRef={captchaRef}
+              onChange={updateCaptcha}
+              onRefresh={refreshCaptcha}
+            />
+          </div>
 
           {status ? (
-            <p className="rounded border border-blue-200 bg-blue-50 px-2.5 py-2 text-[11px] leading-relaxed text-blue-900" role="status">
+            <p className="rounded border border-blue-200 bg-blue-50 px-2.5 py-2 text-[11px] leading-relaxed text-blue-900 md:col-span-2" role="status">
               {status}
             </p>
           ) : null}
 
-          <Button className="w-full justify-center rounded" size="md" type="submit">
+          <Button className="w-full justify-center rounded md:col-span-2" size="md" type="submit">
             Register
           </Button>
         </form>
@@ -842,11 +864,11 @@ export function HomeLoginCard() {
         </form>
       )}
 
-      <div className="mt-4 border-t border-slate-200 pt-3 lg:shrink-0">
+      <div className={`${isRegistration ? 'mt-2 pt-2' : 'mt-4 pt-3'} border-t border-slate-200 lg:shrink-0`}>
         {isRegistration ? (
-          <div className="space-y-2">
+          <div className={isRegistration ? 'space-y-1.5' : 'space-y-2'}>
             <p className="text-center text-[11px] font-medium text-slate-600">Already have an account?</p>
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
+            <div className={`grid gap-2 sm:grid-cols-2${isRegistration ? '' : ' lg:grid-cols-1'}`}>
               <Button
                 className="w-full justify-center rounded"
                 onClick={() => switchMode('applicant')}

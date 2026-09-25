@@ -1,8 +1,29 @@
+import { useCallback, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { ROUTES, SECTION_IDS } from '../../lib/constants';
+import type { HomeAuthMode, HomeAuthNavigationState } from '../../types';
 import { HomeLoginCard } from './HomeLoginCard';
 import { Button } from '../ui/Button';
 
+function getInitialAuthMode(state: unknown): HomeAuthMode {
+  if (typeof state !== 'object' || state === null) {
+    return 'applicant';
+  }
+
+  const requestedMode = (state as Partial<HomeAuthNavigationState>).homeAuthMode;
+  return requestedMode === 'applicant' || requestedMode === 'admin' || requestedMode === 'registration'
+    ? requestedMode
+    : 'applicant';
+}
+
 export function HeroBanner() {
+  const location = useLocation();
+  const [authMode, setAuthMode] = useState(() => getInitialAuthMode(location.state));
+  const isRegistration = authMode === 'registration';
+  const handleAuthModeChange = useCallback((mode: HomeAuthMode) => {
+    setAuthMode(mode);
+  }, []);
+
   return (
     <section
       className="relative bg-gradient-to-r from-gov-blue-dark via-gov-blue to-slate-900 text-white py-6 md:py-8 px-4 overflow-hidden border-b-4 border-amber-500"
@@ -14,8 +35,10 @@ export function HeroBanner() {
         style={{ backgroundImage: 'radial-gradient(#ffffff 1px, transparent 1px)', backgroundSize: '16px 16px' }}
       />
 
-      <div className="max-w-7xl mx-auto relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-        <div className="lg:col-span-8 space-y-4">
+      <div
+        className={`max-w-7xl mx-auto relative z-10 grid grid-cols-1 lg:grid-cols-12 ${isRegistration ? 'gap-4 lg:items-start' : 'gap-8 lg:items-center'}`}
+      >
+        <div className={`${isRegistration ? 'lg:col-span-6' : 'lg:col-span-8'} space-y-4`}>
           <div className="inline-flex items-center gap-2 px-2.5 md:px-3 py-1 bg-white/10 backdrop-blur rounded-full text-[11px] md:text-xs text-amber-300 border border-amber-400/40">
             <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
               <path
@@ -68,7 +91,7 @@ export function HeroBanner() {
           </p>
         </div>
 
-        <HomeLoginCard />
+        <HomeLoginCard onModeChange={handleAuthModeChange} />
       </div>
     </section>
   );
