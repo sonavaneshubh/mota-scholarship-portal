@@ -1,4 +1,24 @@
+import { Link } from 'react-router-dom';
 import { FOOTER_LINK_COLUMNS, FOOTER_SECURITY_SEALS, SITE } from '../../lib/constants';
+import type { FooterLink } from '../../types';
+
+function renderFooterLink(link: FooterLink) {
+  const className = 'hover:text-amber-400 transition';
+
+  if (link.href.startsWith('/')) {
+    return (
+      <Link className={className} to={link.href}>
+        {link.label}
+      </Link>
+    );
+  }
+
+  return (
+    <a className={className} href={link.href}>
+      {link.label}
+    </a>
+  );
+}
 
 export function Footer() {
   return (
@@ -26,11 +46,7 @@ export function Footer() {
             </h4>
             <ul className="space-y-1.5 text-xs text-slate-300">
               {column.links.map((link) => (
-                <li key={link.label}>
-                  <a className="hover:text-amber-400 transition" href={link.href}>
-                    {link.label}
-                  </a>
-                </li>
+                <li key={link.label}>{renderFooterLink(link)}</li>
               ))}
             </ul>
           </div>

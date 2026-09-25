@@ -73,13 +73,15 @@ function getInputClass(hasError: boolean, extraClass = '') {
   }`;
 }
 
-function getRequestedHomeAuthMode(state: unknown) {
+function getRequestedHomeAuthMode(state: unknown): HomeAuthMode | null {
   if (typeof state !== 'object' || state === null) {
     return null;
   }
 
   const requestedMode = (state as Partial<HomeAuthNavigationState>).homeAuthMode;
-  return requestedMode === 'registration' ? requestedMode : null;
+  return requestedMode === 'applicant' || requestedMode === 'admin' || requestedMode === 'registration'
+    ? requestedMode
+    : null;
 }
 
 function getLoginUsernameError(username: string) {
@@ -319,14 +321,14 @@ export function HomeLoginCard() {
   useEffect(() => {
     if (
       location.pathname !== ROUTES.home ||
-      requestedMode !== 'registration' ||
+      !requestedMode ||
       handledLocationKeyRef.current === location.key
     ) {
       return;
     }
 
     handledLocationKeyRef.current = location.key;
-    resetCard('registration');
+    resetCard(requestedMode);
     focusCardHeading(true);
   }, [focusCardHeading, location.key, location.pathname, requestedMode, resetCard]);
 

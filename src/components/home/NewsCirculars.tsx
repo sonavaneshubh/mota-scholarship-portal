@@ -22,9 +22,9 @@ export function NewsCirculars() {
                 DEMO
               </span>
               <div>
-                <a className="font-medium text-gov-blue hover:underline" href="#notices">
+                <Link className="font-medium text-gov-blue hover:underline" to={ROUTES.guidelinesNotices}>
                   {item.title}
-                </a>
+                </Link>
                 <div className="text-[10px] text-slate-500 mt-0.5">{item.meta}</div>
               </div>
             </div>

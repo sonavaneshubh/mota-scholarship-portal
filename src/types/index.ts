@@ -24,7 +24,7 @@ export interface NavigationItem {
 export type HomeAuthMode = 'applicant' | 'admin' | 'registration';
 
 export interface HomeAuthNavigationState {
-  homeAuthMode: 'registration';
+  homeAuthMode: HomeAuthMode;
 }
 
 export interface Announcement {
