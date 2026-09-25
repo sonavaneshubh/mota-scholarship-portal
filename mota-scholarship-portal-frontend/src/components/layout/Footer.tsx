@@ -46,8 +46,8 @@ export function Footer() {
               {column.heading}
             </h4>
             <ul className="space-y-1.5 text-xs text-slate-300">
-              {column.links.map((link) => (
-                <li key={link.label}>{renderFooterLink(link)}</li>
+              {column.links.map((link, linkIndex) => (
+                <li key={`${column.id}-${linkIndex}`}>{renderFooterLink(link)}</li>
               ))}
             </ul>
           </div>

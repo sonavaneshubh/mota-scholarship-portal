@@ -7,7 +7,6 @@ import { ADMIN_DEMO_IDENTIFIER, ADMIN_DEMO_PASSWORD } from '../../services/admin
 import { ROUTES } from '../../lib/constants';
 import type { HomeAuthMode, HomeAuthNavigationState } from '../../types';
 import { Button } from '../ui/Button';
-import { signOut } from '../../services/auth/authService';
 
 interface LoginErrors {
   username?: string;
@@ -103,19 +102,6 @@ function getRequestedHomeAuthMode(state: unknown, pathname: string): HomeAuthMod
   }
 
   return null;
-}
-
-function getRequestedApplicantPath(state: unknown) {
-  if (typeof state !== 'object' || state === null) {
-    return null;
-  }
-
-  const requested = (state as Partial<HomeAuthNavigationState>).from;
-  if (!requested?.pathname?.startsWith('/applicant/')) {
-    return null;
-  }
-
-  return `${requested.pathname}${requested.search ?? ''}${requested.hash ?? ''}`;
 }
 
 function getLoginUsernameError(username: string) {
@@ -291,7 +277,7 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
   const navigate = useNavigate();
   const { signIn, signUp, signOut, resetPassword } = useApplicantAuth();
   const { signIn: signInAdmin } = useAdminAuth();
-  const requestedMode = getRequestedHomeAuthMode(location.state);
+  const requestedMode = getRequestedHomeAuthMode(location.state, location.pathname);
   const [mode, setMode] = useState<HomeAuthMode>(() => requestedMode ?? 'applicant');
   const [loginUsername, setLoginUsername] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
@@ -469,7 +455,10 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
         return;
       }
 
-        setStatus('Admin identity verified. The admin workspace will be connected in a later phase.');
+      const result = await signIn(loginUsername, loginPassword);
+
+      if (!result.success) {
+        setStatus(result.error ?? 'The email or password is incorrect.');
         return;
       }
 

@@ -2,6 +2,9 @@ import { useRef, useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useApplicantAuth } from '../context/useApplicantAuth';
 import { PORTAL_SCHEMES } from '../data/portalSchemes';
+import { APPLICANT_APPLICATIONS } from '../data/applicantData';
+import { WelcomeSection } from '../components/applicant/WelcomeSection';
+import { OverviewCard } from '../components/applicant/OverviewCard';
 import { calculateApplicantProfileCompletion } from '../lib/applicantProfile';
 import { ROUTES } from '../lib/constants';
 
@@ -44,7 +47,7 @@ function typeToneClass(type: string) {
 }
 
 export function ApplicantDashboard() {
-  const { session, signOut } = useApplicantAuth();
+  const { session, user, signOut } = useApplicantAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [fontSize, setFontSize] = useState(BASE_FONT_SIZE);
@@ -52,7 +55,7 @@ export function ApplicantDashboard() {
   const [page, setPage] = useState(1);
   const trackRef = useRef<HTMLDivElement>(null);
 
-  if (!session) {
+  if (!session || !user) {
     return (
       <Navigate
         replace
@@ -63,13 +66,15 @@ export function ApplicantDashboard() {
         to={ROUTES.homeLogin}
       />
     );
-  const { user } = useApplicantAuth();
+  }
 
   if (!user) {
     return null;
   }
 
-  const completion = calculateApplicantProfileCompletion(session.user);
+  const completion = calculateApplicantProfileCompletion(user);
+  const underReview = APPLICANT_APPLICATIONS.filter((app) => app.status === 'under-scrutiny' || app.status === 'submitted').length;
+  const actionRequired = APPLICANT_APPLICATIONS.filter((app) => app.status === 'deficiency-raised').length;
   const pageCount = Math.max(1, Math.ceil(PORTAL_SCHEMES.length / PAGE_SIZE));
   const visibleSchemes = PORTAL_SCHEMES.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
@@ -101,7 +106,12 @@ export function ApplicantDashboard() {
             <div className="flex items-center space-x-1.5">
               <span className="inline-block h-2 w-2 rounded-full bg-emerald-600" />
               <span className="font-medium">भारत सरकार | Government of India</span>
-    <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
+    
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
       <WelcomeSection profile={user} />
 
       <section aria-labelledby="overview-heading" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -151,7 +161,7 @@ export function ApplicantDashboard() {
               <option>मराठी</option>
             </select>
           </div>
-        </div>
+        </section>
 
         <div className="flex items-center justify-between px-6 py-3">
           <div className="flex items-center space-x-4">
@@ -243,7 +253,7 @@ export function ApplicantDashboard() {
             to={ROUTES.applicant.profile}
           >
             <span className="relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-amber-300 to-amber-500 text-2xs font-bold text-[#0b2546] ring-2 ring-amber-400/50">
-              {session.user.avatarInitials}
+              {user?.avatarInitials}
               <span
                 aria-hidden="true"
                 className="absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full border-2 border-[#0b2546] bg-emerald-400"
@@ -251,9 +261,9 @@ export function ApplicantDashboard() {
             </span>
             <span className="leading-tight">
               <span className="block text-2xs font-semibold text-white transition group-hover:text-amber-200">
-                {session.user.name}
+                {user?.name}
               </span>
-              <span className="block text-2xs text-amber-300/80">{session.user.category}</span>
+              <span className="block text-2xs text-amber-300/80">{user?.category}</span>
             </span>
             <i
               aria-hidden="true"
@@ -271,6 +281,9 @@ export function ApplicantDashboard() {
           </button>
         </div>
       </nav>
+
+      </div>
+
 
       <main className="flex max-w-full flex-1 overflow-hidden bg-white" id="main-content">
         <aside className="flex w-60 flex-shrink-0 select-none flex-col border-r border-slate-200 bg-white text-xs shadow-[1px_0_3px_rgba(0,0,0,0.03)]">

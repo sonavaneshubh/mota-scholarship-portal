@@ -14,10 +14,10 @@ import { ROUTES } from '../lib/constants';
 
 export function ApplicantApplicationPage() {
   const { applicationId } = useParams<{ applicationId: string }>();
-  const { session } = useApplicantAuth();
+  const { session, user } = useApplicantAuth();
   const application = APPLICANT_APPLICATIONS.find((item) => item.id === applicationId);
 
-  if (!session) {
+  if (!session || !user) {
     return null;
   }
 
@@ -61,7 +61,7 @@ export function ApplicantApplicationPage() {
           <p className="mt-2 text-sm font-semibold text-gov-blue-dark">{application.nextStep}</p>
         </div>
         <dl className="mt-5 grid gap-4 border-y border-slate-100 py-5 sm:grid-cols-2 lg:grid-cols-4">
-          <div><dt className="text-xs text-slate-500">Applicant</dt><dd className="mt-1 text-sm font-semibold text-slate-800">{session.user.name}</dd></div>
+          <div><dt className="text-xs text-slate-500">Applicant</dt><dd className="mt-1 text-sm font-semibold text-slate-800">{user?.name}</dd></div>
           <div><dt className="text-xs text-slate-500">Submitted on</dt><dd className="mt-1 text-sm font-semibold text-slate-800">{application.submittedAt}</dd></div>
           <div><dt className="text-xs text-slate-500">Last updated</dt><dd className="mt-1 text-sm font-semibold text-slate-800">{application.updatedAt}</dd></div>
           <div><dt className="text-xs text-slate-500">Support shown</dt><dd className="mt-1 text-sm font-semibold text-slate-800">{application.amountLabel}</dd></div>
@@ -77,11 +77,11 @@ export function ApplicantApplicationPage() {
           <p className="text-xs font-bold uppercase tracking-wider text-gov-saffron-dark">Applicant information</p>
           <h2 className="mt-1 text-lg font-bold text-gov-blue-dark">Profile used for this record</h2>
           <dl className="mt-4 grid gap-4 sm:grid-cols-2">
-            <div><dt className="text-xs text-slate-500">Applicant ID</dt><dd className="mt-1 text-sm font-semibold text-slate-800">{session.user.id}</dd></div>
-            <div><dt className="text-xs text-slate-500">Category</dt><dd className="mt-1 text-sm font-semibold text-slate-800">{session.user.category}</dd></div>
-            <div><dt className="text-xs text-slate-500">Location</dt><dd className="mt-1 text-sm font-semibold text-slate-800">{session.user.state}, {session.user.district}</dd></div>
-            <div><dt className="text-xs text-slate-500">Course</dt><dd className="mt-1 text-sm font-semibold text-slate-800">{session.user.course}</dd></div>
-            <div className="sm:col-span-2"><dt className="text-xs text-slate-500">Institution</dt><dd className="mt-1 text-sm font-semibold text-slate-800">{session.user.institution}</dd></div>
+            <div><dt className="text-xs text-slate-500">Applicant ID</dt><dd className="mt-1 text-sm font-semibold text-slate-800">{user?.id}</dd></div>
+            <div><dt className="text-xs text-slate-500">Category</dt><dd className="mt-1 text-sm font-semibold text-slate-800">{user?.category}</dd></div>
+            <div><dt className="text-xs text-slate-500">Location</dt><dd className="mt-1 text-sm font-semibold text-slate-800">{user?.state}, {user?.district}</dd></div>
+            <div><dt className="text-xs text-slate-500">Course</dt><dd className="mt-1 text-sm font-semibold text-slate-800">{user?.course}</dd></div>
+            <div className="sm:col-span-2"><dt className="text-xs text-slate-500">Institution</dt><dd className="mt-1 text-sm font-semibold text-slate-800">{user?.institution}</dd></div>
           </dl>
           <Button className="mt-5" size="sm" to={ROUTES.applicant.profile} variant="outline">View profile</Button>
         </Card>
