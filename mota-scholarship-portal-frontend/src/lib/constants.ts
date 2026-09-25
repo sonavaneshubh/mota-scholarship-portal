@@ -157,7 +157,6 @@ export const FOOTER_LINK_COLUMNS: FooterLinkColumn[] = [
     links: [
       { label: 'Help & Grievance', href: ROUTES.helpGrievance },
       { label: 'Officer / Administrator Access', href: ROUTES.admin.login },
-      { label: 'Help & Grievance', href: SECTION_IDS.HELP_GRIEVANCE },
       { label: 'Contact (Prototype)', href: '#prototype-contact' },
     ],
   },
