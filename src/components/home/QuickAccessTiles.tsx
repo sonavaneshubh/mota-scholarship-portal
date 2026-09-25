@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { QUICK_ACTIONS } from '../../data/mockData';
 import type { AccentTone, QuickAction, QuickActionIcon } from '../../types';
 
@@ -109,6 +110,13 @@ export function QuickAccessTiles() {
             </div>
             {action.hasInlineInput ? (
               <TrackInput />
+            ) : action.href.startsWith('/') ? (
+              <Link
+                className={`mt-3 block text-xs font-semibold ${linkClass[action.accent]}`}
+                to={action.href}
+              >
+                {action.ctaLabel} →
+              </Link>
             ) : (
               <a
                 className={`mt-3 block text-xs font-semibold ${linkClass[action.accent]}`}

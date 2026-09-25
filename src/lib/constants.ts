@@ -22,6 +22,10 @@ export const SITE = {
 /** Future route groups — declared now, implemented in later milestones. */
 export const ROUTES = {
   home: '/',
+  aboutMota: '/about-mota',
+  scholarshipsFellowships: '/scholarships-fellowships',
+  guidelinesNotices: '/guidelines-notices',
+  helpGrievance: '/help-grievance',
   homeLogin: '/#home-login',
   applicant: {
     login: '/applicant/login',
@@ -97,12 +101,11 @@ export const SECTION_IDS = {
 } as const;
 
 export const NAVIGATION_ITEMS: NavigationItem[] = [
-  { id: 'home', label: 'Home', href: ROUTES.home, active: true },
-  { id: 'about', label: 'About MoTA', href: SECTION_IDS.ABOUT },
-  { id: 'schemes', label: 'Scholarships & Fellowships', href: SECTION_IDS.SCHEMES },
-  { id: 'how-it-works', label: 'How It Works', href: SECTION_IDS.HOW_IT_WORKS },
-  { id: 'notices', label: 'Guidelines & Notices', href: SECTION_IDS.NOTICES },
-  { id: 'help', label: 'Help / Grievance', href: SECTION_IDS.HELP_GRIEVANCE },
+  { id: 'home', label: 'Home', href: ROUTES.home },
+  { id: 'about', label: 'About MoTA', href: ROUTES.aboutMota },
+  { id: 'scholarships-fellowships', label: 'Scholarships & Fellowships', href: ROUTES.scholarshipsFellowships },
+  { id: 'guidelines-notices', label: 'Guidelines & Notices', href: ROUTES.guidelinesNotices },
+  { id: 'help-grievance', label: 'Help & Grievance', href: ROUTES.helpGrievance },
 ];
 
 export const LANGUAGES: LanguageOption[] = [
@@ -120,10 +123,11 @@ export const FOOTER_LINK_COLUMNS: FooterLinkColumn[] = [
     heading: 'Portal',
     links: [
       { label: 'Home', href: ROUTES.home },
-      { label: 'Scholarships & Fellowships', href: SECTION_IDS.SCHEMES },
+      { label: 'About MoTA', href: ROUTES.aboutMota },
+      { label: 'Scholarships & Fellowships', href: ROUTES.scholarshipsFellowships },
       { label: 'How It Works', href: SECTION_IDS.HOW_IT_WORKS },
-      { label: 'Guidelines & Notices', href: SECTION_IDS.NOTICES },
-      { label: 'Help', href: SECTION_IDS.HELP_GRIEVANCE },
+      { label: 'Guidelines & Notices', href: ROUTES.guidelinesNotices },
+      { label: 'Help & Grievance', href: ROUTES.helpGrievance },
     ],
   },
   {
@@ -139,6 +143,8 @@ export const FOOTER_LINK_COLUMNS: FooterLinkColumn[] = [
     id: 'support',
     heading: 'Support',
     links: [
+      { label: 'Help & Grievance', href: ROUTES.helpGrievance },
+      { label: 'Officer / Administrator Access', href: ROUTES.admin.login },
       { label: 'Help & Grievance', href: SECTION_IDS.HELP_GRIEVANCE },
       { label: 'Contact (Prototype)', href: '#prototype-contact' },
     ],

@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom';
+import { ROUTES } from '../../lib/constants';
 import type { Scheme, SchemeBadgeTone } from '../../types';
 
 const badgeToneClass: Record<SchemeBadgeTone, string> = {
@@ -60,9 +62,9 @@ export function SchemeCard({ scheme }: SchemeCardProps) {
       </div>
 
       <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
-        <a className="text-xs font-semibold text-gov-blue hover:underline" href="#guidelines-draft">
+        <Link className="text-xs font-semibold text-gov-blue hover:underline" to={ROUTES.guidelinesNotices}>
           Guidelines (Draft)
-        </a>
+        </Link>
         <a
           className="px-3 py-1 bg-gov-blue hover:bg-gov-blue-dark text-white text-xs font-semibold rounded transition"
           href={scheme.applyHref}

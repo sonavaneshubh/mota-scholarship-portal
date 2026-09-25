@@ -1,4 +1,4 @@
-import { SECTION_IDS } from '../lib/constants';
+import { ROUTES, SECTION_IDS } from '../lib/constants';
 import type {
   Announcement,
   AtGlanceItem,
@@ -49,7 +49,7 @@ export const QUICK_ACTIONS: QuickAction[] = [
     description: 'Browse available scholarship and fellowship schemes.',
     icon: 'scheme',
     accent: 'blue',
-    href: SECTION_IDS.SCHEMES,
+    href: ROUTES.scholarshipsFellowships,
     ctaLabel: 'View Schemes',
   },
   {
@@ -78,7 +78,7 @@ export const QUICK_ACTIONS: QuickAction[] = [
     description: 'Get help or submit and track a grievance.',
     icon: 'grievance',
     accent: 'purple',
-    href: SECTION_IDS.HELP_GRIEVANCE,
+    href: ROUTES.helpGrievance,
     ctaLabel: 'Get Support',
     anchorId: 'help-grievance',
   },

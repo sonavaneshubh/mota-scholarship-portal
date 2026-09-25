@@ -7,6 +7,7 @@ export interface SectionHeadingProps {
   description?: ReactNode;
   align?: 'left' | 'center';
   className?: string;
+  id?: string;
 }
 
 export function SectionHeading({
@@ -16,6 +17,7 @@ export function SectionHeading({
   description,
   align = 'left',
   className = '',
+  id,
 }: SectionHeadingProps) {
   const alignClass =
     align === 'center' ? 'text-center max-w-3xl mx-auto mb-8' : 'mb-6';
@@ -29,7 +31,7 @@ export function SectionHeading({
       {eyebrow ? (
         <span className={`text-xs font-bold ${eyebrowClass}`}>{eyebrow}</span>
       ) : null}
-      <h2 className="text-xl md:text-2xl font-bold text-gov-blue-dark mt-2">{title}</h2>
+      <h2 id={id} className="text-xl md:text-2xl font-bold text-gov-blue-dark mt-2">{title}</h2>
       {description ? (
         <p className="text-xs md:text-sm text-slate-600 mt-1">{description}</p>
       ) : null}
