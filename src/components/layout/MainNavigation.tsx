@@ -38,10 +38,10 @@ export function MainNavigation() {
         </ul>
 
         <div className="hidden lg:flex items-center space-x-2 py-1.5">
-          <Button variant="ghost" size="sm" to={ROUTES.applicant.login}>
+          <Button variant="ghost" size="sm" to={ROUTES.homeLogin}>
             Login
           </Button>
-          <Button variant="accent" size="sm" to={ROUTES.applicant.register}>
+          <Button variant="accent" size="sm" to={ROUTES.homeLogin}>
             New Registration
           </Button>
         </div>
@@ -94,7 +94,7 @@ export function MainNavigation() {
             <Button
               variant="ghost"
               size="sm"
-              to={ROUTES.applicant.login}
+              to={ROUTES.homeLogin}
               className="justify-center"
               onClick={() => setMobileOpen(false)}
             >
@@ -103,7 +103,7 @@ export function MainNavigation() {
             <Button
               variant="accent"
               size="sm"
-              to={ROUTES.applicant.register}
+              to={ROUTES.homeLogin}
               className="justify-center"
               onClick={() => setMobileOpen(false)}
             >

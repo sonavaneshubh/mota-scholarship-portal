@@ -1,3 +1,5 @@
+import { useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { ELIGIBILITY_COPY } from '../data/mockData';
 import { SECTION_IDS } from '../lib/constants';
 import { AboutMinistry } from '../components/home/AboutMinistry';
@@ -6,12 +8,19 @@ import { GovernmentInitiatives } from '../components/home/GovernmentInitiatives'
 import { HeroBanner } from '../components/home/HeroBanner';
 import { HowToApply } from '../components/home/HowToApply';
 import { NewsCirculars } from '../components/home/NewsCirculars';
-import { OfficerQuickLogin } from '../components/home/OfficerQuickLogin';
 import { QuickAccessTiles } from '../components/home/QuickAccessTiles';
 import { SchemeDirectory } from '../components/home/SchemeDirectory';
 import { Button } from '../components/ui/Button';
 
 export function Home() {
+  const location = useLocation();
+
+  useEffect(() => {
+    if (location.hash === SECTION_IDS.LOGIN) {
+      document.getElementById('home-login')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [location.hash, location.key]);
+
   return (
     <>
       <HeroBanner />
@@ -83,9 +92,8 @@ export function Home() {
         data-purpose="how-to-apply-guide"
         id={SECTION_IDS.HOW_TO_APPLY.replace('#', '')}
       >
-        <div className="max-w-7xl mx-auto px-4 grid grid-cols-1 lg:grid-cols-12 gap-8">
+        <div className="max-w-7xl mx-auto px-4">
           <HowToApply />
-          <OfficerQuickLogin />
         </div>
       </section>
 

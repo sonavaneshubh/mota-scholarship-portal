@@ -22,11 +22,13 @@ export const SITE = {
 /** Future route groups — declared now, implemented in later milestones. */
 export const ROUTES = {
   home: '/',
+  homeLogin: '/#home-login',
   applicant: {
     login: '/applicant/login',
     register: '/applicant/register',
     dashboard: '/applicant/dashboard',
     schemes: '/applicant/schemes',
+    applications: '/applicant/applications',
     schemeDetail: '/applicant/schemes/:id',
     eligibility: '/applicant/eligibility',
     application: '/applicant/application/:id',
@@ -53,6 +55,18 @@ export const ROUTES = {
   },
 } as const;
 
+export function applicantSchemePath(schemeId: string) {
+  return `${ROUTES.applicant.schemes}/${encodeURIComponent(schemeId)}`;
+}
+
+export function applicantApplicationPath(applicationId: string) {
+  return `${ROUTES.applicant.applications}/${encodeURIComponent(applicationId)}`;
+}
+
+export function applicantStatusPath(applicationId: string) {
+  return `${ROUTES.applicant.status}/${encodeURIComponent(applicationId)}`;
+}
+
 /** In-page anchors used by the Home navigation. */
 export const ANCHORS = {
   top: 'top',
@@ -64,7 +78,7 @@ export const ANCHORS = {
   howToApply: 'how-to-apply',
   notices: 'notices',
   helpGrievance: 'help-grievance',
-  officerAccess: 'officer-access',
+  login: 'home-login',
   track: 'track-application',
 } as const;
 
@@ -78,7 +92,7 @@ export const SECTION_IDS = {
   HOW_TO_APPLY: '#how-to-apply',
   NOTICES: '#notices',
   HELP_GRIEVANCE: '#help-grievance',
-  OFFICER_ACCESS: '#officer-access',
+  LOGIN: '#home-login',
   TRACK: '#track-application',
 } as const;
 
@@ -116,8 +130,7 @@ export const FOOTER_LINK_COLUMNS: FooterLinkColumn[] = [
     id: 'applicant',
     heading: 'Applicant',
     links: [
-      { label: 'Login', href: ROUTES.applicant.login },
-      { label: 'New Registration', href: ROUTES.applicant.register },
+      { label: 'Login', href: ROUTES.homeLogin },
       { label: 'Track Application', href: SECTION_IDS.TRACK },
       { label: 'Check Eligibility', href: SECTION_IDS.ELIGIBILITY },
     ],
@@ -127,7 +140,6 @@ export const FOOTER_LINK_COLUMNS: FooterLinkColumn[] = [
     heading: 'Support',
     links: [
       { label: 'Help & Grievance', href: SECTION_IDS.HELP_GRIEVANCE },
-      { label: 'Officer / Administrator Access', href: ROUTES.admin.login },
       { label: 'Contact (Prototype)', href: '#prototype-contact' },
     ],
   },

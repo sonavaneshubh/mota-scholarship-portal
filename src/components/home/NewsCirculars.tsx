@@ -1,6 +1,4 @@
-import { Link } from 'react-router-dom';
 import { CIRCULARS } from '../../data/mockData';
-import { ROUTES } from '../../lib/constants';
 import { Badge } from '../ui/Badge';
 
 export function NewsCirculars() {
@@ -32,14 +30,6 @@ export function NewsCirculars() {
         ))}
       </ul>
 
-      <div className="mt-4 pt-3 border-t border-slate-100 bg-slate-50 p-2.5 rounded text-center">
-        <span className="text-[11px] text-slate-600 block">
-          Officer / administrator access is a prototype UI.
-        </span>
-        <Link className="text-xs font-bold text-gov-blue hover:text-gov-saffron" to={ROUTES.admin.login}>
-          Officer / Administrator Access →
-        </Link>
-      </div>
     </div>
   );
 }

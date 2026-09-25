@@ -2,7 +2,7 @@ import { DEFICIENCY_NOTE, HOW_TO_APPLY_PHASES } from '../../data/mockData';
 
 export function HowToApply() {
   return (
-    <div className="lg:col-span-8 space-y-4">
+    <div className="space-y-4">
       <div className="border-b border-slate-200 pb-2">
         <span className="text-[11px] sm:text-xs font-bold text-gov-saffron uppercase">Applicant Journey</span>
         <h3 className="text-base md:text-lg font-bold text-gov-blue-dark">How to Apply on the Unified Portal</h3>

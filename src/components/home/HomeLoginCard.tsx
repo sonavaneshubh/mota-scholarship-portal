@@ -1,8 +1,9 @@
 import { useRef, useState } from 'react';
 import type { FormEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useApplicantAuth } from '../../context/useApplicantAuth';
+import { ROUTES } from '../../lib/constants';
 import { Button } from '../ui/Button';
-
-type LoginMode = 'applicant' | 'admin';
 
 interface LoginErrors {
   username?: string;
@@ -33,21 +34,21 @@ function getUsernameError(username: string) {
 }
 
 export function HomeLoginCard() {
-  const [mode, setMode] = useState<LoginMode>('applicant');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [captchaCode, setCaptchaCode] = useState(createCaptchaCode);
   const [captchaInput, setCaptchaInput] = useState('');
   const [errors, setErrors] = useState<LoginErrors>({});
   const [status, setStatus] = useState('');
+  const navigate = useNavigate();
+  const { signIn } = useApplicantAuth();
   const usernameRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
   const captchaRef = useRef<HTMLInputElement>(null);
 
-  const isAdmin = mode === 'admin';
-  const heading = isAdmin ? 'Admin Login Here' : 'Applicant Login Here';
-  const usernameLabel = isAdmin ? 'Admin Username / Email' : 'Username / Email';
-  const loginLabel = isAdmin ? 'Admin Login' : 'Login Here';
+  const heading = 'Applicant Login Here';
+  const usernameLabel = 'Username / Email';
+  const loginLabel = 'Login Here';
 
   function updateUsername(value: string) {
     setUsername(value);
@@ -72,16 +73,6 @@ export function HomeLoginCard() {
     setCaptchaInput('');
     setErrors((current) => ({ ...current, captcha: '' }));
     setStatus('CAPTCHA refreshed.');
-  }
-
-  function switchMode(nextMode: LoginMode) {
-    setMode(nextMode);
-    setUsername('');
-    setPassword('');
-    setCaptchaCode(createCaptchaCode());
-    setCaptchaInput('');
-    setErrors({});
-    setStatus('');
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -114,18 +105,20 @@ export function HomeLoginCard() {
       return;
     }
 
-    setStatus('This phase does not include authentication. We did not submit your details.');
+    signIn(username);
+    navigate(ROUTES.applicant.dashboard);
   }
 
   return (
     <div
-      className="lg:col-span-4 bg-white/95 text-slate-900 p-4 rounded-lg shadow-lg border border-slate-200"
+      id="home-login"
+      className="lg:col-span-4 bg-white/95 text-slate-900 p-4 rounded-lg shadow-lg border border-slate-200 scroll-mt-24"
       data-purpose="home-login-card"
     >
       <div className="flex items-center justify-between gap-3 border-b border-slate-200 pb-1.5 mb-3">
         <h3 className="text-sm font-bold text-gov-blue-dark">{heading}</h3>
         <span className="text-[10px] font-bold text-amber-800 bg-amber-100 border border-amber-300 px-1.5 py-0.5 rounded">
-          UI Only
+          Demo Access
         </span>
       </div>
 
@@ -140,7 +133,7 @@ export function HomeLoginCard() {
             name="username"
             type="text"
             value={username}
-            placeholder={isAdmin ? 'Admin username or email' : 'Username or email'}
+            placeholder="Username or email"
             autoComplete="username"
             autoCapitalize="none"
             spellCheck={false}
@@ -270,18 +263,6 @@ export function HomeLoginCard() {
           </button>
         </div>
       </form>
-
-      <div className="mt-4 border-t border-slate-200 pt-3">
-        <Button
-          className="w-full justify-center rounded"
-          onClick={() => switchMode(isAdmin ? 'applicant' : 'admin')}
-          size="md"
-          type="button"
-          variant="outline"
-        >
-          {isAdmin ? 'Applicant Login' : 'Admin Login'}
-        </Button>
-      </div>
     </div>
   );
 }

@@ -125,3 +125,90 @@ export interface MinistryStat {
   label: string;
   valueClass: string;
 }
+
+export type ApplicantApplicationStatus =
+  | 'draft'
+  | 'submitted'
+  | 'under-review'
+  | 'action-required'
+  | 'approved'
+  | 'rejected';
+
+export type ApplicantDocumentStatus = 'verified' | 'pending' | 'missing' | 'needs-update';
+
+export type ApplicantNotificationTone = 'info' | 'success' | 'warning' | 'action';
+
+export type ApplicantQuickActionIcon = 'scheme' | 'documents' | 'notifications' | 'profile';
+
+export interface ApplicantProfile {
+  id: string;
+  name: string;
+  email: string;
+  mobile: string;
+  state: string;
+  district: string;
+  category: string;
+  course: string;
+  institution: string;
+  avatarInitials: string;
+  profileCompletion: number;
+}
+
+export interface ApplicantSession {
+  user: ApplicantProfile;
+  signedInAt: string;
+}
+
+export interface ApplicantApplication {
+  id: string;
+  schemeId: string;
+  schemeName: string;
+  submittedAt: string;
+  updatedAt: string;
+  status: ApplicantApplicationStatus;
+  statusLabel: string;
+  nextStep: string;
+  referenceNumber: string;
+  amountLabel: string;
+  documentsComplete: number;
+  documentsTotal: number;
+}
+
+export interface ApplicantRequiredAction {
+  id: string;
+  title: string;
+  description: string;
+  dueLabel: string;
+  href: string;
+  ctaLabel: string;
+  tone: 'blue' | 'amber' | 'green';
+}
+
+export interface ApplicantNotification {
+  id: string;
+  title: string;
+  description: string;
+  timestamp: string;
+  tone: ApplicantNotificationTone;
+  unread?: boolean;
+  href: string;
+}
+
+export interface ApplicantDocument {
+  id: string;
+  name: string;
+  description: string;
+  status: ApplicantDocumentStatus;
+  statusLabel: string;
+  updatedAt: string;
+  required: boolean;
+}
+
+export interface ApplicantQuickAction {
+  id: string;
+  title: string;
+  description: string;
+  icon: ApplicantQuickActionIcon;
+  href: string;
+  ctaLabel: string;
+}

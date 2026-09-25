@@ -53,8 +53,8 @@ export function HeroBanner() {
             <Button variant="ghost" size="lg" href={SECTION_IDS.TRACK} className="w-full sm:w-auto justify-center">
               Track Application
             </Button>
-            <Button variant="emerald" size="lg" to={ROUTES.applicant.login} className="w-full sm:w-auto justify-center">
-              Login / Register
+            <Button variant="emerald" size="lg" to={ROUTES.homeLogin} className="w-full sm:w-auto justify-center">
+              Login
             </Button>
           </div>
 
