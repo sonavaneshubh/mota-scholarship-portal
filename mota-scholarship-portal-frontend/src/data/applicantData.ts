@@ -8,7 +8,6 @@ import type {
   ApplicantDocument,
   ApplicantNotification,
   ApplicantProfile,
-  ApplicantQuickAction,
   ApplicantRequiredAction,
 } from '../types';
 
@@ -173,38 +172,3 @@ export function getApplicantRequiredActions(): ApplicantRequiredAction[] {
 }
 
 export const APPLICANT_REQUIRED_ACTIONS = getApplicantRequiredActions();
-
-export const APPLICANT_QUICK_ACTIONS: ApplicantQuickAction[] = [
-  {
-    id: 'browse-schemes',
-    title: 'Browse schemes',
-    description: 'Find sample scholarships and fellowships.',
-    icon: 'scheme',
-    href: ROUTES.applicant.schemes,
-    ctaLabel: 'Explore',
-  },
-  {
-    id: 'view-documents',
-    title: 'Manage documents',
-    description: 'Review the sample document set and correction needs.',
-    icon: 'documents',
-    href: ROUTES.applicant.documents,
-    ctaLabel: 'Open',
-  },
-  {
-    id: 'view-notifications',
-    title: 'View notifications',
-    description: 'Stay updated on sample application activity.',
-    icon: 'notifications',
-    href: ROUTES.applicant.notifications,
-    ctaLabel: 'View',
-  },
-  {
-    id: 'view-profile',
-    title: 'View profile',
-    description: 'Check the personal details used in this sample session.',
-    icon: 'profile',
-    href: ROUTES.applicant.profile,
-    ctaLabel: 'View',
-  },
-];
