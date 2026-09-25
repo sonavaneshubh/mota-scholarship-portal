@@ -16,9 +16,14 @@ export function TopAccessibilityBar() {
   const [lang, setLang] = useState<LanguageOption>(LANGUAGES[0]);
 
   useEffect(() => {
-    document.documentElement.style.fontSize = `${fontScale * 16}px`;
+    const el = document.documentElement;
+    if (fontScale === DEFAULT_FONT_SCALE) {
+      el.style.removeProperty('font-size');
+    } else {
+      el.style.fontSize = `${fontScale * 16}px`;
+    }
     return () => {
-      document.documentElement.style.fontSize = '';
+      el.style.removeProperty('font-size');
     };
   }, [fontScale]);
 

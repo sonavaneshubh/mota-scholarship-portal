@@ -14,7 +14,7 @@ export function GovernmentInitiatives() {
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center justify-center gap-6 md:gap-10 text-xs font-bold text-slate-700">
+        <div className="flex flex-wrap items-center justify-center gap-3 md:gap-10 text-xs font-bold text-slate-700">
           {GOVERNMENT_INITIATIVES.map((initiative) => (
             <div
               key={initiative.id}

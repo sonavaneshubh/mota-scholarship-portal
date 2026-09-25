@@ -1,0 +1,195 @@
+import { applicantApplicationPath, applicantSchemePath } from '../lib/constants';
+import type {
+  ApplicantApplication,
+  ApplicantDocument,
+  ApplicantNotification,
+  ApplicantProfile,
+  ApplicantQuickAction,
+  ApplicantRequiredAction,
+} from '../types';
+
+export const APPLICANT_PROFILE: ApplicantProfile = {
+  id: 'applicant-demo-001',
+  name: 'Aarav Kumar',
+  email: 'aarav.kumar@example.in',
+  mobile: '+91 98765 43210',
+  state: 'Odisha',
+  district: 'Khordha',
+  category: 'Scheduled Tribe',
+  course: 'B.Tech, Computer Science',
+  institution: 'Kalinga Institute of Technology',
+  avatarInitials: 'AK',
+  profileCompletion: 82,
+};
+
+export const APPLICANT_APPLICATIONS: ApplicantApplication[] = [
+  {
+    id: 'APP-2026-001',
+    schemeId: 'demo-higher-ed',
+    schemeName: 'Demo — Higher Education Scholarship',
+    submittedAt: '12 August 2026',
+    updatedAt: '22 September 2026',
+    status: 'under-review',
+    statusLabel: 'Under review',
+    nextStep: 'Document verification is in progress.',
+    referenceNumber: 'MOTA-DEMO-2026-001',
+    amountLabel: '₹1,20,000 (sample)',
+    documentsComplete: 4,
+    documentsTotal: 5,
+  },
+  {
+    id: 'APP-2026-002',
+    schemeId: 'demo-post-matric',
+    schemeName: 'Demo — Post-Matric Scholarship',
+    submittedAt: '04 September 2026',
+    updatedAt: '24 September 2026',
+    status: 'action-required',
+    statusLabel: 'Action required',
+    nextStep: 'Upload your latest income certificate to continue.',
+    referenceNumber: 'MOTA-DEMO-2026-002',
+    amountLabel: '₹36,000 (sample)',
+    documentsComplete: 3,
+    documentsTotal: 5,
+  },
+];
+
+export const APPLICANT_REQUIRED_ACTIONS: ApplicantRequiredAction[] = [
+  {
+    id: 'action-documents',
+    title: 'Complete your document set',
+    description: 'Upload one pending document to keep your Post-Matric application moving.',
+    dueLabel: 'Due 28 September 2026',
+    href: '/applicant/documents',
+    ctaLabel: 'Upload document',
+    tone: 'amber',
+  },
+  {
+    id: 'action-profile',
+    title: 'Review your profile details',
+    description: 'A few profile fields are still incomplete. Keep your application details accurate.',
+    dueLabel: 'Recommended',
+    href: '/applicant/profile',
+    ctaLabel: 'Review profile',
+    tone: 'blue',
+  },
+];
+
+export const APPLICANT_NOTIFICATIONS: ApplicantNotification[] = [
+  {
+    id: 'notification-review',
+    title: 'Application under review',
+    description: 'Your Higher Education Scholarship application is being reviewed by the demo verification team.',
+    timestamp: '22 September 2026',
+    tone: 'info',
+    unread: true,
+    href: applicantApplicationPath('APP-2026-001'),
+  },
+  {
+    id: 'notification-document',
+    title: 'Document needed',
+    description: 'Upload your latest income certificate for the Post-Matric Scholarship application.',
+    timestamp: '24 September 2026',
+    tone: 'action',
+    unread: true,
+    href: '/applicant/documents',
+  },
+  {
+    id: 'notification-profile',
+    title: 'Profile almost complete',
+    description: 'Complete your profile to make future scholarship applications faster.',
+    timestamp: '18 September 2026',
+    tone: 'success',
+    href: '/applicant/profile',
+  },
+  {
+    id: 'notification-scheme',
+    title: 'New demo scheme available',
+    description: 'Explore the sample Research Fellowship listing in the scheme directory.',
+    timestamp: '15 September 2026',
+    tone: 'info',
+    href: applicantSchemePath('demo-fellowship'),
+  },
+];
+
+export const APPLICANT_DOCUMENTS: ApplicantDocument[] = [
+  {
+    id: 'doc-aadhaar',
+    name: 'Aadhaar card',
+    description: 'Identity document for applicant verification.',
+    status: 'verified',
+    statusLabel: 'Verified',
+    updatedAt: '12 August 2026',
+    required: true,
+  },
+  {
+    id: 'doc-category',
+    name: 'Category certificate',
+    description: 'Sample Scheduled Tribe category certificate.',
+    status: 'verified',
+    statusLabel: 'Verified',
+    updatedAt: '12 August 2026',
+    required: true,
+  },
+  {
+    id: 'doc-institution',
+    name: 'Institution verification',
+    description: 'Bonafide certificate from your current institution.',
+    status: 'verified',
+    statusLabel: 'Verified',
+    updatedAt: '13 August 2026',
+    required: true,
+  },
+  {
+    id: 'doc-income',
+    name: 'Income certificate',
+    description: 'Latest income certificate for the Post-Matric Scholarship.',
+    status: 'needs-update',
+    statusLabel: 'Needs update',
+    updatedAt: '04 September 2026',
+    required: true,
+  },
+  {
+    id: 'doc-bank',
+    name: 'Bank account proof',
+    description: 'Sample cancelled cheque or bank statement.',
+    status: 'pending',
+    statusLabel: 'Pending review',
+    updatedAt: '04 September 2026',
+    required: true,
+  },
+];
+
+export const APPLICANT_QUICK_ACTIONS: ApplicantQuickAction[] = [
+  {
+    id: 'browse-schemes',
+    title: 'Browse schemes',
+    description: 'Find sample scholarships and fellowships.',
+    icon: 'scheme',
+    href: '/applicant/schemes',
+    ctaLabel: 'Explore',
+  },
+  {
+    id: 'view-documents',
+    title: 'Manage documents',
+    description: 'Review and update your document set.',
+    icon: 'documents',
+    href: '/applicant/documents',
+    ctaLabel: 'Open',
+  },
+  {
+    id: 'view-notifications',
+    title: 'View notifications',
+    description: 'Stay updated on application activity.',
+    icon: 'notifications',
+    href: '/applicant/notifications',
+    ctaLabel: 'View',
+  },
+  {
+    id: 'edit-profile',
+    title: 'Edit profile',
+    description: 'Keep your personal details current.',
+    icon: 'profile',
+    href: '/applicant/profile',
+    ctaLabel: 'Edit',
+  },
+];

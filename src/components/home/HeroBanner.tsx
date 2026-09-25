@@ -5,7 +5,7 @@ import { Button } from '../ui/Button';
 export function HeroBanner() {
   return (
     <section
-      className="relative bg-gradient-to-r from-gov-blue-dark via-gov-blue to-slate-900 text-white py-8 px-4 overflow-hidden border-b-4 border-amber-500"
+      className="relative bg-gradient-to-r from-gov-blue-dark via-gov-blue to-slate-900 text-white py-6 md:py-8 px-4 overflow-hidden border-b-4 border-amber-500"
       data-purpose="hero-banner"
     >
       <div
@@ -16,7 +16,7 @@ export function HeroBanner() {
 
       <div className="max-w-7xl mx-auto relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
         <div className="lg:col-span-8 space-y-4">
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 backdrop-blur rounded-full text-xs text-amber-300 border border-amber-400/40">
+          <div className="inline-flex items-center gap-2 px-2.5 md:px-3 py-1 bg-white/10 backdrop-blur rounded-full text-[11px] md:text-xs text-amber-300 border border-amber-400/40">
             <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
               <path
                 clipRule="evenodd"
@@ -27,34 +27,36 @@ export function HeroBanner() {
             AI-Enabled • Human-Verified Workflow
           </div>
 
-          <h2 className="text-2xl md:text-4xl font-extrabold tracking-tight leading-tight">
+          <h2 className="text-[22px] sm:text-2xl md:text-4xl font-extrabold tracking-tight leading-tight">
             Scholarship &amp; Fellowship Management Portal
           </h2>
 
-          <div className="text-lg md:text-xl font-medium text-amber-200">
+          <div className="text-base sm:text-lg md:text-xl font-medium text-amber-200">
             A Unified Digital Platform for Tribal Students &amp; Researchers
           </div>
 
-          <p className="text-slate-200 text-sm md:text-base leading-relaxed max-w-2xl">
+          <p className="text-slate-200 text-[13px] md:text-base leading-relaxed max-w-2xl">
             A unified digital platform for discovering schemes, checking eligibility, submitting
             applications, managing documents, and tracking application verification and decisions.
           </p>
 
           <div className="pt-2 flex flex-wrap gap-3">
             <Button variant="accent" size="lg" to={ROUTES.scholarshipsFellowships}>
+          <div className="pt-2 flex flex-wrap gap-2 md:gap-3">
+            <Button variant="accent" size="lg" href={SECTION_IDS.SCHEMES} className="w-full sm:w-auto justify-center">
               Explore Scholarships &amp; Fellowships
               <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M14 5l7 7m0 0l-7 7m7-7H3" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </Button>
-            <Button variant="ghost" size="lg" href={SECTION_IDS.ELIGIBILITY}>
+            <Button variant="ghost" size="lg" href={SECTION_IDS.ELIGIBILITY} className="w-full sm:w-auto justify-center">
               Check Eligibility
             </Button>
-            <Button variant="ghost" size="lg" href={SECTION_IDS.TRACK}>
+            <Button variant="ghost" size="lg" href={SECTION_IDS.TRACK} className="w-full sm:w-auto justify-center">
               Track Application
             </Button>
-            <Button variant="emerald" size="lg" to={ROUTES.applicant.login}>
-              Login / Register
+            <Button variant="emerald" size="lg" to={ROUTES.homeLogin} className="w-full sm:w-auto justify-center">
+              Login
             </Button>
           </div>
 

@@ -32,9 +32,9 @@ function StepCard({ step }: { step: WorkflowStep }) {
   const styles = toneStyles[step.tone];
 
   return (
-    <div className={`bg-white ${styles.border} rounded-lg p-4 relative shadow-sm`}>
+    <div className={`bg-white ${styles.border} rounded-lg p-3.5 md:p-4 relative shadow-sm`}>
       <div
-        className={`w-8 h-8 rounded-full ${styles.circle} flex items-center justify-center font-bold text-sm mb-2`}
+        className={`w-7 h-7 md:w-8 md:h-8 rounded-full ${styles.circle} flex items-center justify-center font-bold text-sm mb-2`}
       >
         {step.id}
       </div>
@@ -69,33 +69,33 @@ function StepCard({ step }: { step: WorkflowStep }) {
 export function GovernanceWorkflow() {
   return (
     <section
-      className="max-w-7xl mx-auto px-4 py-12"
+      className="max-w-7xl mx-auto px-4 py-10 md:py-12"
       data-purpose="application-processing-workflow"
       id="how-it-works"
     >
       <div className="text-center max-w-3xl mx-auto mb-8">
-        <span className="text-xs font-bold text-gov-blue uppercase tracking-wider bg-blue-50 border border-blue-200 px-2.5 py-1 rounded">
+        <span className="text-[11px] sm:text-xs font-bold text-gov-blue uppercase tracking-wider bg-blue-50 border border-blue-200 px-2.5 py-1 rounded">
           End-to-End Digital Workflow
         </span>
-        <h2 className="text-2xl font-bold text-slate-900 mt-2">
+        <h2 className="text-xl md:text-2xl font-bold text-slate-900 mt-2">
           How Your Application Is Processed
         </h2>
-        <p className="text-xs md:text-sm text-slate-600 mt-1">
+        <p className="text-[13px] md:text-sm text-slate-600 mt-1">
           From scheme discovery to the final authorized decision — AI assists with extraction and
           checks, while <strong>authorized officers verify and remain responsible for every final
           decision</strong>.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 relative">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 md:gap-4 relative">
         {WORKFLOW_STEPS.map((step) => (
           <StepCard key={step.id} step={step} />
         ))}
       </div>
 
-      <div className="mt-6 bg-emerald-50 border border-gov-green/40 rounded-lg p-4 flex flex-col md:flex-row items-center justify-between gap-4">
+      <div className="mt-6 bg-emerald-50 border border-gov-green/40 rounded-lg p-3.5 md:p-4 flex flex-col md:flex-row items-center justify-between gap-3 md:gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-gov-green text-white flex-shrink-0 flex items-center justify-center">
+          <div className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-gov-green text-white flex-shrink-0 flex items-center justify-center">
             <svg
               className="w-5 h-5"
               fill="none"

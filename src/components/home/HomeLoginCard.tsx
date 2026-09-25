@@ -3,6 +3,11 @@ import type { FormEvent, RefObject } from 'react';
 import { useLocation } from 'react-router-dom';
 import { ROUTES } from '../../lib/constants';
 import type { HomeAuthMode, HomeAuthNavigationState } from '../../types';
+import { useRef, useState } from 'react';
+import type { FormEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useApplicantAuth } from '../../context/useApplicantAuth';
+import { ROUTES } from '../../lib/constants';
 import { Button } from '../ui/Button';
 
 interface LoginErrors {
@@ -264,6 +269,8 @@ export function HomeLoginCard() {
   const [registrationValues, setRegistrationValues] = useState<RegistrationValues>(createRegistrationValues);
   const [showRegistrationPassword, setShowRegistrationPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [captchaCode, setCaptchaCode] = useState(createCaptchaCode);
   const [captchaInput, setCaptchaInput] = useState('');
   const [loginErrors, setLoginErrors] = useState<LoginErrors>({});
@@ -278,6 +285,10 @@ export function HomeLoginCard() {
   const confirmPasswordRef = useRef<HTMLInputElement>(null);
   const emailRef = useRef<HTMLInputElement>(null);
   const mobileRef = useRef<HTMLInputElement>(null);
+  const navigate = useNavigate();
+  const { signIn } = useApplicantAuth();
+  const usernameRef = useRef<HTMLInputElement>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
   const captchaRef = useRef<HTMLInputElement>(null);
   const handledLocationKeyRef = useRef<string | null>(null);
 
@@ -336,6 +347,9 @@ export function HomeLoginCard() {
     resetCard(nextMode);
     focusCardHeading(false);
   }
+  const heading = 'Applicant Login Here';
+  const usernameLabel = 'Username / Email';
+  const loginLabel = 'Login Here';
 
   function updateLoginUsername(value: string) {
     setLoginUsername(value);
@@ -400,6 +414,7 @@ export function HomeLoginCard() {
   }
 
   function handleRegistrationSubmit(event: FormEvent<HTMLFormElement>) {
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     const nextErrors: RegistrationErrors = {
@@ -459,12 +474,16 @@ export function HomeLoginCard() {
     setStatus(
       'Registration cannot continue. We created no account. The service did not check username availability. It did not verify any email or mobile number.',
     );
+    signIn(username);
+    navigate(ROUTES.applicant.dashboard);
   }
 
   return (
     <div
       id="home-authentication-card"
       className="lg:col-span-4 lg:h-[34rem] lg:overflow-hidden lg:flex lg:flex-col bg-white/95 text-slate-900 p-4 rounded-lg shadow-lg border border-slate-200"
+      id="home-login"
+      className="lg:col-span-4 bg-white/95 text-slate-900 p-4 rounded-lg shadow-lg border border-slate-200 scroll-mt-24"
       data-purpose="home-login-card"
     >
       <div className="flex items-center justify-between gap-3 border-b border-slate-200 pb-1.5 mb-3 lg:shrink-0">
@@ -477,7 +496,7 @@ export function HomeLoginCard() {
           {heading}
         </h3>
         <span className="text-[10px] font-bold text-amber-800 bg-amber-100 border border-amber-300 px-1.5 py-0.5 rounded">
-          UI Only
+          Demo Access
         </span>
       </div>
 
@@ -542,6 +561,33 @@ export function HomeLoginCard() {
             />
             <p className="mt-1 text-[11px] leading-relaxed text-slate-500" id="home-registration-username-help">
               Use 4–32 characters. The registration service will check availability after it connects.
+      <form className="space-y-3" noValidate onSubmit={handleSubmit}>
+        <div>
+          <label className="block text-xs font-semibold text-slate-700 mb-1" htmlFor="home-login-username">
+            {usernameLabel}
+          </label>
+          <input
+            ref={usernameRef}
+            id="home-login-username"
+            name="username"
+            type="text"
+            value={username}
+            placeholder="Username or email"
+            autoComplete="username"
+            autoCapitalize="none"
+            spellCheck={false}
+            aria-invalid={Boolean(errors.username)}
+            aria-describedby={errors.username ? 'home-login-username-error' : undefined}
+            onChange={(event) => updateUsername(event.target.value)}
+            className={`w-full text-xs px-2.5 py-2 border rounded bg-white focus:outline-none focus:ring-2 ${
+              errors.username
+                ? 'border-red-600 focus:border-red-600 focus:ring-red-200'
+                : 'border-slate-300 focus:border-gov-blue focus:ring-blue-100'
+            }`}
+          />
+          {errors.username ? (
+            <p className="mt-1 text-[11px] font-medium text-red-700" id="home-login-username-error">
+              {errors.username}
             </p>
             {registrationErrors.username ? (
               <p className="mt-1 text-[11px] font-medium text-red-700" id="home-registration-username-error">
@@ -869,6 +915,10 @@ export function HomeLoginCard() {
           </Button>
         )}
       </div>
+            Forgot Username
+          </button>
+        </div>
+      </form>
     </div>
   );
 }

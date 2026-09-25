@@ -68,3 +68,15 @@
     scroll-behavior: auto;
   }
 }
+
+/*
+ * Mobile-first compactness: shrink the base type size (and therefore all
+ * rem-based text/icons/boxes) on small screens so the layout reads comfortably
+ * on phones. Never overridden once the user touches the A-/A/A+ control, which
+ * writes an inline font-size on <html>.
+ */
+@media (max-width: 640px) {
+  html {
+    font-size: 15px;
+  }
+}
