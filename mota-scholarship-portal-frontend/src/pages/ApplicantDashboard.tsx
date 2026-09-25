@@ -44,7 +44,7 @@ function typeToneClass(type: string) {
 }
 
 export function ApplicantDashboard() {
-  const { session, signOut } = useApplicantAuth();
+  const { session, user, loading, signOut } = useApplicantAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [fontSize, setFontSize] = useState(BASE_FONT_SIZE);
@@ -52,7 +52,11 @@ export function ApplicantDashboard() {
   const [page, setPage] = useState(1);
   const trackRef = useRef<HTMLDivElement>(null);
 
-  if (!session) {
+  if (loading) {
+    return null;
+  }
+
+  if (!session || !user) {
     return (
       <Navigate
         replace
@@ -63,18 +67,14 @@ export function ApplicantDashboard() {
         to={ROUTES.homeLogin}
       />
     );
-  const { user } = useApplicantAuth();
-
-  if (!user) {
-    return null;
   }
 
-  const completion = calculateApplicantProfileCompletion(session.user);
+  const completion = calculateApplicantProfileCompletion(user);
   const pageCount = Math.max(1, Math.ceil(PORTAL_SCHEMES.length / PAGE_SIZE));
   const visibleSchemes = PORTAL_SCHEMES.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  function handleLogout() {
-    signOut();
+  async function handleLogout() {
+    await signOut();
     navigate(ROUTES.homeLogin, { replace: true });
   }
 
@@ -101,23 +101,6 @@ export function ApplicantDashboard() {
             <div className="flex items-center space-x-1.5">
               <span className="inline-block h-2 w-2 rounded-full bg-emerald-600" />
               <span className="font-medium">भारत सरकार | Government of India</span>
-    <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
-      <WelcomeSection profile={user} />
-
-      <section aria-labelledby="overview-heading" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <h2 className="sr-only" id="overview-heading">Application overview</h2>
-        <OverviewCard detail="All submitted applications" label="Applications" tone="blue" value={String(APPLICANT_APPLICATIONS.length)} />
-        <OverviewCard detail="Currently being reviewed" label="In review" tone="purple" value={String(underReview)} />
-        <OverviewCard detail="Needs your attention" label="Action required" tone="amber" value={String(actionRequired)} />
-        <OverviewCard detail="Your profile is almost ready" label="Profile" tone="green" value={`${user.profileCompletion}%`} />
-      </section>
-
-      <div className="grid gap-6 lg:grid-cols-3">
-        <section className="space-y-4 lg:col-span-2" aria-labelledby="recent-applications-heading">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-gov-saffron-dark">Your workspace</p>
-              <h2 className="mt-1 text-xl font-bold text-gov-blue-dark" id="recent-applications-heading">Recent applications</h2>
             </div>
             <span className="text-slate-300">|</span>
             <span>जनजातीय कार्य मंत्रालय | Ministry of Tribal Affairs</span>
@@ -243,7 +226,7 @@ export function ApplicantDashboard() {
             to={ROUTES.applicant.profile}
           >
             <span className="relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-amber-300 to-amber-500 text-2xs font-bold text-[#0b2546] ring-2 ring-amber-400/50">
-              {session.user.avatarInitials}
+              {user.avatarInitials}
               <span
                 aria-hidden="true"
                 className="absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full border-2 border-[#0b2546] bg-emerald-400"
@@ -251,9 +234,9 @@ export function ApplicantDashboard() {
             </span>
             <span className="leading-tight">
               <span className="block text-2xs font-semibold text-white transition group-hover:text-amber-200">
-                {session.user.name}
+                {user.name}
               </span>
-              <span className="block text-2xs text-amber-300/80">{session.user.category}</span>
+              <span className="block text-2xs text-amber-300/80">{user.category}</span>
             </span>
             <i
               aria-hidden="true"

@@ -141,52 +141,6 @@ export function ApplicantLayout() {
     (document) => document.type === 'Category' && document.status === 'verified',
   );
 
-  function handleLogout() {
-    signOut();
-    navigate(ROUTES.homeLogin, { replace: true });
-  }
-
-  return (
-    <div className="min-h-screen bg-gov-slate-bg">
-      <div ref={backgroundRef} className="flex min-h-screen flex-col">
-        <TopAccessibilityBar />
-        <Masthead />
-        <ApplicantHeader
-          profile={session.user}
-          sidebarOpen={sidebarOpen}
-          unreadCount={unreadNotificationCount}
-          onLogout={handleLogout}
-          onToggleSidebar={() => setSidebarOpen((current) => !current)}
-        />
-        <AnnouncementTicker />
-
-        <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-center text-xs font-medium text-amber-950">
-          Demo applicant workspace. Records are sample data; uploads, submissions, AI checks, and grievance delivery are not connected to a backend.
-        </div>
-
-        <main className="min-w-0 flex-grow" id={SECTION_IDS.MAIN_CONTENT.replace('#', '')}>
-          <div className="mx-auto grid min-w-0 max-w-[90rem] gap-4 px-4 py-4 sm:px-6 lg:grid-cols-[15rem_minmax(0,1fr)] lg:px-6">
-            <aside className="hidden min-w-0 lg:block">
-              <div className="sticky top-20 max-h-[calc(100vh-6rem)] overflow-y-auto rounded border border-slate-200 bg-white shadow-sm">
-                <ApplicantSidebar
-                  applicationCount={APPLICANT_APPLICATIONS.length}
-                  categoryVerified={categoryVerified}
-                  documentAttentionCount={documentAttentionCount}
-                  idPrefix="desktop-applicant-sidebar"
-                  profile={session.user}
-                  unreadNotificationCount={unreadNotificationCount}
-                  onLogout={handleLogout}
-                />
-              </div>
-            </aside>
-
-            <div className="min-w-0" key={location.pathname}>
-              <Outlet />
-            </div>
-          </div>
-        </main>
-
-        <Footer />
   if (loading) {
     return null;
   }
@@ -205,9 +159,45 @@ export function ApplicantLayout() {
 
   return (
     <div className="flex min-h-screen flex-col bg-gov-slate-bg">
-      <ApplicantHeader onLogout={handleLogout} profile={user} />
-      <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-center text-xs text-amber-900">
-        Authentication uses Supabase. Application and document data remain sample content in this phase.
+      <div ref={backgroundRef} className="flex min-h-0 flex-grow flex-col">
+        <TopAccessibilityBar />
+        <Masthead />
+        <ApplicantHeader
+          profile={user}
+          sidebarOpen={sidebarOpen}
+          unreadCount={unreadNotificationCount}
+          onLogout={handleLogout}
+          onToggleSidebar={() => setSidebarOpen((current) => !current)}
+        />
+        <AnnouncementTicker />
+
+        <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-center text-xs font-medium text-amber-950">
+          Authentication uses Supabase. Application and document data remain sample content in this phase.
+        </div>
+
+        <main className="min-w-0 flex-grow" id={SECTION_IDS.MAIN_CONTENT.replace('#', '')}>
+          <div className="mx-auto grid min-w-0 max-w-[90rem] gap-4 px-4 py-4 sm:px-6 lg:grid-cols-[15rem_minmax(0,1fr)] lg:px-6">
+            <aside className="hidden min-w-0 lg:block">
+              <div className="sticky top-20 max-h-[calc(100vh-6rem)] overflow-y-auto rounded border border-slate-200 bg-white shadow-sm">
+                <ApplicantSidebar
+                  applicationCount={APPLICANT_APPLICATIONS.length}
+                  categoryVerified={categoryVerified}
+                  documentAttentionCount={documentAttentionCount}
+                  idPrefix="desktop-applicant-sidebar"
+                  profile={user}
+                  unreadNotificationCount={unreadNotificationCount}
+                  onLogout={handleLogout}
+                />
+              </div>
+            </aside>
+
+            <div className="min-w-0" key={location.pathname}>
+              <Outlet />
+            </div>
+          </div>
+        </main>
+
+        <Footer />
       </div>
 
       {sidebarOpen ? (
@@ -232,7 +222,7 @@ export function ApplicantLayout() {
               categoryVerified={categoryVerified}
               documentAttentionCount={documentAttentionCount}
               idPrefix="mobile-applicant-sidebar"
-              profile={session.user}
+              profile={user}
               unreadNotificationCount={unreadNotificationCount}
               onClose={closeSidebar}
               onLogout={handleLogout}

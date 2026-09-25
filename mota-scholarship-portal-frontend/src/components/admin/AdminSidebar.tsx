@@ -29,9 +29,7 @@ const managementItems: SidebarItem[] = [
   { label: 'Admin users', to: ROUTES.admin.users, icon: 'users' },
   { label: 'Notifications', to: ROUTES.admin.notifications, icon: 'notifications' },
   { label: 'Settings', to: ROUTES.admin.settings, icon: 'settings' },
-  { label: 'Audit logs', to: ROUTES.admin.auditLogs, icon: 'clock' },
-  { label: 'Data export', to: ROUTES.admin.dataExport, icon: 'download' },
-  { label: 'System health', to: ROUTES.admin.systemHealth, icon: 'heartbeat' },
+  { label: 'Audit logs', to: ROUTES.admin.audit, icon: 'clock' },
 ];
 
 function navClass({ isActive }: { isActive: boolean }) {

@@ -15,43 +15,6 @@ import {
 import type { SignUpInput } from '../services/auth/authService';
 import { ApplicantAuthContext } from './ApplicantAuthContextValue';
 
-export const APPLICANT_SESSION_KEY = 'mota-applicant-session';
-
-const DEMO_PROFILE: ApplicantProfile = {
-  id: 'applicant-demo-001',
-  name: 'Aarav Kumar',
-  email: 'aarav.kumar@example.in',
-  mobile: '+91 98765 43210',
-  state: 'Odisha',
-  district: 'Khordha',
-  category: 'Scheduled Tribe',
-  course: 'B.Tech, Computer Science',
-  institution: 'Kalinga Institute of Technology',
-  avatarInitials: 'AK',
-};
-
-function isApplicantSession(value: unknown): value is ApplicantSession {
-  if (!value || typeof value !== 'object') {
-    return false;
-  }
-
-  const candidate = value as Partial<ApplicantSession>;
-  const user = candidate.user as Partial<ApplicantProfile> | undefined;
-
-  return (
-    typeof candidate.signedInAt === 'string' &&
-    Boolean(user) &&
-    typeof user?.id === 'string' &&
-    typeof user.name === 'string' &&
-    typeof user.email === 'string' &&
-    typeof user.mobile === 'string' &&
-    typeof user.state === 'string' &&
-    typeof user.district === 'string' &&
-    typeof user.category === 'string' &&
-    typeof user.course === 'string' &&
-    typeof user.institution === 'string' &&
-    typeof user.avatarInitials === 'string'
-  );
 function getMetadataString(user: User, key: string) {
   const value = user.user_metadata[key];
   return typeof value === 'string' ? value.trim() : '';
@@ -81,7 +44,6 @@ function toApplicantProfile(authUser: User, profile: AuthProfile | null): Applic
   const category = getMetadataString(authUser, 'category');
   const course = getMetadataString(authUser, 'course');
   const institution = getMetadataString(authUser, 'institution');
-  const completedFields = [name, email, mobile, state, district, category, course, institution].filter(Boolean).length;
 
   return {
     id: authUser.id,
@@ -94,7 +56,6 @@ function toApplicantProfile(authUser: User, profile: AuthProfile | null): Applic
     course,
     institution,
     avatarInitials: getInitials(name),
-    profileCompletion: Math.round((completedFields / 8) * 100),
   };
 }
 
@@ -214,23 +175,6 @@ export function ApplicantAuthProvider({ children }: { children: ReactNode }) {
     [clearAuthState],
   );
 
-    try {
-      window.localStorage.setItem(APPLICANT_SESSION_KEY, JSON.stringify(nextSession));
-    } catch {
-      return false;
-    }
-
-    setSession(nextSession);
-    return true;
-  }, []);
-
-  const signOut = useCallback(() => {
-    try {
-      window.localStorage.removeItem(APPLICANT_SESSION_KEY);
-    } finally {
-      setSession(null);
-    }
-  }, []);
   const signUp = useCallback(
     async (input: SignUpInput) => {
       const result = await signUpWithSupabase(input);

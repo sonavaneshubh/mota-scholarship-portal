@@ -288,10 +288,8 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
   const location = useLocation();
   const navigate = useNavigate();
   const { signIn, signUp, signOut, resetPassword } = useApplicantAuth();
-  const requestedMode = getRequestedHomeAuthMode(location.state, location.pathname);
-  const { signIn } = useApplicantAuth();
   const { signIn: signInAdmin } = useAdminAuth();
-  const requestedMode = getRequestedHomeAuthMode(location.state);
+  const requestedMode = getRequestedHomeAuthMode(location.state, location.pathname);
   const requestedApplicantPath = getRequestedApplicantPath(location.state);
   const [mode, setMode] = useState<HomeAuthMode>(() => requestedMode ?? 'applicant');
   const [loginUsername, setLoginUsername] = useState('');
@@ -450,46 +448,30 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
     setIsSubmitting(true);
 
     try {
+      if (isAdmin) {
+        setIsAuthenticating(true);
+        setStatus('Checking admin credentials…');
+
+        try {
+          const result = await signInAdmin(loginUsername, loginPassword, true);
+
+          if (!result.ok) {
+            setStatus(result.message ?? 'The admin ID or password is incorrect.');
+            return;
+          }
+
+          navigate(ROUTES.admin.dashboard);
+        } finally {
+          setIsAuthenticating(false);
+        }
+
+        return;
+      }
+
       const result = await signIn(loginUsername, loginPassword);
 
       if (!result.success) {
         setStatus(result.error ?? 'Sign in could not be completed. Please try again.');
-        return;
-      }
-
-      if (isAdmin) {
-        if (result.role !== 'admin') {
-          await signOut();
-          setStatus('This account is not authorized for admin access.');
-          return;
-        }
-    if (isAdmin) {
-      setIsAuthenticating(true);
-      setStatus('Checking admin credentials…');
-
-      try {
-        const result = await signInAdmin(loginUsername, loginPassword, true);
-
-        if (!result.ok) {
-          setStatus(result.message ?? 'The admin ID or password is incorrect.');
-          return;
-        }
-
-        navigate(ROUTES.admin.dashboard);
-      } finally {
-        setIsAuthenticating(false);
-      }
-
-      return;
-    }
-
-    if (!signIn(loginUsername)) {
-      setStatus('The demo session could not be saved in this browser. No login was created.');
-      return;
-    }
-
-    navigate(requestedApplicantPath ?? ROUTES.applicant.dashboard, { replace: true });
-        setStatus('Admin identity verified. The admin workspace will be connected in a later phase.');
         return;
       }
 
@@ -499,7 +481,7 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
         return;
       }
 
-      navigate(ROUTES.applicant.dashboard);
+      navigate(requestedApplicantPath ?? ROUTES.applicant.dashboard, { replace: true });
     } finally {
       setIsSubmitting(false);
     }
@@ -978,8 +960,6 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
             </p>
           ) : null}
 
-          <Button className="w-full justify-center rounded" disabled={isSubmitting} size="md" type="submit">
-            {isSubmitting ? 'Please wait…' : loginLabel}
           <Button className="w-full justify-center rounded" disabled={isAuthenticating} size="md" type="submit">
             {isAuthenticating ? 'Signing in…' : loginLabel}
           </Button>
