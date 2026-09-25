@@ -1,9 +1,12 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { OFFICER_RESOURCES } from '../../data/mockData';
+import { ROUTES } from '../../lib/constants';
 import { Button } from '../ui/Button';
 
 export function OfficerQuickLogin() {
   const [code, setCode] = useState('');
+  const navigate = useNavigate();
 
   return (
     <div
@@ -28,7 +31,10 @@ export function OfficerQuickLogin() {
       <form
         className="space-y-3"
         data-purpose="officer-quick-login"
-        onSubmit={(e) => e.preventDefault()}
+        onSubmit={(event) => {
+          event.preventDefault();
+          navigate(ROUTES.admin.login);
+        }}
       >
         <div>
           <label htmlFor="officer-code" className="block text-xs font-medium text-slate-700 mb-1">

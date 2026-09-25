@@ -1,4 +1,4 @@
-import { SECTION_IDS, SITE } from '../../lib/constants';
+import { ROUTES, SECTION_IDS, SITE } from '../../lib/constants';
 import { Button } from '../ui/Button';
 
 function NationalEmblem() {
@@ -64,7 +64,7 @@ export function Masthead() {
             <div className="text-[10px] text-slate-500">{SITE.helpdeskHours}</div>
           </div>
           <div className="flex flex-col gap-1">
-            <Button variant="primary" size="md" href={SECTION_IDS.OFFICER_ACCESS}>
+            <Button variant="primary" size="md" to={ROUTES.applicant.login}>
               Login
             </Button>
             <Button variant="outline" size="sm" href={SECTION_IDS.TRACK}>

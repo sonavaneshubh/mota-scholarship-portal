@@ -23,6 +23,8 @@ export const SITE = {
 export const ROUTES = {
   home: '/',
   applicant: {
+    login: '/applicant/login',
+    register: '/applicant/register',
     dashboard: '/applicant/dashboard',
     schemes: '/applicant/schemes',
     schemeDetail: '/applicant/schemes/:id',
@@ -36,6 +38,7 @@ export const ROUTES = {
     profile: '/applicant/profile',
   },
   admin: {
+    login: '/admin/login',
     dashboard: '/admin/dashboard',
     applications: '/admin/applications',
     applicationDetail: '/admin/applications/:id',
@@ -113,8 +116,8 @@ export const FOOTER_LINK_COLUMNS: FooterLinkColumn[] = [
     id: 'applicant',
     heading: 'Applicant',
     links: [
-      { label: 'Login', href: SECTION_IDS.OFFICER_ACCESS },
-      { label: 'New Registration', href: SECTION_IDS.HOW_TO_APPLY },
+      { label: 'Login', href: ROUTES.applicant.login },
+      { label: 'New Registration', href: ROUTES.applicant.register },
       { label: 'Track Application', href: SECTION_IDS.TRACK },
       { label: 'Check Eligibility', href: SECTION_IDS.ELIGIBILITY },
     ],
@@ -124,7 +127,7 @@ export const FOOTER_LINK_COLUMNS: FooterLinkColumn[] = [
     heading: 'Support',
     links: [
       { label: 'Help & Grievance', href: SECTION_IDS.HELP_GRIEVANCE },
-      { label: 'Officer / Administrator Access', href: SECTION_IDS.OFFICER_ACCESS },
+      { label: 'Officer / Administrator Access', href: ROUTES.admin.login },
       { label: 'Contact (Prototype)', href: '#prototype-contact' },
     ],
   },

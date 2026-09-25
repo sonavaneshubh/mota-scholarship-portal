@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { NAVIGATION_ITEMS, SECTION_IDS } from '../../lib/constants';
+import { NAVIGATION_ITEMS, ROUTES } from '../../lib/constants';
 import { Button } from '../ui/Button';
 
 export function MainNavigation() {
@@ -38,10 +38,10 @@ export function MainNavigation() {
         </ul>
 
         <div className="hidden lg:flex items-center space-x-2 py-1.5">
-          <Button variant="ghost" size="sm" href={SECTION_IDS.OFFICER_ACCESS}>
+          <Button variant="ghost" size="sm" to={ROUTES.applicant.login}>
             Login
           </Button>
-          <Button variant="accent" size="sm" href={SECTION_IDS.HOW_TO_APPLY}>
+          <Button variant="accent" size="sm" to={ROUTES.applicant.register}>
             New Registration
           </Button>
         </div>
@@ -91,10 +91,22 @@ export function MainNavigation() {
             )}
           </ul>
           <div className="px-2 py-3 flex flex-col gap-2 border-t border-blue-900">
-            <Button variant="ghost" size="sm" href={SECTION_IDS.OFFICER_ACCESS} className="justify-center">
+            <Button
+              variant="ghost"
+              size="sm"
+              to={ROUTES.applicant.login}
+              className="justify-center"
+              onClick={() => setMobileOpen(false)}
+            >
               Login
             </Button>
-            <Button variant="accent" size="sm" href={SECTION_IDS.HOW_TO_APPLY} className="justify-center">
+            <Button
+              variant="accent"
+              size="sm"
+              to={ROUTES.applicant.register}
+              className="justify-center"
+              onClick={() => setMobileOpen(false)}
+            >
               New Registration
             </Button>
           </div>

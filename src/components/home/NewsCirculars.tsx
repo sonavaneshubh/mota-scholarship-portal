@@ -1,5 +1,6 @@
+import { Link } from 'react-router-dom';
 import { CIRCULARS } from '../../data/mockData';
-import { SECTION_IDS } from '../../lib/constants';
+import { ROUTES } from '../../lib/constants';
 import { Badge } from '../ui/Badge';
 
 export function NewsCirculars() {
@@ -35,12 +36,9 @@ export function NewsCirculars() {
         <span className="text-[11px] text-slate-600 block">
           Officer / administrator access is a prototype UI.
         </span>
-        <a
-          className="text-xs font-bold text-gov-blue hover:text-gov-saffron"
-          href={SECTION_IDS.OFFICER_ACCESS}
-        >
+        <Link className="text-xs font-bold text-gov-blue hover:text-gov-saffron" to={ROUTES.admin.login}>
           Officer / Administrator Access →
-        </a>
+        </Link>
       </div>
     </div>
   );

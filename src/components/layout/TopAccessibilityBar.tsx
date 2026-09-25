@@ -54,7 +54,7 @@ export function TopAccessibilityBar() {
           </span>
         </div>
 
-        <div className="flex items-center space-x-3">
+        <div className="flex min-w-0 flex-wrap items-center justify-end gap-2 sm:gap-3">
           <div
             className="flex items-center border border-slate-300 rounded bg-white overflow-hidden px-1"
             title="Accessibility Font Adjust"

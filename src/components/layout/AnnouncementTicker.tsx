@@ -14,7 +14,7 @@ export function AnnouncementTicker() {
         <span className="inline-flex items-center gap-1.5 font-semibold uppercase text-slate-500 bg-slate-100 border border-slate-300 px-2 py-0.5 rounded mr-2 flex-shrink-0">
           Sample
         </span>
-        <div className="overflow-hidden whitespace-nowrap w-full">
+        <div className="overflow-hidden whitespace-nowrap w-full min-w-0">
           <div className="marquee-track text-slate-800 font-medium">
             {doubled.map((item, idx) => (
               <span key={`${item.id}-${idx}`} className="mx-4">

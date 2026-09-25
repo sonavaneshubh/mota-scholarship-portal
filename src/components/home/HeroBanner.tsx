@@ -1,5 +1,5 @@
-import { APPLICATION_GLANCE } from '../../data/mockData';
-import { SECTION_IDS } from '../../lib/constants';
+import { ROUTES, SECTION_IDS } from '../../lib/constants';
+import { HomeLoginCard } from './HomeLoginCard';
 import { Button } from '../ui/Button';
 
 export function HeroBanner() {
@@ -53,7 +53,7 @@ export function HeroBanner() {
             <Button variant="ghost" size="lg" href={SECTION_IDS.TRACK}>
               Track Application
             </Button>
-            <Button variant="emerald" size="lg" href={SECTION_IDS.OFFICER_ACCESS}>
+            <Button variant="emerald" size="lg" to={ROUTES.applicant.login}>
               Login / Register
             </Button>
           </div>
@@ -63,34 +63,7 @@ export function HeroBanner() {
           </p>
         </div>
 
-        <div className="lg:col-span-4 bg-white/95 text-slate-900 p-4 rounded-lg shadow-lg border border-slate-200">
-          <div className="flex items-center justify-between border-b pb-1.5 mb-2">
-            <span className="text-xs uppercase tracking-wider font-bold text-gov-blue">
-              Application at a Glance
-            </span>
-            <span className="text-[10px] font-bold text-amber-800 bg-amber-100 border border-amber-300 px-1.5 py-0.5 rounded">
-              Prototype
-            </span>
-          </div>
-          <p className="text-[11px] text-slate-500 mb-2">
-            How the portal works — from discovery to decision.
-          </p>
-          <ol className="divide-y divide-slate-100">
-            {APPLICATION_GLANCE.map((item) => (
-              <li key={item.id} className="flex items-center gap-2.5 py-1.5">
-                <span className="w-7 h-7 rounded-full bg-gov-blue text-white text-[11px] font-bold flex items-center justify-center flex-shrink-0">
-                  {item.number}
-                </span>
-                <span className="text-xs font-semibold text-slate-800">{item.title}</span>
-              </li>
-            ))}
-          </ol>
-          <div className="mt-2 pt-2 border-t border-slate-200 text-center">
-            <span className="text-[11px] text-slate-600 italic">
-              AI assists. Authorized officers verify and decide.
-            </span>
-          </div>
-        </div>
+        <HomeLoginCard />
       </div>
     </section>
   );
