@@ -1,10 +1,19 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { NAVIGATION_ITEMS, ROUTES } from '../../lib/constants';
+import type { HomeAuthNavigationState } from '../../types';
 import { Button } from '../ui/Button';
 
 export function MainNavigation() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  function openRegistrationCard() {
+    const state: HomeAuthNavigationState = { homeAuthMode: 'registration' };
+    setMobileOpen(false);
+    navigate(ROUTES.home, { replace: location.pathname === ROUTES.home, state });
+  }
 
   return (
     <nav aria-label="Main Navigation" className="bg-gov-blue text-white sticky top-0 z-40 shadow">
@@ -41,14 +50,20 @@ export function MainNavigation() {
           <Button variant="ghost" size="sm" to={ROUTES.applicant.login}>
             Login
           </Button>
-          <Button variant="accent" size="sm" to={ROUTES.applicant.register}>
+          <Button
+            variant="accent"
+            size="sm"
+            type="button"
+            aria-controls="home-authentication-card"
+            onClick={openRegistrationCard}
+          >
             New Registration
           </Button>
         </div>
 
         <button
           type="button"
-          className="md:hidden text-white p-2 focus:outline-none"
+          className="lg:hidden text-white p-2 focus:outline-none"
           aria-label="Toggle navigation menu"
           aria-expanded={mobileOpen}
           onClick={() => setMobileOpen((o) => !o)}
@@ -64,7 +79,7 @@ export function MainNavigation() {
       </div>
 
       {mobileOpen ? (
-        <div className="md:hidden border-t border-blue-900 bg-gov-blue-dark">
+        <div className="lg:hidden border-t border-blue-900 bg-gov-blue-dark">
           <ul className="px-2 py-1 space-y-0.5 text-sm">
             {NAVIGATION_ITEMS.map((item) =>
               item.active ? (
@@ -103,9 +118,10 @@ export function MainNavigation() {
             <Button
               variant="accent"
               size="sm"
-              to={ROUTES.applicant.register}
+              type="button"
               className="justify-center"
-              onClick={() => setMobileOpen(false)}
+              aria-controls="home-authentication-card"
+              onClick={openRegistrationCard}
             >
               New Registration
             </Button>

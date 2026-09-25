@@ -21,6 +21,12 @@ export interface NavigationItem {
   external?: boolean;
 }
 
+export type HomeAuthMode = 'applicant' | 'admin' | 'registration';
+
+export interface HomeAuthNavigationState {
+  homeAuthMode: 'registration';
+}
+
 export interface Announcement {
   id: string;
   mark: string;
