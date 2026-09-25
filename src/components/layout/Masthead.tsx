@@ -2,8 +2,8 @@ import { SITE } from '../../lib/constants';
 
 function NationalEmblem() {
   return (
-    <div className="w-12 h-14 md:w-14 md:h-16 flex-shrink-0 flex items-center justify-center border-r border-slate-300 pr-2.5 md:pr-3">
-      <svg aria-label="Placeholder representation of Emblem of India" className="h-12 md:h-16 w-auto text-slate-900" fill="currentColor" viewBox="0 0 100 130">
+    <div className="w-14 h-16 flex-shrink-0 flex items-center justify-center border-r border-slate-300 pr-3">
+      <svg aria-label="Placeholder representation of Emblem of India" className="h-16 w-auto text-slate-900" fill="currentColor" viewBox="0 0 100 130">
         <path
           d="M50 5 C40 5 35 15 35 25 C35 30 38 35 42 38 C35 40 28 46 28 55 C28 62 33 68 40 70 L35 85 L65 85 L60 70 C67 68 72 62 72 55 C72 46 65 40 58 38 C62 35 65 30 65 25 C65 15 60 5 50 5 Z"
           fill="#2d3748"
@@ -27,23 +27,23 @@ export function Masthead() {
       data-purpose="official-branding-header"
     >
       <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-        <div className="flex items-center gap-2.5 md:gap-3 text-left">
+        <div className="flex items-center gap-3 text-left">
           <NationalEmblem />
           <div>
-            <div className="text-[10px] md:text-xs uppercase tracking-wider text-slate-600 font-semibold leading-tight">
+            <div className="text-xs uppercase tracking-wider text-slate-600 font-semibold leading-tight">
               {SITE.govtLineHi} • {SITE.govtLineEn}
             </div>
-            <h1 className="text-sm md:text-lg font-bold text-gov-blue-dark leading-tight mt-0.5">
+            <h1 className="text-base md:text-lg font-bold text-gov-blue-dark leading-tight mt-0.5">
               {SITE.nameHi}
             </h1>
-            <div className="text-xs md:text-sm font-semibold text-slate-800 leading-tight">{SITE.nameEn}</div>
-            <div className="text-[10px] md:text-[11px] text-gov-saffron-dark font-medium mt-0.5">
+            <div className="text-sm font-semibold text-slate-800 leading-tight">{SITE.nameEn}</div>
+            <div className="text-[11px] text-gov-saffron-dark font-medium mt-0.5">
               {SITE.portalName}
             </div>
           </div>
         </div>
 
-        <div className="hidden lg:flex items-center gap-6 px-4 border-x border-slate-200">
+        <div className="hidden lg:flex flex-1 items-center justify-center gap-6 px-4 border-x border-slate-200 text-center">
           <div className="text-center">
             <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider bg-amber-100 border border-amber-300 text-amber-800 px-2 py-0.5 rounded">
               <span className="w-1.5 h-1.5 rounded-full bg-gov-saffron" />
@@ -56,12 +56,13 @@ export function Masthead() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3 text-right w-full sm:w-auto">
-          <div className="hidden sm:block">
-            <div className="text-[11px] text-slate-500 font-medium">{SITE.helpdeskLabel}</div>
-            <div className="text-sm font-bold text-gov-blue">{SITE.helpdeskPhone}</div>
-            <div className="text-[10px] text-slate-500">{SITE.helpdeskHours}</div>
+        <div className="w-full sm:w-auto rounded-lg border border-amber-200 bg-amber-50/70 px-4 py-2 text-right">
+          <div className="flex items-center justify-end gap-1.5 text-[10px] font-bold uppercase tracking-wider text-amber-800">
+            <span className="w-1.5 h-1.5 rounded-full bg-gov-saffron" />
+            {SITE.helpdeskLabel}
           </div>
+          <div className="mt-1 text-sm font-bold text-gov-blue">{SITE.helpdeskPhone}</div>
+          <div className="text-[10px] text-slate-600">{SITE.helpdeskHours}</div>
         </div>
       </div>
     </section>

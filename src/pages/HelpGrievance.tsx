@@ -13,9 +13,12 @@ export function HelpGrievance() {
       <div className="max-w-7xl mx-auto px-4">
         <Link
           to={ROUTES.home}
-          className="inline-flex min-h-11 items-center text-sm font-semibold text-gov-blue underline underline-offset-2 hover:text-gov-saffron"
+          className="group inline-flex min-h-11 items-center gap-2 rounded-full border border-blue-200 bg-white px-4 py-2 text-sm font-semibold text-gov-blue shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-gov-saffron hover:bg-amber-50 hover:text-gov-blue-dark focus-visible:ring-2 focus-visible:ring-gov-saffron focus-visible:ring-offset-2"
         >
-          ← Back to Home
+          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-100 text-base leading-none text-gov-blue transition group-hover:bg-amber-100 group-hover:text-gov-saffron-dark" aria-hidden="true">
+            ←
+          </span>
+          <span>Back to Home</span>
         </Link>
 
         <div className="mt-5 max-w-3xl">
