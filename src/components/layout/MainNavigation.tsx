@@ -72,7 +72,7 @@ export function MainNavigation() {
             variant="ghost"
             size="sm"
             type="button"
-            aria-controls="home-authentication-card"
+            aria-controls="home-login"
             onClick={() => openAuthCard('applicant')}
           >
             Login
@@ -81,13 +81,9 @@ export function MainNavigation() {
             variant="accent"
             size="sm"
             type="button"
-            aria-controls="home-authentication-card"
+            aria-controls="home-login"
             onClick={() => openAuthCard('registration')}
           >
-          <Button variant="ghost" size="sm" to={ROUTES.homeLogin}>
-            Login
-          </Button>
-          <Button variant="accent" size="sm" to={ROUTES.homeLogin}>
             New Registration
           </Button>
         </div>
@@ -112,40 +108,13 @@ export function MainNavigation() {
       {mobileOpen ? (
         <div className="lg:hidden border-t border-blue-900 bg-gov-blue-dark">
           <NavigationItems mobile onNavigate={() => setMobileOpen(false)} />
-        <div className="md:hidden border-t border-blue-900 bg-gov-blue-dark max-h-[80vh] overflow-y-auto">
-          <ul className="px-2 py-1 space-y-0.5 text-sm">
-            {NAVIGATION_ITEMS.map((item) =>
-              item.active ? (
-                <li key={item.id}>
-                  <Link
-                    to={item.href}
-                    className="block py-2 px-3 text-white font-bold border-l-2 border-amber-400"
-                    onClick={() => setMobileOpen(false)}
-                  >
-                    {item.label}
-                  </Link>
-                </li>
-              ) : (
-                <li key={item.id}>
-                  <a
-                    href={item.href}
-                    className="block py-2 px-3 text-slate-100 hover:bg-gov-blue-light"
-                    onClick={() => setMobileOpen(false)}
-                  >
-                    {item.label}
-                  </a>
-                </li>
-              ),
-            )}
-          </ul>
           <div className="px-2 py-3 flex flex-col gap-2 border-t border-blue-900">
             <Button
               variant="ghost"
               size="sm"
               type="button"
-              to={ROUTES.homeLogin}
               className="justify-center"
-              aria-controls="home-authentication-card"
+              aria-controls="home-login"
               onClick={() => openAuthCard('applicant')}
             >
               Login
@@ -154,9 +123,8 @@ export function MainNavigation() {
               variant="accent"
               size="sm"
               type="button"
-              to={ROUTES.homeLogin}
               className="justify-center"
-              aria-controls="home-authentication-card"
+              aria-controls="home-login"
               onClick={() => openAuthCard('registration')}
             >
               New Registration

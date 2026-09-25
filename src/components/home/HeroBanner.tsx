@@ -40,10 +40,13 @@ export function HeroBanner() {
             applications, managing documents, and tracking application verification and decisions.
           </p>
 
-          <div className="pt-2 flex flex-wrap gap-3">
-            <Button variant="accent" size="lg" to={ROUTES.scholarshipsFellowships}>
           <div className="pt-2 flex flex-wrap gap-2 md:gap-3">
-            <Button variant="accent" size="lg" href={SECTION_IDS.SCHEMES} className="w-full sm:w-auto justify-center">
+            <Button
+              variant="accent"
+              size="lg"
+              to={ROUTES.scholarshipsFellowships}
+              className="w-full sm:w-auto justify-center"
+            >
               Explore Scholarships &amp; Fellowships
               <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M14 5l7 7m0 0l-7 7m7-7H3" strokeLinecap="round" strokeLinejoin="round" />

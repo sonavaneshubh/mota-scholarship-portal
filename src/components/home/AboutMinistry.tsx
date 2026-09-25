@@ -1,3 +1,4 @@
+import { MINISTRY_STATS } from '../../data/mockData';
 import { Link } from 'react-router-dom';
 import { ROUTES } from '../../lib/constants';
 
@@ -22,6 +23,8 @@ export function AboutMinistry() {
       >
         Read More <span aria-hidden="true">→</span>
       </Link>
+
+      <div className="border-b border-slate-200 pb-3 mb-4 mt-6">
         <span className="text-[11px] sm:text-xs font-bold text-gov-saffron uppercase tracking-wider">
           About the Portal &amp; its Purpose
         </span>
