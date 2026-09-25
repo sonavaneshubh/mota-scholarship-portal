@@ -36,66 +36,6 @@ import { AdminDashboard } from './pages/AdminDashboard';
 export default function App() {
   return (
     <BrowserRouter>
-      <ApplicantAuthProvider>
-        <Routes>
-          <Route element={<SiteLayout />}>
-            <Route path={ROUTES.home} element={<Home />} />
-            <Route path={ROUTES.aboutMota} element={<AboutMota />} />
-            <Route path={ROUTES.scholarshipsFellowships} element={<ScholarshipsFellowships />} />
-            <Route path={ROUTES.guidelinesNotices} element={<GuidelinesNotices />} />
-            <Route path={ROUTES.helpGrievance} element={<HelpGrievance />} />
-            <Route
-              path={ROUTES.applicant.login}
-              element={
-                <Navigate
-                  replace
-                  state={{ homeAuthMode: 'applicant' }}
-                  to={ROUTES.homeLogin}
-                />
-              }
-            />
-            <Route
-              path={ROUTES.applicant.register}
-              element={
-                <Navigate
-                  replace
-                  state={{ homeAuthMode: 'registration' }}
-                  to={ROUTES.homeLogin}
-                />
-              }
-            />
-            <Route
-              path={ROUTES.admin.login}
-              element={
-                <Navigate
-                  replace
-                  state={{ homeAuthMode: 'admin' }}
-                  to={ROUTES.homeLogin}
-                />
-              }
-            />
-            <Route path={ROUTES.applicant.login} element={<Home />} />
-            <Route path={ROUTES.applicant.register} element={<Home />} />
-            <Route path={ROUTES.admin.login} element={<Home />} />
-            <Route path={ROUTES.resetPassword} element={<ResetPasswordPage />} />
-            <Route path="*" element={<Navigate replace to={ROUTES.home} />} />
-          </Route>
-          <Route path={ROUTES.applicant.dashboard} element={<ApplicantDashboard />} />
-          <Route element={<ApplicantLayout />}>
-            <Route path={ROUTES.applicant.schemes} element={<ApplicantSchemesPage />} />
-            <Route path={ROUTES.applicant.schemeDetail} element={<ApplicantSchemeDetailPage />} />
-            <Route path={ROUTES.applicant.applications} element={<ApplicantApplicationsPage />} />
-            <Route path={ROUTES.applicant.application} element={<ApplicantApplicationPage />} />
-            <Route path={ROUTES.applicant.status} element={<ApplicantApplicationPage />} />
-            <Route path={ROUTES.applicant.documents} element={<ApplicantDocumentsPage />} />
-            <Route path={ROUTES.applicant.history} element={<ApplicantHistoryPage />} />
-            <Route path={ROUTES.applicant.grievance} element={<ApplicantGrievancesPage />} />
-            <Route path={ROUTES.applicant.guidelines} element={<ApplicantGuidelinesPage />} />
-            <Route path={ROUTES.applicant.notifications} element={<ApplicantNotificationsPage />} />
-            <Route path={ROUTES.applicant.profile} element={<ApplicantProfilePage />} />
-          </Route>
-        </Routes>
-      </ApplicantAuthProvider>
       <AdminAuthProvider>
         <ApplicantAuthProvider>
           <Routes>
@@ -111,16 +51,18 @@ export default function App() {
               <Route path={ROUTES.admin.notifications} element={<Notifications />} />
               <Route path={ROUTES.admin.settings} element={<AdminSettings />} />
             </Route>
+
             <Route element={<SiteLayout />}>
               <Route path={ROUTES.home} element={<Home />} />
               <Route path={ROUTES.aboutMota} element={<AboutMota />} />
               <Route path={ROUTES.scholarshipsFellowships} element={<ScholarshipsFellowships />} />
               <Route path={ROUTES.guidelinesNotices} element={<GuidelinesNotices />} />
               <Route path={ROUTES.helpGrievance} element={<HelpGrievance />} />
-              <Route path={ROUTES.applicant.login} element={<Navigate replace to={ROUTES.homeLogin} />} />
-              <Route path={ROUTES.applicant.register} element={<Navigate replace to={ROUTES.homeLogin} />} />
-              <Route path="*" element={<Navigate replace to={ROUTES.home} />} />
+              <Route path={ROUTES.applicant.login} element={<Home />} />
+              <Route path={ROUTES.applicant.register} element={<Home />} />
+              <Route path={ROUTES.resetPassword} element={<ResetPasswordPage />} />
             </Route>
+
             <Route element={<ApplicantLayout />}>
               <Route path={ROUTES.applicant.dashboard} element={<ApplicantDashboard />} />
               <Route path={ROUTES.applicant.schemes} element={<ApplicantSchemesPage />} />
@@ -132,9 +74,12 @@ export default function App() {
               <Route path={ROUTES.applicant.notifications} element={<ApplicantNotificationsPage />} />
               <Route path={ROUTES.applicant.profile} element={<ApplicantProfilePage />} />
             </Route>
+
+            <Route path="*" element={<Navigate replace to={ROUTES.home} />} />
           </Routes>
         </ApplicantAuthProvider>
       </AdminAuthProvider>
     </BrowserRouter>
   );
 }
+

@@ -3,9 +3,11 @@ import type { FormEvent, RefObject } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useApplicantAuth } from '../../context/useApplicantAuth';
 import { useAdminAuth } from '../../context/useAdminAuth';
+import { ADMIN_DEMO_IDENTIFIER, ADMIN_DEMO_PASSWORD } from '../../services/adminAuth';
 import { ROUTES } from '../../lib/constants';
 import type { HomeAuthMode, HomeAuthNavigationState } from '../../types';
 import { Button } from '../ui/Button';
+import { signOut } from '../../services/auth/authService';
 
 interface LoginErrors {
   username?: string;
@@ -288,11 +290,8 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
   const location = useLocation();
   const navigate = useNavigate();
   const { signIn, signUp, signOut, resetPassword } = useApplicantAuth();
-  const requestedMode = getRequestedHomeAuthMode(location.state, location.pathname);
-  const { signIn } = useApplicantAuth();
   const { signIn: signInAdmin } = useAdminAuth();
   const requestedMode = getRequestedHomeAuthMode(location.state);
-  const requestedApplicantPath = getRequestedApplicantPath(location.state);
   const [mode, setMode] = useState<HomeAuthMode>(() => requestedMode ?? 'applicant');
   const [loginUsername, setLoginUsername] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
@@ -450,45 +449,26 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
     setIsSubmitting(true);
 
     try {
-      const result = await signIn(loginUsername, loginPassword);
+      if (isAdmin) {
+        setIsAuthenticating(true);
+        setStatus('Checking admin credentials…');
 
-      if (!result.success) {
-        setStatus(result.error ?? 'Sign in could not be completed. Please try again.');
+        try {
+          const result = await signInAdmin(loginUsername, loginPassword, true);
+
+          if (!result.ok) {
+            setStatus(result.message ?? 'The admin ID or password is incorrect.');
+            return;
+          }
+
+          navigate(ROUTES.admin.dashboard);
+        } finally {
+          setIsAuthenticating(false);
+        }
+
         return;
       }
 
-      if (isAdmin) {
-        if (result.role !== 'admin') {
-          await signOut();
-          setStatus('This account is not authorized for admin access.');
-          return;
-        }
-    if (isAdmin) {
-      setIsAuthenticating(true);
-      setStatus('Checking admin credentials…');
-
-      try {
-        const result = await signInAdmin(loginUsername, loginPassword, true);
-
-        if (!result.ok) {
-          setStatus(result.message ?? 'The admin ID or password is incorrect.');
-          return;
-        }
-
-        navigate(ROUTES.admin.dashboard);
-      } finally {
-        setIsAuthenticating(false);
-      }
-
-      return;
-    }
-
-    if (!signIn(loginUsername)) {
-      setStatus('The demo session could not be saved in this browser. No login was created.');
-      return;
-    }
-
-    navigate(requestedApplicantPath ?? ROUTES.applicant.dashboard, { replace: true });
         setStatus('Admin identity verified. The admin workspace will be connected in a later phase.');
         return;
       }
@@ -501,6 +481,26 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
 
       navigate(ROUTES.applicant.dashboard);
     } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handleDemoAdminLogin() {
+    setIsSubmitting(true);
+    setIsAuthenticating(true);
+    setStatus('Signing in as Demo Admin…');
+
+    try {
+      const result = await signInAdmin(ADMIN_DEMO_IDENTIFIER, ADMIN_DEMO_PASSWORD, true);
+
+      if (!result.ok) {
+        setStatus(result.message ?? 'The admin ID or password is incorrect.');
+        return;
+      }
+
+      navigate(ROUTES.admin.dashboard);
+    } finally {
+      setIsAuthenticating(false);
       setIsSubmitting(false);
     }
   }
@@ -978,11 +978,23 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
             </p>
           ) : null}
 
-          <Button className="w-full justify-center rounded" disabled={isSubmitting} size="md" type="submit">
-            {isSubmitting ? 'Please wait…' : loginLabel}
-          <Button className="w-full justify-center rounded" disabled={isAuthenticating} size="md" type="submit">
-            {isAuthenticating ? 'Signing in…' : loginLabel}
+          <Button className="w-full justify-center rounded" disabled={isSubmitting || isAuthenticating} size="md" type="submit">
+            {isSubmitting || isAuthenticating ? 'Signing in…' : loginLabel}
           </Button>
+
+          {isAdmin ? (
+            <div className="pt-2 border-t border-slate-200">
+              <Button
+                className="w-full justify-center rounded bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold border border-amber-600 shadow-xs"
+                disabled={isSubmitting || isAuthenticating}
+                size="md"
+                type="button"
+                onClick={handleDemoAdminLogin}
+              >
+                {isSubmitting || isAuthenticating ? 'Accessing Demo Admin…' : 'Login as Demo Admin (View All Data)'}
+              </Button>
+            </div>
+          ) : null}
 
           <div className="flex flex-wrap items-center justify-between gap-1 text-[11px]">
             <button

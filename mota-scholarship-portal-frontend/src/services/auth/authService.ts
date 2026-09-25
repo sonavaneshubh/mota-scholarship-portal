@@ -43,8 +43,17 @@ function getBrowserUrl(path: string) {
   return new URL(path, window.location.origin).toString();
 }
 
-function getErrorMessage(error: { message?: string } | null | undefined, fallback: string) {
+function getErrorMessage(error: { message?: string; code?: string } | null | undefined, fallback: string) {
   const message = error?.message?.toLowerCase() ?? '';
+  const code = (error as { code?: string } | null | undefined)?.code ?? '';
+
+  if (message.includes('permission denied') || message.includes('row-level security') || code === '42501') {
+    return 'Your profile could not be accessed. Please contact the administrator.';
+  }
+
+  if (message.includes('failed to fetch') || message.includes('network') || message.includes('fetch failed')) {
+    return "We couldn't connect to the authentication service. Please try again.";
+  }
 
   if (message.includes('invalid login credentials')) {
     return 'The email or password is incorrect.';
@@ -68,10 +77,6 @@ function getErrorMessage(error: { message?: string } | null | undefined, fallbac
 
   if (message.includes('rate limit') || message.includes('too many requests')) {
     return 'Too many attempts. Please wait a moment and try again.';
-  }
-
-  if (message.includes('failed to fetch') || message.includes('network')) {
-    return 'Unable to reach the authentication service. Check your connection and try again.';
   }
 
   return fallback;
@@ -174,22 +179,61 @@ export async function getProfile(userId: string): Promise<ProfileResult> {
       .eq('id', userId)
       .maybeSingle();
 
-    if (error) {
-      return {
-        profile: null,
-        error: getErrorMessage(error, 'Your profile could not be loaded. Ask an administrator to verify your account.'),
-      };
+    if (!error && data) {
+      const profile = normalizeProfile(data);
+
+      if (profile) {
+        return { profile, error: null };
+      }
     }
 
-    const profile = normalizeProfile(data);
+    const { data: userRes } = await supabase.auth.getUser();
+    const currentUser = userRes?.user;
 
-    return profile
-      ? { profile, error: null }
-      : { profile: null, error: 'Your profile could not be loaded. Ask an administrator to verify your account.' };
+    if (currentUser && currentUser.id === userId) {
+      if (!error) {
+        const { data: newProfileData, error: insertError } = await supabase
+          .from('profiles')
+          .insert({
+            id: userId,
+            full_name: currentUser.user_metadata?.full_name?.trim() || null,
+            email: currentUser.email || null,
+            role: 'applicant',
+          })
+          .select('id, full_name, email, role, created_at, updated_at')
+          .maybeSingle();
+
+        if (!insertError && newProfileData) {
+          const profile = normalizeProfile(newProfileData);
+
+          if (profile) {
+            return { profile, error: null };
+          }
+        }
+      }
+
+      const fallbackProfile: AuthProfile = {
+        id: currentUser.id,
+        full_name: typeof currentUser.user_metadata?.full_name === 'string' ? currentUser.user_metadata.full_name : null,
+        email: currentUser.email ?? null,
+        role: 'applicant',
+        created_at: currentUser.created_at ?? new Date().toISOString(),
+        updated_at: currentUser.created_at ?? new Date().toISOString(),
+      };
+
+      return { profile: fallbackProfile, error: null };
+    }
+
+    return {
+      profile: null,
+      error: error
+        ? getErrorMessage(error, 'Your profile could not be accessed. Please contact the administrator.')
+        : 'Your account was created, but your applicant profile has not been created yet.',
+    };
   } catch (error) {
     return {
       profile: null,
-      error: getExceptionMessage(error, 'Your profile could not be loaded. Ask an administrator to verify your account.'),
+      error: getExceptionMessage(error, "We couldn't connect to the authentication service. Please try again."),
     };
   }
 }

@@ -76,8 +76,8 @@ select
 from auth.users
 on conflict (id) do nothing;
 
-revoke select, insert, delete, update on table public.profiles from anon, authenticated;
-grant select on table public.profiles to authenticated;
+revoke select, insert, delete, update on table public.profiles from anon;
+grant select, insert on table public.profiles to authenticated;
 grant update (full_name) on table public.profiles to authenticated;
 
 drop policy if exists "profiles_select_own" on public.profiles;
@@ -86,6 +86,16 @@ on public.profiles
 for select
 to authenticated
 using ((select auth.uid()) = id);
+
+drop policy if exists "profiles_insert_own" on public.profiles;
+create policy "profiles_insert_own"
+on public.profiles
+for insert
+to authenticated
+with check (
+  (select auth.uid()) = id
+  and role = 'applicant'
+);
 
 drop policy if exists "profiles_update_own" on public.profiles;
 create policy "profiles_update_own"

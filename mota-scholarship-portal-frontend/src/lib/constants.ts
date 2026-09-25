@@ -64,6 +64,9 @@ export const ROUTES = {
     verification: '/admin/verification',
     decisions: '/admin/decisions',
     audit: '/admin/audit',
+    auditLogs: '/admin/audit-logs',
+    dataExport: '/admin/data-export',
+    systemHealth: '/admin/system-health',
   },
 } as const;
 

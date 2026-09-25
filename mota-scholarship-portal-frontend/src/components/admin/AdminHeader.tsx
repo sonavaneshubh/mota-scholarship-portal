@@ -9,6 +9,8 @@ interface AdminHeaderProps {
   unreadNotifications: number;
   onMenuClick: () => void;
   onLogout: () => void;
+  sidebarOpen: boolean;
+  isMobile: boolean;
 }
 
 function getPageTitle(pathname: string) {
@@ -22,7 +24,7 @@ function getPageTitle(pathname: string) {
   return 'Dashboard overview';
 }
 
-export function AdminHeader({ user, unreadNotifications, onMenuClick, onLogout }: AdminHeaderProps) {
+export function AdminHeader({ user, unreadNotifications, onMenuClick, onLogout, sidebarOpen, isMobile }: AdminHeaderProps) {
   const location = useLocation();
   const [profileOpen, setProfileOpen] = useState(false);
   const title = getPageTitle(location.pathname);
@@ -32,13 +34,17 @@ export function AdminHeader({ user, unreadNotifications, onMenuClick, onLogout }
     onLogout();
   }
 
+  const showMenuButton = isMobile || !sidebarOpen;
+
   return (
-    <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 shadow-sm backdrop-blur">
+    <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 shadow-sm backdrop-blur transition-all duration-300">
       <div className="flex min-h-20 items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
         <div className="flex min-w-0 items-center gap-3">
-          <button aria-label="Open admin navigation" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-slate-600 hover:bg-slate-100 lg:hidden" type="button" onClick={onMenuClick}>
-            <AdminIcon className="h-5 w-5" name="menu" />
-          </button>
+          {showMenuButton && (
+            <button aria-label="Toggle admin navigation" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-slate-600 hover:bg-slate-100" type="button" onClick={onMenuClick}>
+              <AdminIcon className="h-5 w-5" name="menu" />
+            </button>
+          )}
           <div className="min-w-0">
             <p className="hidden text-[10px] font-bold uppercase tracking-[0.16em] text-gov-saffron-dark sm:block">Administration workspace</p>
             <h1 className="truncate text-base font-bold text-gov-blue-dark sm:mt-1 sm:text-lg">{title}</h1>

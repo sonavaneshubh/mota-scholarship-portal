@@ -10,12 +10,27 @@ export function AdminLayout() {
   const { session, signOut } = useAdminAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
-    setSidebarOpen(false);
+    setSidebarOpen(true);
   }, [location.pathname]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = window.innerWidth < 1024;
+      setIsMobile(mobile);
+      if (!mobile) {
+        setSidebarOpen(true);
+      } else {
+        setSidebarOpen(false);
+      }
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   if (!session) {
     return <Navigate replace state={{ from: location }} to={ROUTES.admin.login} />;
@@ -26,8 +41,8 @@ export function AdminLayout() {
     navigate(ROUTES.admin.login, { replace: true });
   }
 
-  function toggleSidebarCollapse() {
-    setSidebarCollapsed((current) => !current);
+  function toggleSidebar() {
+    setSidebarOpen((prev) => !prev);
   }
 
   const unreadNotifications = ADMIN_NOTIFICATIONS.filter((notification) => !notification.read).length;
@@ -36,14 +51,13 @@ export function AdminLayout() {
     <div className="min-h-screen bg-gov-slate-bg text-slate-800">
       <div className="flex min-h-screen">
         <AdminSidebar
-          onClose={() => setSidebarOpen(false)}
+          onClose={toggleSidebar}
           open={sidebarOpen}
-          collapsed={sidebarCollapsed}
-          onToggleCollapse={toggleSidebarCollapse}
+          isMobile={isMobile}
         />
-        {sidebarOpen ? <button aria-label="Close navigation overlay" className="fixed inset-0 z-30 bg-slate-950/50 lg:hidden" type="button" onClick={() => setSidebarOpen(false)} /> : null}
-        <div className="min-w-0 flex-1">
-          <AdminHeader onLogout={handleLogout} onMenuClick={() => setSidebarOpen(true)} unreadNotifications={unreadNotifications} user={session.user} />
+        {sidebarOpen && isMobile ? <button aria-label="Close navigation overlay" className="fixed inset-0 z-30 bg-slate-950/50" type="button" onClick={toggleSidebar} /> : null}
+        <div className="min-w-0 flex-1 transition-all duration-300">
+          <AdminHeader onLogout={handleLogout} onMenuClick={toggleSidebar} unreadNotifications={unreadNotifications} user={session.user} sidebarOpen={sidebarOpen} isMobile={isMobile} />
           <main className="px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
             <div className="mx-auto max-w-[1600px]">
               <Outlet />

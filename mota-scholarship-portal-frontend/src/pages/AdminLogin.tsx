@@ -92,6 +92,29 @@ export function AdminLogin() {
     navigate(destination, { replace: true });
   }
 
+  async function handleDemoLogin() {
+    setNotice('');
+    setAuthError('');
+    setIdentifier(ADMIN_DEMO_IDENTIFIER);
+    setPassword(ADMIN_DEMO_PASSWORD);
+    setCaptcha(captchaCode);
+    setLoading(true);
+
+    const result = await signIn(ADMIN_DEMO_IDENTIFIER, ADMIN_DEMO_PASSWORD, remember);
+    setLoading(false);
+
+    if (!result.ok) {
+      setAuthError(result.message ?? 'Unable to sign in as Demo Admin.');
+      return;
+    }
+
+    const from = (location.state as { from?: { pathname?: string; search?: string } } | null)?.from;
+    const destination = from?.pathname && from.pathname !== ROUTES.admin.login
+      ? `${from.pathname}${from.search ?? ''}`
+      : ROUTES.admin.dashboard;
+    navigate(destination, { replace: true });
+  }
+
   return (
     <div className="min-h-screen bg-slate-100">
       <div className="h-1.5 bg-gradient-to-r from-gov-saffron via-white to-gov-green" />
@@ -177,6 +200,30 @@ export function AdminLogin() {
                 <Button className="w-full" disabled={loading} size="lg" type="submit" variant="primary">
                   {loading ? <><span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" /> Signing in…</> : <>Sign in to admin portal <AdminIcon className="h-4 w-4" name="arrow-right" /></>}
                 </Button>
+
+                <div className="relative my-4 flex items-center justify-center">
+                  <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-200" /></div>
+                  <span className="relative bg-white px-3 text-[11px] font-bold uppercase tracking-wider text-slate-400">or</span>
+                </div>
+
+                <div className="rounded-xl border border-amber-300/80 bg-gradient-to-br from-amber-50 to-orange-50/40 p-4 text-center shadow-xs">
+                  <div className="flex items-center justify-center gap-1.5 text-xs font-bold uppercase tracking-wider text-amber-900">
+                    <AdminIcon className="h-4 w-4 text-amber-600" name="user" />
+                    <span>Demo Admin Quick Access</span>
+                  </div>
+                  <p className="mt-1 text-xs text-amber-800/90 leading-relaxed">
+                    Instantly sign in as Super Admin to inspect all applications, document verifications, schemes, and user data.
+                  </p>
+                  <Button
+                    className="mt-3 w-full justify-center bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-slate-900 font-bold border-amber-600 shadow-sm transition-all"
+                    disabled={loading}
+                    size="lg"
+                    type="button"
+                    onClick={handleDemoLogin}
+                  >
+                    {loading ? <><span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-900/40 border-t-slate-900" /> Accessing Demo Admin…</> : <>Login as Demo Admin (View All Data) <AdminIcon className="h-4 w-4" name="arrow-right" /></>}
+                  </Button>
+                </div>
               </form>
 
               <div className="mt-6 border-t border-slate-100 pt-4 text-xs text-slate-500">

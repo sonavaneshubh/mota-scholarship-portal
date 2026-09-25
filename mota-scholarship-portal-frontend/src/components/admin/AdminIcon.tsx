@@ -33,6 +33,7 @@ export type AdminIconName =
   | 'info'
   | 'file'
   | 'clock'
+  | 'heartbeat'
   | 'trend-up'
   | 'external';
 
@@ -70,6 +71,7 @@ const iconPaths: Record<AdminIconName, ReactNode> = {
   file: <><path d="M6 3h9l3 3v15H6z" /><path d="M14 3v4h4M9 12h6M9 16h4" /></>,
   clock: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
   'trend-up': <><path d="m4 16 5-5 3 3 7-8" /><path d="M14 6h5v5" /></>,
+  heartbeat: <><path d="M4 12h2l3-8 3 11 3-11 3 8h2" /></>,
   external: <><path d="M14 4h6v6M20 4l-9 9" /><path d="M18 13v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h6" /></>,
 };
 
