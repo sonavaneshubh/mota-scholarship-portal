@@ -7,6 +7,8 @@ dist-ssr
 .vite
 .env
 .env.*
+.env.local
+.env.*.local
 !.env.example
 
 # Editor / local tooling config (may contain machine-specific paths or API keys)

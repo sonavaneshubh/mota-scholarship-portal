@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FormEvent, RefObject } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useApplicantAuth } from '../../context/useApplicantAuth';
+import { useAdminAuth } from '../../context/useAdminAuth';
 import { ROUTES } from '../../lib/constants';
 import type { HomeAuthMode, HomeAuthNavigationState } from '../../types';
 import { Button } from '../ui/Button';
@@ -78,15 +79,28 @@ function getInputClass(hasError: boolean, extraClass = '') {
   }`;
 }
 
-function getRequestedHomeAuthMode(state: unknown): HomeAuthMode | null {
-  if (typeof state !== 'object' || state === null) {
-    return null;
+function getRequestedHomeAuthMode(state: unknown, pathname: string): HomeAuthMode | null {
+  if (typeof state === 'object' && state !== null) {
+    const requestedMode = (state as Partial<HomeAuthNavigationState>).homeAuthMode;
+
+    if (requestedMode === 'applicant' || requestedMode === 'admin' || requestedMode === 'registration') {
+      return requestedMode;
+    }
   }
 
-  const requestedMode = (state as Partial<HomeAuthNavigationState>).homeAuthMode;
-  return requestedMode === 'applicant' || requestedMode === 'admin' || requestedMode === 'registration'
-    ? requestedMode
-    : null;
+  if (pathname === ROUTES.applicant.login) {
+    return 'applicant';
+  }
+
+  if (pathname === ROUTES.applicant.register) {
+    return 'registration';
+  }
+
+  if (pathname === ROUTES.admin.login) {
+    return 'admin';
+  }
+
+  return null;
 }
 
 function getRequestedApplicantPath(state: unknown) {
@@ -106,14 +120,10 @@ function getLoginUsernameError(username: string) {
   const value = username.trim();
 
   if (!value) {
-    return 'Enter your username or email.';
+    return 'Enter your email address.';
   }
 
-  if (value.includes('@') && !emailPattern.test(value)) {
-    return 'Enter a valid email or username.';
-  }
-
-  return '';
+  return emailPattern.test(value) ? '' : 'Enter a valid email address.';
 }
 
 function getApplicantNameError(applicantName: string) {
@@ -167,7 +177,7 @@ function getEmailError(email: string) {
   const value = email.trim();
 
   if (!value) {
-    return '';
+    return 'Enter your email address.';
   }
 
   return emailPattern.test(value) ? '' : 'Enter a valid Email ID.';
@@ -220,8 +230,9 @@ function CaptchaFields({
   return (
     <>
       <div>
-        <span className="block text-xs font-semibold text-slate-700 mb-1">CAPTCHA (Demo)</span>
+        <span className="block text-xs font-semibold text-slate-700 mb-1">CAPTCHA</span>
         <div className="flex items-center gap-2">
+
           <div className="flex min-w-0 flex-1 items-center justify-center rounded border border-slate-300 bg-slate-100 px-3 py-2">
             <span
               className="font-mono text-sm font-bold tracking-[0.3em] text-gov-blue-dark"
@@ -276,7 +287,10 @@ function CaptchaFields({
 export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
   const location = useLocation();
   const navigate = useNavigate();
+  const { signIn, signUp, signOut, resetPassword } = useApplicantAuth();
+  const requestedMode = getRequestedHomeAuthMode(location.state, location.pathname);
   const { signIn } = useApplicantAuth();
+  const { signIn: signInAdmin } = useAdminAuth();
   const requestedMode = getRequestedHomeAuthMode(location.state);
   const requestedApplicantPath = getRequestedApplicantPath(location.state);
   const [mode, setMode] = useState<HomeAuthMode>(() => requestedMode ?? 'applicant');
@@ -290,6 +304,8 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
   const [loginErrors, setLoginErrors] = useState<LoginErrors>({});
   const [registrationErrors, setRegistrationErrors] = useState<RegistrationErrors>({});
   const [status, setStatus] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const loginUsernameRef = useRef<HTMLInputElement>(null);
   const loginPasswordRef = useRef<HTMLInputElement>(null);
@@ -305,7 +321,7 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
   const isAdmin = mode === 'admin';
   const isRegistration = mode === 'registration';
   const heading = isRegistration ? 'Applicant Registration' : isAdmin ? 'Admin Login Here' : 'Applicant Login Here';
-  const usernameLabel = isAdmin ? 'Admin Username / Email' : 'Username / Email';
+  const usernameLabel = isAdmin ? 'Admin Email' : 'Email';
   const loginLabel = isAdmin ? 'Admin Login' : 'Login Here';
   const passwordStrength = getPasswordStrength(registrationValues.password);
   const showUsernameGuidance =
@@ -352,11 +368,13 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
   }, []);
 
   useEffect(() => {
-    if (
-      location.pathname !== ROUTES.home ||
-      !requestedMode ||
-      handledLocationKeyRef.current === location.key
-    ) {
+    const isAuthRoute =
+      location.pathname === ROUTES.home ||
+      location.pathname === ROUTES.applicant.login ||
+      location.pathname === ROUTES.applicant.register ||
+      location.pathname === ROUTES.admin.login;
+
+    if (!isAuthRoute || !requestedMode || handledLocationKeyRef.current === location.key) {
       return;
     }
 
@@ -403,12 +421,12 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
     setStatus('CAPTCHA refreshed.');
   }
 
-  function handleLoginSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleLoginSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     const nextErrors: LoginErrors = {
       username: getLoginUsernameError(loginUsername),
-      password: loginPassword.trim() ? '' : 'Enter your password.',
+      password: loginPassword ? '' : 'Enter your password.',
       captcha: getCaptchaError(captchaInput, captchaCode),
     };
 
@@ -429,8 +447,39 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
       return;
     }
 
+    setIsSubmitting(true);
+
+    try {
+      const result = await signIn(loginUsername, loginPassword);
+
+      if (!result.success) {
+        setStatus(result.error ?? 'Sign in could not be completed. Please try again.');
+        return;
+      }
+
+      if (isAdmin) {
+        if (result.role !== 'admin') {
+          await signOut();
+          setStatus('This account is not authorized for admin access.');
+          return;
+        }
     if (isAdmin) {
-      setStatus('Admin authentication will be connected in a later phase.');
+      setIsAuthenticating(true);
+      setStatus('Checking admin credentials…');
+
+      try {
+        const result = await signInAdmin(loginUsername, loginPassword, true);
+
+        if (!result.ok) {
+          setStatus(result.message ?? 'The admin ID or password is incorrect.');
+          return;
+        }
+
+        navigate(ROUTES.admin.dashboard);
+      } finally {
+        setIsAuthenticating(false);
+      }
+
       return;
     }
 
@@ -440,9 +489,23 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
     }
 
     navigate(requestedApplicantPath ?? ROUTES.applicant.dashboard, { replace: true });
+        setStatus('Admin identity verified. The admin workspace will be connected in a later phase.');
+        return;
+      }
+
+      if (result.role !== 'applicant') {
+        await signOut();
+        setStatus('This account is not authorized for applicant access.');
+        return;
+      }
+
+      navigate(ROUTES.applicant.dashboard);
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
-  function handleRegistrationSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleRegistrationSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     const nextErrors: RegistrationErrors = {
@@ -496,12 +559,68 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
       return;
     }
 
-    setRegistrationValues((current) => ({ ...current, password: '', confirmPassword: '' }));
-    setShowRegistrationPassword(false);
-    setShowConfirmPassword(false);
-    setStatus(
-      'Registration cannot continue. We created no account. The service did not check username availability. It did not verify any email or mobile number.',
-    );
+    setIsSubmitting(true);
+
+    try {
+      const result = await signUp({
+        email: registrationValues.email,
+        password: registrationValues.password,
+        fullName: registrationValues.applicantName,
+        username: registrationValues.username,
+        mobile: registrationValues.mobile,
+      });
+
+      if (!result.success) {
+        setStatus(result.error ?? 'Registration could not be completed. Please try again.');
+        return;
+      }
+
+      setRegistrationValues((current) => ({ ...current, password: '', confirmPassword: '' }));
+      setShowRegistrationPassword(false);
+      setShowConfirmPassword(false);
+
+      if (result.requiresEmailConfirmation) {
+        setStatus('Account created. Check your email to confirm your address before signing in.');
+        return;
+      }
+
+      if (result.role !== 'applicant') {
+        await signOut();
+        setStatus('This account is not authorized for applicant access.');
+        return;
+      }
+
+      setStatus('Account created. Redirecting to your dashboard.');
+      navigate(ROUTES.applicant.dashboard);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handleForgotPassword() {
+    const email = loginUsername.trim();
+    const emailError = getLoginUsernameError(email);
+
+    if (emailError) {
+      setLoginErrors((current) => ({ ...current, username: emailError }));
+      loginUsernameRef.current?.focus();
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const result = await resetPassword(email);
+
+      if (!result.success) {
+        setStatus(result.error ?? 'Password reset could not be requested. Please try again.');
+        return;
+      }
+
+      setStatus('If an account exists for this email, a password reset link has been sent.');
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -520,7 +639,7 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
           {heading}
         </h3>
         <span className="text-[10px] font-bold text-amber-800 bg-amber-100 border border-amber-300 px-1.5 py-0.5 rounded">
-          Demo Access
+          Supabase Auth
         </span>
       </div>
 
@@ -532,7 +651,7 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
           onSubmit={handleRegistrationSubmit}
         >
           <p className="rounded border border-amber-300 bg-amber-50 px-2 py-1.5 text-[10px] leading-snug text-amber-900 md:col-span-2">
-            This frontend scaffold cannot create accounts or check usernames. It cannot send email or mobile verification. Use test data only.
+            Your account is secured by Supabase Auth. Email confirmation is required when enabled by the project administrator.
           </p>
 
           <div>
@@ -585,7 +704,7 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
             />
             {showUsernameGuidance ? (
               <p className="mt-1 text-[11px] leading-relaxed text-slate-500" id="home-registration-username-help">
-                Use 4–32 characters. The registration service will check availability after it connects.
+                This display name is stored in your Supabase user metadata; it is not a public username service.
               </p>
             ) : null}
             {registrationErrors.username ? (
@@ -697,7 +816,7 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
 
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1" htmlFor="home-registration-email">
-              Email ID <span className="font-normal text-slate-500">(Optional)</span>
+              Email ID <span className="font-normal text-slate-500">(Required)</span>
             </label>
             <input
               ref={emailRef}
@@ -718,8 +837,8 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
             />
             <p className="mt-1 text-[11px] leading-relaxed text-slate-500" id="home-registration-email-help">
               {registrationValues.email
-                ? 'You must verify this email. The email service is unavailable.'
-                : 'Optional. You must verify any Email ID before registration.'}
+                ? 'We will send a Supabase confirmation link to this address.'
+                : 'Enter the email address you will use to sign in.'}
             </p>
             {registrationErrors.email ? (
               <p className="mt-1 text-[11px] font-medium text-red-700" id="home-registration-email-error">
@@ -752,8 +871,8 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
             />
             <p className="mt-1 text-[11px] leading-relaxed text-slate-500" id="home-registration-mobile-help">
               {registrationValues.mobile
-                ? 'You must verify this number by OTP. The SMS service is unavailable.'
-                : 'Optional. You must verify any mobile number by OTP.'}
+                ? 'This number is stored in your Supabase user metadata. OTP verification is not configured.'
+                : 'Optional. Mobile verification is not configured in this authentication phase.'}
             </p>
             {registrationErrors.mobile ? (
               <p className="mt-1 text-[11px] font-medium text-red-700" id="home-registration-mobile-error">
@@ -781,8 +900,8 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
             </p>
           ) : null}
 
-          <Button className="w-full justify-center rounded md:col-span-2" size="md" type="submit">
-            Register
+          <Button className="w-full justify-center rounded md:col-span-2" disabled={isSubmitting} size="md" type="submit">
+            {isSubmitting ? 'Creating account…' : 'Register'}
           </Button>
         </form>
       ) : (
@@ -802,7 +921,7 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
               name="username"
               type="text"
               value={loginUsername}
-              placeholder={isAdmin ? 'Admin username or email' : 'Username or email'}
+              placeholder={isAdmin ? 'Admin email' : 'Email address'}
               autoComplete="username"
               autoCapitalize="none"
               spellCheck={false}
@@ -859,22 +978,25 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
             </p>
           ) : null}
 
-          <Button className="w-full justify-center rounded" size="md" type="submit">
-            {loginLabel}
+          <Button className="w-full justify-center rounded" disabled={isSubmitting} size="md" type="submit">
+            {isSubmitting ? 'Please wait…' : loginLabel}
+          <Button className="w-full justify-center rounded" disabled={isAuthenticating} size="md" type="submit">
+            {isAuthenticating ? 'Signing in…' : loginLabel}
           </Button>
 
           <div className="flex flex-wrap items-center justify-between gap-1 text-[11px]">
             <button
               className="min-h-11 px-1.5 font-semibold text-gov-blue underline underline-offset-2 hover:text-gov-saffron"
               type="button"
-              onClick={() => setStatus('Password recovery will come in a later phase.')}
+              disabled={isSubmitting}
+              onClick={handleForgotPassword}
             >
               Forgot Password
             </button>
             <button
               className="min-h-11 px-1.5 font-semibold text-gov-blue underline underline-offset-2 hover:text-gov-saffron"
               type="button"
-              onClick={() => setStatus('Username recovery will come in a later phase.')}
+              onClick={() => setStatus('Username recovery is not available. Use your email address to sign in.')}
             >
               Forgot Username
             </button>
