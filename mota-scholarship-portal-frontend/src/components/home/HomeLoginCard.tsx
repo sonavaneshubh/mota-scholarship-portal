@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FormEvent, RefObject } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useApplicantAuth } from '../../context/useApplicantAuth';
+import { useAdminAuth } from '../../context/useAdminAuth';
 import { ROUTES } from '../../lib/constants';
 import type { HomeAuthMode, HomeAuthNavigationState } from '../../types';
 import { Button } from '../ui/Button';
@@ -264,6 +265,7 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
   const location = useLocation();
   const navigate = useNavigate();
   const { signIn } = useApplicantAuth();
+  const { signIn: signInAdmin } = useAdminAuth();
   const requestedMode = getRequestedHomeAuthMode(location.state);
   const [mode, setMode] = useState<HomeAuthMode>(() => requestedMode ?? 'applicant');
   const [loginUsername, setLoginUsername] = useState('');
@@ -276,6 +278,7 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
   const [loginErrors, setLoginErrors] = useState<LoginErrors>({});
   const [registrationErrors, setRegistrationErrors] = useState<RegistrationErrors>({});
   const [status, setStatus] = useState('');
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const loginUsernameRef = useRef<HTMLInputElement>(null);
   const loginPasswordRef = useRef<HTMLInputElement>(null);
@@ -389,7 +392,7 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
     setStatus('CAPTCHA refreshed.');
   }
 
-  function handleLoginSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleLoginSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     const nextErrors: LoginErrors = {
@@ -416,7 +419,22 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
     }
 
     if (isAdmin) {
-      setStatus('Admin authentication will be connected in a later phase.');
+      setIsAuthenticating(true);
+      setStatus('Checking admin credentials…');
+
+      try {
+        const result = await signInAdmin(loginUsername, loginPassword, true);
+
+        if (!result.ok) {
+          setStatus(result.message ?? 'The admin ID or password is incorrect.');
+          return;
+        }
+
+        navigate(ROUTES.admin.dashboard);
+      } finally {
+        setIsAuthenticating(false);
+      }
+
       return;
     }
 
@@ -841,8 +859,8 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
             </p>
           ) : null}
 
-          <Button className="w-full justify-center rounded" size="md" type="submit">
-            {loginLabel}
+          <Button className="w-full justify-center rounded" disabled={isAuthenticating} size="md" type="submit">
+            {isAuthenticating ? 'Signing in…' : loginLabel}
           </Button>
 
           <div className="flex flex-wrap items-center justify-between gap-1 text-[11px]">
