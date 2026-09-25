@@ -1,6 +1,6 @@
 import type { Session, User } from '@supabase/supabase-js';
 import { ROUTES } from '../../lib/constants';
-import { supabase } from '../../lib/supabase';
+import { supabase, DEMO_MODE, DEMO_USERS } from '../../lib/supabase';
 import type { AuthProfile, UserRole } from '../../types';
 
 export interface SignUpInput {
@@ -34,6 +34,47 @@ interface ProfileResult {
 
 const notConfiguredMessage =
   'Supabase authentication is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY to .env.local.';
+
+function createMockUser(demoUser: typeof DEMO_USERS[0]) {
+  const mockUser: User = {
+    id: `demo-${demoUser.email}`,
+    email: demoUser.email,
+    user_metadata: {
+      full_name: demoUser.fullName,
+      mobile: demoUser.mobile,
+      state: demoUser.state,
+      district: demoUser.district,
+      category: demoUser.category,
+      course: demoUser.course,
+      institution: demoUser.institution,
+    },
+    app_metadata: {},
+    aud: 'authenticated',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    role: 'authenticated',
+  } as User;
+
+  const mockSession: Session = {
+    access_token: 'demo-token',
+    refresh_token: 'demo-refresh',
+    expires_in: 3600,
+    expires_at: Date.now() / 1000 + 3600,
+    token_type: 'bearer',
+    user: mockUser,
+  };
+
+  const mockProfile: AuthProfile = {
+    id: mockUser.id,
+    full_name: demoUser.fullName,
+    email: demoUser.email,
+    role: 'applicant',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
+  return { mockUser, mockSession, mockProfile };
+}
 
 function getBrowserUrl(path: string) {
   if (typeof window === 'undefined') {
@@ -128,6 +169,10 @@ function normalizeProfile(value: unknown): AuthProfile | null {
 }
 
 export async function getSession(): Promise<{ session: Session | null; error: string | null }> {
+  if (DEMO_MODE) {
+    return { session: null, error: null };
+  }
+
   if (!supabase) {
     return { session: null, error: null };
   }
@@ -168,6 +213,15 @@ export async function getCurrentUser(): Promise<{ user: User | null; error: stri
 }
 
 export async function getProfile(userId: string): Promise<ProfileResult> {
+  if (DEMO_MODE) {
+    const demoUser = DEMO_USERS.find((u) => `demo-${u.email}` === userId);
+    if (demoUser) {
+      const { mockProfile } = createMockUser(demoUser);
+      return { profile: mockProfile, error: null };
+    }
+    return { profile: null, error: 'Demo user not found' };
+  }
+
   if (!supabase) {
     return { profile: null, error: notConfiguredMessage };
   }
@@ -239,6 +293,34 @@ export async function getProfile(userId: string): Promise<ProfileResult> {
 }
 
 export async function signUp(input: SignUpInput): Promise<SignUpResult> {
+  if (DEMO_MODE) {
+    const existing = DEMO_USERS.find((u) => u.email === input.email.trim());
+    if (existing) {
+      return failedSignUp('An account with this email already exists.');
+    }
+    const newDemoUser = {
+      email: input.email.trim(),
+      password: input.password,
+      fullName: input.fullName.trim(),
+      mobile: input.mobile?.trim() || '',
+      state: '',
+      district: '',
+      category: '',
+      course: '',
+      institution: '',
+    };
+    const { mockUser, mockSession, mockProfile } = createMockUser(newDemoUser);
+    return {
+      success: true,
+      error: null,
+      user: mockUser,
+      session: mockSession,
+      profile: mockProfile,
+      role: 'applicant',
+      requiresEmailConfirmation: false,
+    };
+  }
+
   if (!supabase) {
     return failedSignUp(notConfiguredMessage);
   }
@@ -305,6 +387,22 @@ export async function signUp(input: SignUpInput): Promise<SignUpResult> {
 }
 
 export async function signIn(email: string, password: string): Promise<SignInResult> {
+  if (DEMO_MODE) {
+    const demoUser = DEMO_USERS.find((u) => u.email === email.trim() && u.password === password);
+    if (demoUser) {
+      const { mockUser, mockSession, mockProfile } = createMockUser(demoUser);
+      return {
+        success: true,
+        error: null,
+        user: mockUser,
+        session: mockSession,
+        profile: mockProfile,
+        role: 'applicant',
+      };
+    }
+    return failedSignIn('Invalid demo credentials. Use demo@applicant.test / demo123');
+  }
+
   if (!supabase) {
     return failedSignIn(notConfiguredMessage);
   }
@@ -344,6 +442,10 @@ export async function signIn(email: string, password: string): Promise<SignInRes
 }
 
 export async function signOut(): Promise<AuthResult> {
+  if (DEMO_MODE) {
+    return { success: true, error: null };
+  }
+
   if (!supabase) {
     return { success: true, error: null };
   }
@@ -364,6 +466,14 @@ export async function signOut(): Promise<AuthResult> {
 }
 
 export async function resetPassword(email: string): Promise<AuthResult> {
+  if (DEMO_MODE) {
+    const demoUser = DEMO_USERS.find((u) => u.email === email.trim());
+    if (demoUser) {
+      return { success: true, error: null };
+    }
+    return { success: false, error: 'Demo account not found' };
+  }
+
   if (!supabase) {
     return { success: false, error: notConfiguredMessage };
   }
@@ -388,6 +498,10 @@ export async function resetPassword(email: string): Promise<AuthResult> {
 }
 
 export async function updatePassword(password: string): Promise<AuthResult> {
+  if (DEMO_MODE) {
+    return { success: true, error: null };
+  }
+
   if (!supabase) {
     return { success: false, error: notConfiguredMessage };
   }

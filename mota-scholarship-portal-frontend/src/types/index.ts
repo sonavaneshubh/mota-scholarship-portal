@@ -179,6 +179,7 @@ export interface ApplicantProfile {
   course: string;
   institution: string;
   avatarInitials: string;
+  profileCompletion?: number;
 }
 
 export interface ApplicantApplication {

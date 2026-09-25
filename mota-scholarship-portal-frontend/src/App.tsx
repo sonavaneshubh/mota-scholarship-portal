@@ -11,9 +11,6 @@ import { ApplicantApplicationPage } from './pages/ApplicantApplicationPage';
 import { ApplicantApplicationsPage } from './pages/ApplicantApplicationsPage';
 import { ApplicantDashboard } from './pages/ApplicantDashboard';
 import { ApplicantDocumentsPage } from './pages/ApplicantDocumentsPage';
-import { ApplicantGrievancesPage } from './pages/ApplicantGrievancesPage';
-import { ApplicantGuidelinesPage } from './pages/ApplicantGuidelinesPage';
-import { ApplicantHistoryPage } from './pages/ApplicantHistoryPage';
 import { ApplicantNotificationsPage } from './pages/ApplicantNotificationsPage';
 import { ApplicantProfilePage } from './pages/ApplicantProfilePage';
 import { ApplicantSchemeDetailPage } from './pages/ApplicantSchemeDetailPage';
@@ -35,7 +32,7 @@ import { AdminDashboard } from './pages/AdminDashboard';
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <AdminAuthProvider>
         <ApplicantAuthProvider>
           <Routes>

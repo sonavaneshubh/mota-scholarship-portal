@@ -13,10 +13,9 @@ export function ApplicantProfilePage() {
     return null;
   }
 
-  const profile = session.user;
+  const profile = user;
   const completion = calculateApplicantProfileCompletion(profile);
   const sections = getApplicantProfileSections(profile);
-  const profile = user;
   const details = [
     ['Full name', profile.name],
     ['Email', profile.email],

@@ -17,41 +17,6 @@ import { ApplicantAuthContext } from './ApplicantAuthContextValue';
 
 export const APPLICANT_SESSION_KEY = 'mota-applicant-session';
 
-const DEMO_PROFILE: ApplicantProfile = {
-  id: 'applicant-demo-001',
-  name: 'Aarav Kumar',
-  email: 'aarav.kumar@example.in',
-  mobile: '+91 98765 43210',
-  state: 'Odisha',
-  district: 'Khordha',
-  category: 'Scheduled Tribe',
-  course: 'B.Tech, Computer Science',
-  institution: 'Kalinga Institute of Technology',
-  avatarInitials: 'AK',
-};
-
-function isApplicantSession(value: unknown): value is ApplicantSession {
-  if (!value || typeof value !== 'object') {
-    return false;
-  }
-
-  const candidate = value as Partial<ApplicantSession>;
-  const user = candidate.user as Partial<ApplicantProfile> | undefined;
-
-  return (
-    typeof candidate.signedInAt === 'string' &&
-    Boolean(user) &&
-    typeof user?.id === 'string' &&
-    typeof user.name === 'string' &&
-    typeof user.email === 'string' &&
-    typeof user.mobile === 'string' &&
-    typeof user.state === 'string' &&
-    typeof user.district === 'string' &&
-    typeof user.category === 'string' &&
-    typeof user.course === 'string' &&
-    typeof user.institution === 'string' &&
-    typeof user.avatarInitials === 'string'
-  );
 function getMetadataString(user: User, key: string) {
   const value = user.user_metadata[key];
   return typeof value === 'string' ? value.trim() : '';
@@ -214,23 +179,17 @@ export function ApplicantAuthProvider({ children }: { children: ReactNode }) {
     [clearAuthState],
   );
 
-    try {
-      window.localStorage.setItem(APPLICANT_SESSION_KEY, JSON.stringify(nextSession));
-    } catch {
-      return false;
+  const signOut = useCallback(async () => {
+    const result = await signOutFromSupabase();
+
+    if (result.success) {
+      clearAuthState();
     }
 
-    setSession(nextSession);
-    return true;
-  }, []);
+    return result;
+  }, [clearAuthState]);
 
-  const signOut = useCallback(() => {
-    try {
-      window.localStorage.removeItem(APPLICANT_SESSION_KEY);
-    } finally {
-      setSession(null);
-    }
-  }, []);
+  const resetPassword = useCallback((email: string) => requestPasswordReset(email), []);
   const signUp = useCallback(
     async (input: SignUpInput) => {
       const result = await signUpWithSupabase(input);
@@ -256,17 +215,6 @@ export function ApplicantAuthProvider({ children }: { children: ReactNode }) {
     [clearAuthState],
   );
 
-  const signOut = useCallback(async () => {
-    const result = await signOutFromSupabase();
-
-    if (result.success) {
-      clearAuthState();
-    }
-
-    return result;
-  }, [clearAuthState]);
-
-  const resetPassword = useCallback((email: string) => requestPasswordReset(email), []);
   const updatePassword = useCallback((password: string) => updateSupabasePassword(password), []);
 
   const user = useMemo(() => (authUser ? toApplicantProfile(authUser, profile) : null), [authUser, profile]);

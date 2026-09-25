@@ -133,6 +133,14 @@ export function ApplicantLayout() {
     );
   }
 
+  if (loading) {
+    return null;
+  }
+
+  if (!session || !user || role !== 'applicant') {
+    return <Navigate replace state={{ from: location }} to={ROUTES.applicant.login} />;
+  }
+
   const unreadNotificationCount = APPLICANT_NOTIFICATIONS.filter((notification) => notification.unread).length;
   const documentAttentionCount = APPLICANT_DOCUMENTS.filter((document) =>
     ['needs-correction', 'rejected'].includes(document.status),
@@ -141,9 +149,9 @@ export function ApplicantLayout() {
     (document) => document.type === 'Category' && document.status === 'verified',
   );
 
-  function handleLogout() {
-    signOut();
-    navigate(ROUTES.homeLogin, { replace: true });
+  async function handleLogout() {
+    await signOut();
+    navigate(ROUTES.applicant.login, { replace: true });
   }
 
   return (
@@ -152,7 +160,7 @@ export function ApplicantLayout() {
         <TopAccessibilityBar />
         <Masthead />
         <ApplicantHeader
-          profile={session.user}
+          profile={user}
           sidebarOpen={sidebarOpen}
           unreadCount={unreadNotificationCount}
           onLogout={handleLogout}
@@ -173,7 +181,7 @@ export function ApplicantLayout() {
                   categoryVerified={categoryVerified}
                   documentAttentionCount={documentAttentionCount}
                   idPrefix="desktop-applicant-sidebar"
-                  profile={session.user}
+                  profile={user}
                   unreadNotificationCount={unreadNotificationCount}
                   onLogout={handleLogout}
                 />
@@ -187,60 +195,38 @@ export function ApplicantLayout() {
         </main>
 
         <Footer />
-  if (loading) {
-    return null;
-  }
-
-  if (!session || !user || role !== 'applicant') {
-    return <Navigate replace state={{ from: location }} to={ROUTES.applicant.login} />;
-  }
-
-  async function handleLogout() {
-    const result = await signOut();
-
-    if (result.success) {
-      navigate(ROUTES.applicant.login, { replace: true });
-    }
-  }
-
-  return (
-    <div className="flex min-h-screen flex-col bg-gov-slate-bg">
-      <ApplicantHeader onLogout={handleLogout} profile={user} />
-      <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-center text-xs text-amber-900">
-        Authentication uses Supabase. Application and document data remain sample content in this phase.
-      </div>
-
-      {sidebarOpen ? (
-        <div className="fixed inset-0 z-50 lg:hidden">
-          <button
-            aria-label="Close applicant navigation overlay"
-            className="absolute inset-0 h-full w-full bg-slate-950/60"
-            type="button"
-            onClick={closeSidebar}
-          />
-          <aside
-            aria-label="Applicant mobile navigation"
-            aria-modal="true"
-            className="relative h-full w-[min(20rem,90vw)] overflow-y-auto border-r border-slate-300 bg-white shadow-2xl"
-            id="applicant-mobile-sidebar"
-            ref={mobileSidebarRef}
-            role="dialog"
-            tabIndex={-1}
-          >
-            <ApplicantSidebar
-              applicationCount={APPLICANT_APPLICATIONS.length}
-              categoryVerified={categoryVerified}
-              documentAttentionCount={documentAttentionCount}
-              idPrefix="mobile-applicant-sidebar"
-              profile={session.user}
-              unreadNotificationCount={unreadNotificationCount}
-              onClose={closeSidebar}
-              onLogout={handleLogout}
-              onNavigate={closeSidebar}
+        {sidebarOpen ? (
+          <div className="fixed inset-0 z-50 lg:hidden">
+            <button
+              aria-label="Close applicant navigation overlay"
+              className="absolute inset-0 h-full w-full bg-slate-950/60"
+              type="button"
+              onClick={closeSidebar}
             />
-          </aside>
-        </div>
-      ) : null}
+            <aside
+              aria-label="Applicant mobile navigation"
+              aria-modal="true"
+              className="relative h-full w-[min(20rem,90vw)] overflow-y-auto border-r border-slate-300 bg-white shadow-2xl"
+              id="applicant-mobile-sidebar"
+              ref={mobileSidebarRef}
+              role="dialog"
+              tabIndex={-1}
+            >
+              <ApplicantSidebar
+                applicationCount={APPLICANT_APPLICATIONS.length}
+                categoryVerified={categoryVerified}
+                documentAttentionCount={documentAttentionCount}
+                idPrefix="mobile-applicant-sidebar"
+                profile={user}
+                unreadNotificationCount={unreadNotificationCount}
+                onClose={closeSidebar}
+                onLogout={handleLogout}
+                onNavigate={closeSidebar}
+              />
+            </aside>
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }
