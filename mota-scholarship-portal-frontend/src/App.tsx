@@ -15,6 +15,7 @@ import { ApplicantProfilePage } from './pages/ApplicantProfilePage';
 import { ApplicantSchemeDetailPage } from './pages/ApplicantSchemeDetailPage';
 import { ApplicantSchemesPage } from './pages/ApplicantSchemesPage';
 import { Home } from './pages/Home';
+import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import { ScholarshipsFellowships } from './pages/ScholarshipsFellowships';
 
 export default function App() {
@@ -28,9 +29,10 @@ export default function App() {
             <Route path={ROUTES.scholarshipsFellowships} element={<ScholarshipsFellowships />} />
             <Route path={ROUTES.guidelinesNotices} element={<GuidelinesNotices />} />
             <Route path={ROUTES.helpGrievance} element={<HelpGrievance />} />
-            <Route path={ROUTES.applicant.login} element={<Navigate replace to={ROUTES.homeLogin} />} />
-            <Route path={ROUTES.applicant.register} element={<Navigate replace to={ROUTES.homeLogin} />} />
-            <Route path={ROUTES.admin.login} element={<Navigate replace to={ROUTES.homeLogin} />} />
+            <Route path={ROUTES.applicant.login} element={<Home />} />
+            <Route path={ROUTES.applicant.register} element={<Home />} />
+            <Route path={ROUTES.admin.login} element={<Home />} />
+            <Route path={ROUTES.resetPassword} element={<ResetPasswordPage />} />
             <Route path="*" element={<Navigate replace to={ROUTES.home} />} />
           </Route>
           <Route element={<ApplicantLayout />}>
