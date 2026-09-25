@@ -64,7 +64,7 @@ export function MainNavigation() {
       </div>
 
       {mobileOpen ? (
-        <div className="md:hidden border-t border-blue-900 bg-gov-blue-dark">
+        <div className="md:hidden border-t border-blue-900 bg-gov-blue-dark max-h-[80vh] overflow-y-auto">
           <ul className="px-2 py-1 space-y-0.5 text-sm">
             {NAVIGATION_ITEMS.map((item) =>
               item.active ? (

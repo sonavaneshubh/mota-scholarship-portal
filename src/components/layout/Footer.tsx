@@ -3,7 +3,7 @@ import { FOOTER_LINK_COLUMNS, FOOTER_SECURITY_SEALS, SITE } from '../../lib/cons
 export function Footer() {
   return (
     <footer className="bg-gov-blue-dark text-slate-300 text-xs border-t-4 border-amber-500" role="contentinfo">
-      <div className="max-w-7xl mx-auto px-4 py-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="max-w-7xl mx-auto px-4 py-6 md:py-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 md:gap-6">
         <div>
           <h4 className="text-white text-xs font-bold uppercase tracking-wider mb-3 pb-1 border-b border-blue-900">
             About This Prototype

@@ -11,7 +11,7 @@ export function SchemeDirectory() {
 
   return (
     <section
-      className="bg-slate-100 py-10 border-y border-slate-200"
+      className="bg-slate-100 py-8 md:py-10 border-y border-slate-200"
       data-purpose="schemes-fellowships-directory"
       id="schemes-list"
     >
@@ -21,7 +21,7 @@ export function SchemeDirectory() {
             <span className="text-xs font-bold text-gov-saffron uppercase tracking-wider">
               MoTA Prototype Portfolio
             </span>
-            <h2 className="text-xl md:text-2xl font-bold text-gov-blue-dark">
+            <h2 className="text-lg md:text-2xl font-bold text-gov-blue-dark">
               Scholarships &amp; Fellowships
             </h2>
             <p className="text-xs md:text-sm text-slate-600 mt-1">
@@ -59,7 +59,7 @@ export function SchemeDirectory() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
           {visibleSchemes.map((scheme) => (
             <SchemeCard key={scheme.id} scheme={scheme} />
           ))}

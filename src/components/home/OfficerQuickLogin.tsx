@@ -10,7 +10,7 @@ export function OfficerQuickLogin() {
 
   return (
     <div
-      className="lg:col-span-4 bg-slate-50 border border-slate-200 rounded-lg p-5"
+      className="lg:col-span-4 bg-slate-50 border border-slate-200 rounded-lg p-4 sm:p-5"
       id="officer-access"
     >
       <div className="flex items-center justify-between border-b border-slate-200 pb-2 mb-3">

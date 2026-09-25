@@ -18,7 +18,7 @@ export function Home() {
       <QuickAccessTiles />
 
       <section
-        className="max-w-7xl mx-auto px-4 py-10"
+        className="max-w-7xl mx-auto px-4 py-8 md:py-10"
         data-purpose="about-ministry-briefing"
         id={SECTION_IDS.ABOUT.replace('#', '')}
       >
@@ -35,12 +35,12 @@ export function Home() {
         data-purpose="eligibility-precheck-intro"
         id={SECTION_IDS.ELIGIBILITY.replace('#', '')}
       >
-        <div className="max-w-7xl mx-auto px-4 grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+        <div className="max-w-7xl mx-auto px-4 grid grid-cols-1 lg:grid-cols-12 gap-5 md:gap-6 items-center">
           <div className="lg:col-span-8">
-            <span className="text-xs font-bold text-gov-blue uppercase tracking-wider bg-blue-50 border border-blue-200 px-2.5 py-1 rounded">
+            <span className="text-[11px] sm:text-xs font-bold text-gov-blue uppercase tracking-wider bg-blue-50 border border-blue-200 px-2.5 py-1 rounded">
               {ELIGIBILITY_COPY.eyebrow}
             </span>
-            <h2 className="text-xl md:text-2xl font-bold text-gov-blue-dark mt-2">
+            <h2 className="text-lg md:text-2xl font-bold text-gov-blue-dark mt-2">
               {ELIGIBILITY_COPY.title}
             </h2>
             <p className="text-xs md:text-sm text-slate-600 mt-1 max-w-2xl">
@@ -79,7 +79,7 @@ export function Home() {
       <GovernanceWorkflow />
 
       <section
-        className="bg-white py-10 border-t border-slate-200"
+        className="bg-white py-8 md:py-10 border-t border-slate-200"
         data-purpose="how-to-apply-guide"
         id={SECTION_IDS.HOW_TO_APPLY.replace('#', '')}
       >

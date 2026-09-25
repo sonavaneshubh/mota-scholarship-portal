@@ -13,7 +13,7 @@ export interface SchemeCardProps {
 
 export function SchemeCard({ scheme }: SchemeCardProps) {
   return (
-    <div className="bg-white border border-slate-200 rounded-lg p-4 flex flex-col justify-between shadow-sm hover:border-gov-blue transition">
+    <div className="bg-white border border-slate-200 rounded-lg p-3.5 md:p-4 flex flex-col justify-between shadow-sm hover:border-gov-blue transition">
       <div>
         <div className="flex flex-wrap items-center gap-1.5 mb-2">
           <span
