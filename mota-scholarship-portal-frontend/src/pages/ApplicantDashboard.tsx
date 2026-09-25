@@ -63,6 +63,10 @@ export function ApplicantDashboard() {
         to={ROUTES.homeLogin}
       />
     );
+  const { user } = useApplicantAuth();
+
+  if (!user) {
+    return null;
   }
 
   const completion = calculateApplicantProfileCompletion(session.user);
@@ -97,6 +101,23 @@ export function ApplicantDashboard() {
             <div className="flex items-center space-x-1.5">
               <span className="inline-block h-2 w-2 rounded-full bg-emerald-600" />
               <span className="font-medium">भारत सरकार | Government of India</span>
+    <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
+      <WelcomeSection profile={user} />
+
+      <section aria-labelledby="overview-heading" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <h2 className="sr-only" id="overview-heading">Application overview</h2>
+        <OverviewCard detail="All submitted applications" label="Applications" tone="blue" value={String(APPLICANT_APPLICATIONS.length)} />
+        <OverviewCard detail="Currently being reviewed" label="In review" tone="purple" value={String(underReview)} />
+        <OverviewCard detail="Needs your attention" label="Action required" tone="amber" value={String(actionRequired)} />
+        <OverviewCard detail="Your profile is almost ready" label="Profile" tone="green" value={`${user.profileCompletion}%`} />
+      </section>
+
+      <div className="grid gap-6 lg:grid-cols-3">
+        <section className="space-y-4 lg:col-span-2" aria-labelledby="recent-applications-heading">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-gov-saffron-dark">Your workspace</p>
+              <h2 className="mt-1 text-xl font-bold text-gov-blue-dark" id="recent-applications-heading">Recent applications</h2>
             </div>
             <span className="text-slate-300">|</span>
             <span>जनजातीय कार्य मंत्रालय | Ministry of Tribal Affairs</span>

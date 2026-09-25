@@ -5,20 +5,29 @@ import type { HomeAuthMode, HomeAuthNavigationState } from '../../types';
 import { HomeLoginCard } from './HomeLoginCard';
 import { Button } from '../ui/Button';
 
-function getInitialAuthMode(state: unknown): HomeAuthMode {
-  if (typeof state !== 'object' || state === null) {
-    return 'applicant';
+function getInitialAuthMode(state: unknown, pathname: string): HomeAuthMode {
+  if (typeof state === 'object' && state !== null) {
+    const requestedMode = (state as Partial<HomeAuthNavigationState>).homeAuthMode;
+
+    if (requestedMode === 'applicant' || requestedMode === 'admin' || requestedMode === 'registration') {
+      return requestedMode;
+    }
   }
 
-  const requestedMode = (state as Partial<HomeAuthNavigationState>).homeAuthMode;
-  return requestedMode === 'applicant' || requestedMode === 'admin' || requestedMode === 'registration'
-    ? requestedMode
-    : 'applicant';
+  if (pathname === ROUTES.applicant.register) {
+    return 'registration';
+  }
+
+  if (pathname === ROUTES.admin.login) {
+    return 'admin';
+  }
+
+  return 'applicant';
 }
 
 export function HeroBanner() {
   const location = useLocation();
-  const [authMode, setAuthMode] = useState(() => getInitialAuthMode(location.state));
+  const [authMode, setAuthMode] = useState(() => getInitialAuthMode(location.state, location.pathname));
   const isRegistration = authMode === 'registration';
   const handleAuthModeChange = useCallback((mode: HomeAuthMode) => {
     setAuthMode(mode);

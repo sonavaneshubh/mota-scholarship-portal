@@ -7,15 +7,16 @@ import { ROUTES } from '../lib/constants';
 import { calculateApplicantProfileCompletion, getApplicantProfileSections } from '../lib/applicantProfile';
 
 export function ApplicantProfilePage() {
-  const { session } = useApplicantAuth();
+  const { user } = useApplicantAuth();
 
-  if (!session) {
+  if (!user) {
     return null;
   }
 
   const profile = session.user;
   const completion = calculateApplicantProfileCompletion(profile);
   const sections = getApplicantProfileSections(profile);
+  const profile = user;
   const details = [
     ['Full name', profile.name],
     ['Email', profile.email],
@@ -31,7 +32,7 @@ export function ApplicantProfilePage() {
     <div className="space-y-6 py-1 sm:py-2">
       <ApplicantPageHeader
         action={<Button size="md" to={ROUTES.applicant.dashboard} variant="outline">Back to dashboard</Button>}
-        description="Review the sample profile used in this applicant workspace. Editing and verification are not connected."
+        description="Review the profile associated with your Supabase account. Editing and verification are not connected in this phase."
         eyebrow="Applicant workspace"
         title="My profile"
       />
@@ -42,7 +43,7 @@ export function ApplicantProfilePage() {
             <div>
               <h2 className="text-xl font-bold text-gov-blue-dark">{profile.name}</h2>
               <p className="mt-1 text-sm text-slate-500">Applicant ID: {profile.id}</p>
-              <div className="mt-2"><Badge tone="blue">Demo profile</Badge></div>
+              <div className="mt-2"><Badge tone="blue">Supabase profile</Badge></div>
             </div>
           </div>
           <dl className="mt-5 grid gap-x-6 gap-y-5 sm:grid-cols-2">

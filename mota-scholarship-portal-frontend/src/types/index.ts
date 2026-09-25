@@ -23,6 +23,17 @@ export interface NavigationItem {
 
 export type HomeAuthMode = 'applicant' | 'admin' | 'registration';
 
+export type UserRole = 'applicant' | 'admin';
+
+export interface AuthProfile {
+  id: string;
+  full_name: string | null;
+  email: string | null;
+  role: UserRole;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface HomeAuthNavigationState {
   homeAuthMode: HomeAuthMode;
   from?: {
@@ -168,11 +179,6 @@ export interface ApplicantProfile {
   course: string;
   institution: string;
   avatarInitials: string;
-}
-
-export interface ApplicantSession {
-  user: ApplicantProfile;
-  signedInAt: string;
 }
 
 export interface ApplicantApplication {
