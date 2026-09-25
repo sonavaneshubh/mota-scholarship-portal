@@ -17,9 +17,9 @@ import { Button } from '../components/ui/Button';
 import { ROUTES } from '../lib/constants';
 
 export function ApplicantDashboard() {
-  const { session } = useApplicantAuth();
+  const { user } = useApplicantAuth();
 
-  if (!session) {
+  if (!user) {
     return null;
   }
 
@@ -28,14 +28,14 @@ export function ApplicantDashboard() {
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
-      <WelcomeSection profile={session.user} />
+      <WelcomeSection profile={user} />
 
       <section aria-labelledby="overview-heading" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <h2 className="sr-only" id="overview-heading">Application overview</h2>
         <OverviewCard detail="All submitted applications" label="Applications" tone="blue" value={String(APPLICANT_APPLICATIONS.length)} />
         <OverviewCard detail="Currently being reviewed" label="In review" tone="purple" value={String(underReview)} />
         <OverviewCard detail="Needs your attention" label="Action required" tone="amber" value={String(actionRequired)} />
-        <OverviewCard detail="Your profile is almost ready" label="Profile" tone="green" value={`${session.user.profileCompletion}%`} />
+        <OverviewCard detail="Your profile is almost ready" label="Profile" tone="green" value={`${user.profileCompletion}%`} />
       </section>
 
       <div className="grid gap-6 lg:grid-cols-3">

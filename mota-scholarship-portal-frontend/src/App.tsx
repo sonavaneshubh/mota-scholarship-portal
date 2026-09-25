@@ -18,6 +18,7 @@ import { ApplicantSchemesPage } from './pages/ApplicantSchemesPage';
 import { GuidelinesNotices } from './pages/GuidelinesNotices';
 import { HelpGrievance } from './pages/HelpGrievance';
 import { Home } from './pages/Home';
+import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import { ScholarshipsFellowships } from './pages/ScholarshipsFellowships';
 import { Applications } from './pages/admin/Applications';
 import { ApplicationDetails } from './pages/admin/ApplicationDetails';
@@ -32,6 +33,33 @@ import { AdminDashboard } from './pages/AdminDashboard';
 export default function App() {
   return (
     <BrowserRouter>
+      <ApplicantAuthProvider>
+        <Routes>
+          <Route element={<SiteLayout />}>
+            <Route path={ROUTES.home} element={<Home />} />
+            <Route path={ROUTES.aboutMota} element={<AboutMota />} />
+            <Route path={ROUTES.scholarshipsFellowships} element={<ScholarshipsFellowships />} />
+            <Route path={ROUTES.guidelinesNotices} element={<GuidelinesNotices />} />
+            <Route path={ROUTES.helpGrievance} element={<HelpGrievance />} />
+            <Route path={ROUTES.applicant.login} element={<Home />} />
+            <Route path={ROUTES.applicant.register} element={<Home />} />
+            <Route path={ROUTES.admin.login} element={<Home />} />
+            <Route path={ROUTES.resetPassword} element={<ResetPasswordPage />} />
+            <Route path="*" element={<Navigate replace to={ROUTES.home} />} />
+          </Route>
+          <Route element={<ApplicantLayout />}>
+            <Route path={ROUTES.applicant.dashboard} element={<ApplicantDashboard />} />
+            <Route path={ROUTES.applicant.schemes} element={<ApplicantSchemesPage />} />
+            <Route path={ROUTES.applicant.schemeDetail} element={<ApplicantSchemeDetailPage />} />
+            <Route path={ROUTES.applicant.applications} element={<ApplicantApplicationsPage />} />
+            <Route path={ROUTES.applicant.application} element={<ApplicantApplicationPage />} />
+            <Route path={ROUTES.applicant.status} element={<ApplicantApplicationPage />} />
+            <Route path={ROUTES.applicant.documents} element={<ApplicantDocumentsPage />} />
+            <Route path={ROUTES.applicant.notifications} element={<ApplicantNotificationsPage />} />
+            <Route path={ROUTES.applicant.profile} element={<ApplicantProfilePage />} />
+          </Route>
+        </Routes>
+      </ApplicantAuthProvider>
       <AdminAuthProvider>
         <ApplicantAuthProvider>
           <Routes>

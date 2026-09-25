@@ -4,24 +4,31 @@ import { ROUTES, SECTION_IDS } from '../../lib/constants';
 import { ApplicantHeader } from './ApplicantHeader';
 
 export function ApplicantLayout() {
-  const { session, signOut } = useApplicantAuth();
+  const { session, user, role, loading, signOut } = useApplicantAuth();
   const location = useLocation();
   const navigate = useNavigate();
 
-  if (!session) {
-    return <Navigate replace state={{ from: location }} to={ROUTES.homeLogin} />;
+  if (loading) {
+    return null;
   }
 
-  function handleLogout() {
-    signOut();
-    navigate(ROUTES.homeLogin, { replace: true });
+  if (!session || !user || role !== 'applicant') {
+    return <Navigate replace state={{ from: location }} to={ROUTES.applicant.login} />;
+  }
+
+  async function handleLogout() {
+    const result = await signOut();
+
+    if (result.success) {
+      navigate(ROUTES.applicant.login, { replace: true });
+    }
   }
 
   return (
     <div className="flex min-h-screen flex-col bg-gov-slate-bg">
-      <ApplicantHeader onLogout={handleLogout} profile={session.user} />
+      <ApplicantHeader onLogout={handleLogout} profile={user} />
       <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-center text-xs text-amber-900">
-        Demo workspace: profile and application data are sample content stored only in this browser.
+        Authentication uses Supabase. Application and document data remain sample content in this phase.
       </div>
       <main className="flex-grow" id={SECTION_IDS.MAIN_CONTENT.replace('#', '')}>
         <Outlet />

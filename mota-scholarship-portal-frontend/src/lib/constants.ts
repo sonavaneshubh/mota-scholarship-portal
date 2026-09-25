@@ -26,6 +26,7 @@ export const ROUTES = {
   guidelinesNotices: '/guidelines-notices',
   helpGrievance: '/help-grievance',
   homeLogin: '/#home-login',
+  resetPassword: '/reset-password',
   applicant: {
     login: '/applicant/login',
     register: '/applicant/register',
