@@ -11,6 +11,7 @@ export function AdminLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   useEffect(() => {
     setSidebarOpen(false);
@@ -25,12 +26,21 @@ export function AdminLayout() {
     navigate(ROUTES.admin.login, { replace: true });
   }
 
+  function toggleSidebarCollapse() {
+    setSidebarCollapsed((current) => !current);
+  }
+
   const unreadNotifications = ADMIN_NOTIFICATIONS.filter((notification) => !notification.read).length;
 
   return (
     <div className="min-h-screen bg-gov-slate-bg text-slate-800">
       <div className="flex min-h-screen">
-        <AdminSidebar onClose={() => setSidebarOpen(false)} open={sidebarOpen} />
+        <AdminSidebar
+          onClose={() => setSidebarOpen(false)}
+          open={sidebarOpen}
+          collapsed={sidebarCollapsed}
+          onToggleCollapse={toggleSidebarCollapse}
+        />
         {sidebarOpen ? <button aria-label="Close navigation overlay" className="fixed inset-0 z-30 bg-slate-950/50 lg:hidden" type="button" onClick={() => setSidebarOpen(false)} /> : null}
         <div className="min-w-0 flex-1">
           <AdminHeader onLogout={handleLogout} onMenuClick={() => setSidebarOpen(true)} unreadNotifications={unreadNotifications} user={session.user} />
