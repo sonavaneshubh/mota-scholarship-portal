@@ -35,12 +35,15 @@ export const ROUTES = {
     applications: '/applicant/applications',
     schemeDetail: '/applicant/schemes/:id',
     eligibility: '/applicant/eligibility',
-    application: '/applicant/application/:id',
+    application: '/applicant/applications/:applicationId',
     documents: '/applicant/documents',
     deficiencies: '/applicant/deficiencies',
     resubmission: '/applicant/resubmission',
-    status: '/applicant/status/:id',
+    status: '/applicant/applications/:applicationId/status',
     notifications: '/applicant/notifications',
+    history: '/applicant/history',
+    grievance: '/applicant/grievance',
+    guidelines: '/applicant/guidelines',
     profile: '/applicant/profile',
   },
   admin: {
@@ -68,7 +71,7 @@ export function applicantApplicationPath(applicationId: string) {
 }
 
 export function applicantStatusPath(applicationId: string) {
-  return `${ROUTES.applicant.status}/${encodeURIComponent(applicationId)}`;
+  return `${ROUTES.applicant.applications}/${encodeURIComponent(applicationId)}/status`;
 }
 
 /** In-page anchors used by the Home navigation. */

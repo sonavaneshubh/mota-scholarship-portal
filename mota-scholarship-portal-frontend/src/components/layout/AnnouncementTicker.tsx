@@ -19,7 +19,7 @@ export function AnnouncementTicker() {
           <div className="marquee-track text-slate-800 font-medium">
             {doubled.map((item, idx) => (
               <span key={`${item.id}-${idx}`} className="mx-4">
-                <span className="text-gov-blue font-semibold">★ {item.mark}:</span>{' '}
+                <span className="text-gov-blue font-semibold">DEMO · {item.mark}:</span>{' '}
                 {item.text}
               </span>
             ))}

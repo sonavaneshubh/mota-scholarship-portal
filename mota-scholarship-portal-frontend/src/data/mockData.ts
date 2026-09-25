@@ -103,6 +103,8 @@ export const SCHEMES: Scheme[] = [
     statusLabel: 'Prototype Listing',
     statusActive: true,
     demo: true,
+    department: 'Directorate of Higher Education (sample)',
+    guidelinesAvailable: true,
     description:
       'Sample configuration for an undergraduate/postgraduate scholarship with tuition assistance. Shown for prototype illustration only.',
     stats: [
@@ -122,6 +124,8 @@ export const SCHEMES: Scheme[] = [
     statusLabel: 'Prototype Listing',
     statusActive: true,
     demo: true,
+    department: 'Ministry of Tribal Affairs — Research Division (sample)',
+    guidelinesAvailable: true,
     description:
       'Sample configuration for a research fellowship supporting ST researchers in full-time M.Phil / Ph.D programmes. Illustration only.',
     stats: [
@@ -141,6 +145,8 @@ export const SCHEMES: Scheme[] = [
     statusLabel: 'Prototype Listing',
     statusActive: true,
     demo: true,
+    department: 'Directorate of School Education (sample)',
+    guidelinesAvailable: true,
     description:
       'Sample configuration for a post-matric scholarship covering late school and college stages. Prototype illustration, not an official scheme detail.',
     stats: [
@@ -160,6 +166,8 @@ export const SCHEMES: Scheme[] = [
     statusLabel: 'Prototype Listing',
     statusActive: true,
     demo: true,
+    department: 'National Tribal Research Institute (sample)',
+    guidelinesAvailable: false,
     description:
       'Sample configuration for research grants focused on tribal studies and related themes. Prototype illustration only.',
     stats: [
@@ -179,6 +187,8 @@ export const SCHEMES: Scheme[] = [
     statusLabel: 'Prototype Listing',
     statusActive: true,
     demo: true,
+    department: 'Directorate of Overseas Studies (sample)',
+    guidelinesAvailable: true,
     description:
       'Sample configuration for support to candidates pursuing study abroad. Prototype illustration, not an official programme.',
     stats: [

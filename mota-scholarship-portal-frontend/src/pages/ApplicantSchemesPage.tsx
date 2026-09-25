@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { SCHEMES, SCHEME_FILTERS } from '../data/mockData';
 import type { SchemeCategory } from '../types';
 import { ApplicantPageHeader } from '../components/applicant/ApplicantPageHeader';
@@ -7,8 +8,33 @@ import { Button } from '../components/ui/Button';
 import { ROUTES } from '../lib/constants';
 
 export function ApplicantSchemesPage() {
-  const [category, setCategory] = useState<SchemeCategory>('all');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const isSuggestedView = searchParams.get('view') === 'suggested';
+  const categoryParam = searchParams.get('category');
+  const category: SchemeCategory = SCHEME_FILTERS.some((filter) => filter.id === categoryParam)
+    ? (categoryParam as SchemeCategory)
+    : 'all';
   const [search, setSearch] = useState('');
+
+  function setCategory(next: SchemeCategory) {
+    setSearchParams(
+      (current) => {
+        const params = new URLSearchParams(current);
+        if (next === 'all') {
+          params.delete('category');
+        } else {
+          params.set('category', next);
+        }
+        return params;
+      },
+      { replace: true },
+    );
+  }
+
+  function clearView() {
+    setSearch('');
+    setSearchParams({});
+  }
 
   const filteredSchemes = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -21,13 +47,19 @@ export function ApplicantSchemesPage() {
   }, [category, search]);
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
+    <div className="space-y-6 py-1 sm:py-2">
       <ApplicantPageHeader
         action={<Button size="md" to={ROUTES.applicant.dashboard} variant="outline">Back to dashboard</Button>}
         description="Browse sample scholarship and fellowship listings. Scheme details and deadlines in this prototype are illustrative only."
         eyebrow="Applicant workspace"
-        title="Scholarships & Fellowships"
+        title={isSuggestedView ? 'Suggested eligible schemes' : 'Scholarships & Fellowships'}
       />
+
+      {isSuggestedView ? (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm leading-relaxed text-amber-950">
+          <span className="font-bold">Suggested review:</span> These sample listings are prompts for review, not an eligibility decision. Confirm official criteria before applying.
+        </div>
+      ) : null}
 
       <section className="rounded-lg border border-slate-200 bg-white p-4" aria-label="Filter schemes">
         <div className="grid gap-3 md:grid-cols-[1fr_15rem]">
@@ -45,8 +77,7 @@ export function ApplicantSchemesPage() {
             <span className="mb-1.5 block text-xs font-semibold text-slate-700">Category</span>
             <select
               className="w-full rounded border border-slate-300 bg-white px-3 py-2.5 text-sm focus:border-gov-blue focus:outline-none focus:ring-2 focus:ring-blue-100"
-              onChange={(event) => setCategory(event.target.value as SchemeCategory)}
-              value={category}
+              onChange={(event) => setCategory(event.target.value as SchemeCategory)}              value={category}
             >
               {SCHEME_FILTERS.map((filter) => <option key={filter.id} value={filter.id}>{filter.label}</option>)}
             </select>
@@ -56,7 +87,7 @@ export function ApplicantSchemesPage() {
 
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm text-slate-600">Showing {filteredSchemes.length} sample scheme{filteredSchemes.length === 1 ? '' : 's'}</p>
-        {search || category !== 'all' ? <button className="min-h-11 text-xs font-semibold text-gov-blue underline underline-offset-2" type="button" onClick={() => { setSearch(''); setCategory('all'); }}>Clear filters</button> : null}
+        {search || category !== 'all' || isSuggestedView ? <button className="min-h-11 text-xs font-semibold text-gov-blue underline underline-offset-2" type="button" onClick={clearView}>Clear view</button> : null}
       </div>
 
       {filteredSchemes.length ? (

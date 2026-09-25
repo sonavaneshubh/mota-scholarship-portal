@@ -16,7 +16,6 @@ const DEMO_PROFILE: ApplicantProfile = {
   course: 'B.Tech, Computer Science',
   institution: 'Kalinga Institute of Technology',
   avatarInitials: 'AK',
-  profileCompletion: 82,
 };
 
 function isApplicantSession(value: unknown): value is ApplicantSession {
@@ -34,6 +33,11 @@ function isApplicantSession(value: unknown): value is ApplicantSession {
     typeof user.name === 'string' &&
     typeof user.email === 'string' &&
     typeof user.mobile === 'string' &&
+    typeof user.state === 'string' &&
+    typeof user.district === 'string' &&
+    typeof user.category === 'string' &&
+    typeof user.course === 'string' &&
+    typeof user.institution === 'string' &&
     typeof user.avatarInitials === 'string'
   );
 }
@@ -80,20 +84,19 @@ export function ApplicantAuthProvider({ children }: { children: ReactNode }) {
     try {
       window.localStorage.setItem(APPLICANT_SESSION_KEY, JSON.stringify(nextSession));
     } catch {
-      return;
+      return false;
     }
 
     setSession(nextSession);
+    return true;
   }, []);
 
   const signOut = useCallback(() => {
     try {
       window.localStorage.removeItem(APPLICANT_SESSION_KEY);
-    } catch {
-      return;
+    } finally {
+      setSession(null);
     }
-
-    setSession(null);
   }, []);
 
   const value = useMemo(

@@ -5,7 +5,7 @@ export interface ApplicantAuthContextValue {
   session: ApplicantSession | null;
   user: ApplicantProfile | null;
   isAuthenticated: boolean;
-  signIn: (identifier: string) => void;
+  signIn: (identifier: string) => boolean;
   signOut: () => void;
 }
 

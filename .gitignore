@@ -8,3 +8,12 @@ dist-ssr
 .env
 .env.*
 !.env.example
+
+# Editor / local tooling config (may contain machine-specific paths or API keys)
+.vscode/
+
+# TypeScript incremental build cache
+*.tsbuildinfo
+
+# Downloaded Stitch design exports (reference artifacts, not source)
+stitch_*/

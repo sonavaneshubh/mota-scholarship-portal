@@ -9,7 +9,7 @@ export function ApplicantNotificationsPage() {
   const unreadCount = APPLICANT_NOTIFICATIONS.filter((notification) => notification.unread).length;
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
+    <div className="space-y-6 py-1 sm:py-2">
       <ApplicantPageHeader
         action={<Button size="md" to={ROUTES.applicant.dashboard} variant="outline">Back to dashboard</Button>}
         description="Stay informed about application activity, document requests, and profile reminders."
