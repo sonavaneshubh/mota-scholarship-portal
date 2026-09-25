@@ -36,6 +36,11 @@ export interface AuthProfile {
 
 export interface HomeAuthNavigationState {
   homeAuthMode: HomeAuthMode;
+  from?: {
+    pathname: string;
+    search?: string;
+    hash?: string;
+  };
 }
 
 export interface Announcement {
@@ -84,6 +89,8 @@ export interface Scheme {
   statusLabel: string;
   statusActive?: boolean;
   demo?: boolean;
+  department: string;
+  guidelinesAvailable?: boolean;
   description: string;
   stats: SchemeStat[];
   applyHref: string;
@@ -146,12 +153,16 @@ export interface MinistryStat {
 export type ApplicantApplicationStatus =
   | 'draft'
   | 'submitted'
-  | 'under-review'
-  | 'action-required'
-  | 'approved'
-  | 'rejected';
+  | 'under-verification'
+  | 'deficiency-raised'
+  | 'resubmission-required'
+  | 'under-scrutiny'
+  | 'selected'
+  | 'not-selected'
+  | 'rejected'
+  | 'withdrawn';
 
-export type ApplicantDocumentStatus = 'verified' | 'pending' | 'missing' | 'needs-update';
+export type ApplicantDocumentStatus = 'uploaded' | 'under-verification' | 'verified' | 'needs-correction' | 'rejected';
 
 export type ApplicantNotificationTone = 'info' | 'success' | 'warning' | 'action';
 
@@ -168,7 +179,6 @@ export interface ApplicantProfile {
   course: string;
   institution: string;
   avatarInitials: string;
-  profileCompletion: number;
 }
 
 export interface ApplicantApplication {
@@ -209,9 +219,12 @@ export interface ApplicantNotification {
 export interface ApplicantDocument {
   id: string;
   name: string;
+  type: string;
   description: string;
   status: ApplicantDocumentStatus;
   statusLabel: string;
+  fileSize: string;
+  uploadedAt: string;
   updatedAt: string;
   required: boolean;
 }

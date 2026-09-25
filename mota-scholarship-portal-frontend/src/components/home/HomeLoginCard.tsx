@@ -103,6 +103,19 @@ function getRequestedHomeAuthMode(state: unknown, pathname: string): HomeAuthMod
   return null;
 }
 
+function getRequestedApplicantPath(state: unknown) {
+  if (typeof state !== 'object' || state === null) {
+    return null;
+  }
+
+  const requested = (state as Partial<HomeAuthNavigationState>).from;
+  if (!requested?.pathname?.startsWith('/applicant/')) {
+    return null;
+  }
+
+  return `${requested.pathname}${requested.search ?? ''}${requested.hash ?? ''}`;
+}
+
 function getLoginUsernameError(username: string) {
   const value = username.trim();
 
@@ -279,6 +292,7 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
   const { signIn } = useApplicantAuth();
   const { signIn: signInAdmin } = useAdminAuth();
   const requestedMode = getRequestedHomeAuthMode(location.state);
+  const requestedApplicantPath = getRequestedApplicantPath(location.state);
   const [mode, setMode] = useState<HomeAuthMode>(() => requestedMode ?? 'applicant');
   const [loginUsername, setLoginUsername] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
@@ -469,6 +483,12 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
       return;
     }
 
+    if (!signIn(loginUsername)) {
+      setStatus('The demo session could not be saved in this browser. No login was created.');
+      return;
+    }
+
+    navigate(requestedApplicantPath ?? ROUTES.applicant.dashboard, { replace: true });
         setStatus('Admin identity verified. The admin workspace will be connected in a later phase.');
         return;
       }

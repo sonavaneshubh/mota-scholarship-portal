@@ -25,10 +25,22 @@ export default {
           border: '#cbd5e1',
           muted: '#64748b',
         },
+        'portal-navy': {
+          DEFAULT: '#0b2546',
+          dark: '#08284d',
+          deep: '#06182e',
+        },
+        'portal-amber': {
+          DEFAULT: '#f59e0b',
+          dark: '#d97706',
+        },
       },
       fontFamily: {
         sans: ['Segoe UI', 'Roboto', 'Arial', 'sans-serif'],
         serif: ['Georgia', 'Cambria', 'serif'],
+      },
+      fontSize: {
+        '2xs': ['11px', { lineHeight: '1rem' }],
       },
     },
   },

@@ -1,4 +1,8 @@
-import { applicantApplicationPath, applicantSchemePath } from '../lib/constants';
+import {
+  applicantApplicationPath,
+  applicantSchemePath,
+  ROUTES,
+} from '../lib/constants';
 import type {
   ApplicantApplication,
   ApplicantDocument,
@@ -19,7 +23,6 @@ export const APPLICANT_PROFILE: ApplicantProfile = {
   course: 'B.Tech, Computer Science',
   institution: 'Kalinga Institute of Technology',
   avatarInitials: 'AK',
-  profileCompletion: 82,
 };
 
 export const APPLICANT_APPLICATIONS: ApplicantApplication[] = [
@@ -29,9 +32,9 @@ export const APPLICANT_APPLICATIONS: ApplicantApplication[] = [
     schemeName: 'Demo — Higher Education Scholarship',
     submittedAt: '12 August 2026',
     updatedAt: '22 September 2026',
-    status: 'under-review',
-    statusLabel: 'Under review',
-    nextStep: 'Document verification is in progress.',
+    status: 'under-scrutiny',
+    statusLabel: 'Under scrutiny',
+    nextStep: 'Document verification and officer scrutiny are in progress.',
     referenceNumber: 'MOTA-DEMO-2026-001',
     amountLabel: '₹1,20,000 (sample)',
     documentsComplete: 4,
@@ -43,9 +46,9 @@ export const APPLICANT_APPLICATIONS: ApplicantApplication[] = [
     schemeName: 'Demo — Post-Matric Scholarship',
     submittedAt: '04 September 2026',
     updatedAt: '24 September 2026',
-    status: 'action-required',
-    statusLabel: 'Action required',
-    nextStep: 'Upload your latest income certificate to continue.',
+    status: 'deficiency-raised',
+    statusLabel: 'Deficiency raised',
+    nextStep: 'Replace the sample income certificate to continue verification.',
     referenceNumber: 'MOTA-DEMO-2026-002',
     amountLabel: '₹36,000 (sample)',
     documentsComplete: 3,
@@ -53,32 +56,12 @@ export const APPLICANT_APPLICATIONS: ApplicantApplication[] = [
   },
 ];
 
-export const APPLICANT_REQUIRED_ACTIONS: ApplicantRequiredAction[] = [
-  {
-    id: 'action-documents',
-    title: 'Complete your document set',
-    description: 'Upload one pending document to keep your Post-Matric application moving.',
-    dueLabel: 'Due 28 September 2026',
-    href: '/applicant/documents',
-    ctaLabel: 'Upload document',
-    tone: 'amber',
-  },
-  {
-    id: 'action-profile',
-    title: 'Review your profile details',
-    description: 'A few profile fields are still incomplete. Keep your application details accurate.',
-    dueLabel: 'Recommended',
-    href: '/applicant/profile',
-    ctaLabel: 'Review profile',
-    tone: 'blue',
-  },
-];
-
 export const APPLICANT_NOTIFICATIONS: ApplicantNotification[] = [
   {
     id: 'notification-review',
-    title: 'Application under review',
-    description: 'Your Higher Education Scholarship application is being reviewed by the demo verification team.',
+    title: 'Application under scrutiny',
+    description:
+      'Your Higher Education Scholarship application is in the sample officer-scrutiny stage.',
     timestamp: '22 September 2026',
     tone: 'info',
     unread: true,
@@ -86,20 +69,21 @@ export const APPLICANT_NOTIFICATIONS: ApplicantNotification[] = [
   },
   {
     id: 'notification-document',
-    title: 'Document needed',
-    description: 'Upload your latest income certificate for the Post-Matric Scholarship application.',
+    title: 'Action required: income certificate',
+    description:
+      'Replace the sample income certificate for the Post-Matric Scholarship application.',
     timestamp: '24 September 2026',
     tone: 'action',
     unread: true,
-    href: '/applicant/documents',
+    href: ROUTES.applicant.documents,
   },
   {
     id: 'notification-profile',
-    title: 'Profile almost complete',
-    description: 'Complete your profile to make future scholarship applications faster.',
+    title: 'Profile details available',
+    description: 'Review your sample profile before applying to another prototype scheme.',
     timestamp: '18 September 2026',
     tone: 'success',
-    href: '/applicant/profile',
+    href: ROUTES.applicant.profile,
   },
   {
     id: 'notification-scheme',
@@ -115,49 +99,80 @@ export const APPLICANT_DOCUMENTS: ApplicantDocument[] = [
   {
     id: 'doc-aadhaar',
     name: 'Aadhaar card',
+    type: 'Identity',
     description: 'Identity document for applicant verification.',
     status: 'verified',
     statusLabel: 'Verified',
+    fileSize: '184 KB (sample)',
+    uploadedAt: '12 August 2026',
     updatedAt: '12 August 2026',
     required: true,
   },
   {
     id: 'doc-category',
     name: 'Category certificate',
+    type: 'Category',
     description: 'Sample Scheduled Tribe category certificate.',
     status: 'verified',
     statusLabel: 'Verified',
+    fileSize: '236 KB (sample)',
+    uploadedAt: '12 August 2026',
     updatedAt: '12 August 2026',
     required: true,
   },
   {
     id: 'doc-institution',
     name: 'Institution verification',
-    description: 'Bonafide certificate from your current institution.',
+    type: 'Academic',
+    description: 'Bonafide certificate from the current sample institution.',
     status: 'verified',
     statusLabel: 'Verified',
+    fileSize: '198 KB (sample)',
+    uploadedAt: '13 August 2026',
     updatedAt: '13 August 2026',
     required: true,
   },
   {
     id: 'doc-income',
     name: 'Income certificate',
-    description: 'Latest income certificate for the Post-Matric Scholarship.',
-    status: 'needs-update',
-    statusLabel: 'Needs update',
-    updatedAt: '04 September 2026',
+    type: 'Income',
+    description: 'Latest income certificate required for the sample Post-Matric application.',
+    status: 'needs-correction',
+    statusLabel: 'Needs correction',
+    fileSize: '—',
+    uploadedAt: '04 September 2026',
+    updatedAt: '24 September 2026',
     required: true,
   },
   {
     id: 'doc-bank',
     name: 'Bank account proof',
+    type: 'Bank',
     description: 'Sample cancelled cheque or bank statement.',
-    status: 'pending',
-    statusLabel: 'Pending review',
-    updatedAt: '04 September 2026',
+    status: 'under-verification',
+    statusLabel: 'Under verification',
+    fileSize: '162 KB (sample)',
+    uploadedAt: '04 September 2026',
+    updatedAt: '18 September 2026',
     required: true,
   },
 ];
+
+export function getApplicantRequiredActions(): ApplicantRequiredAction[] {
+  return APPLICANT_DOCUMENTS.filter((document) => document.status === 'needs-correction').map(
+    (document) => ({
+      id: `correct-${document.id}`,
+      title: `Replace ${document.name.toLowerCase()}`,
+      description: `${document.description} Upload replacement is not connected in this prototype.`,
+      dueLabel: 'Recommended by 28 September 2026',
+      href: applicantApplicationPath('APP-2026-002'),
+      ctaLabel: 'Review deficiency',
+      tone: 'amber' as const,
+    }),
+  );
+}
+
+export const APPLICANT_REQUIRED_ACTIONS = getApplicantRequiredActions();
 
 export const APPLICANT_QUICK_ACTIONS: ApplicantQuickAction[] = [
   {
@@ -165,31 +180,31 @@ export const APPLICANT_QUICK_ACTIONS: ApplicantQuickAction[] = [
     title: 'Browse schemes',
     description: 'Find sample scholarships and fellowships.',
     icon: 'scheme',
-    href: '/applicant/schemes',
+    href: ROUTES.applicant.schemes,
     ctaLabel: 'Explore',
   },
   {
     id: 'view-documents',
     title: 'Manage documents',
-    description: 'Review and update your document set.',
+    description: 'Review the sample document set and correction needs.',
     icon: 'documents',
-    href: '/applicant/documents',
+    href: ROUTES.applicant.documents,
     ctaLabel: 'Open',
   },
   {
     id: 'view-notifications',
     title: 'View notifications',
-    description: 'Stay updated on application activity.',
+    description: 'Stay updated on sample application activity.',
     icon: 'notifications',
-    href: '/applicant/notifications',
+    href: ROUTES.applicant.notifications,
     ctaLabel: 'View',
   },
   {
-    id: 'edit-profile',
-    title: 'Edit profile',
-    description: 'Keep your personal details current.',
+    id: 'view-profile',
+    title: 'View profile',
+    description: 'Check the personal details used in this sample session.',
     icon: 'profile',
-    href: '/applicant/profile',
-    ctaLabel: 'Edit',
+    href: ROUTES.applicant.profile,
+    ctaLabel: 'View',
   },
 ];

@@ -1,6 +1,8 @@
 import { useParams } from 'react-router-dom';
+import { APPLICANT_APPLICATIONS } from '../data/applicantData';
 import { SCHEMES } from '../data/mockData';
 import { ApplicantPageHeader } from '../components/applicant/ApplicantPageHeader';
+import { ApplicationStatusBadge } from '../components/applicant/StatusBadge';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
@@ -12,17 +14,19 @@ export function ApplicantSchemeDetailPage() {
 
   if (!scheme) {
     return (
-      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
-        <div className="rounded-lg border border-slate-200 bg-white p-8 text-center">
+      <div className="space-y-6 py-1 sm:py-2">
+        <Card className="p-8 text-center">
           <h1 className="text-xl font-bold text-gov-blue-dark">Scheme not found</h1>
           <Button className="mt-5" size="md" to={ROUTES.applicant.schemes} variant="outline">Back to schemes</Button>
-        </div>
+        </Card>
       </div>
     );
   }
 
+  const existingApplication = APPLICANT_APPLICATIONS.find((application) => application.schemeId === scheme.id);
+
   return (
-    <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
+    <div className="space-y-6 py-1 sm:py-2">
       <ApplicantPageHeader
         action={<Button size="md" to={ROUTES.applicant.schemes} variant="outline">Back to schemes</Button>}
         description={scheme.description}
@@ -30,7 +34,7 @@ export function ApplicantSchemeDetailPage() {
         title={scheme.name}
       />
       <div className="grid gap-6 lg:grid-cols-3">
-        <Card className="p-5 lg:col-span-2" accentClass="">
+        <Card className="p-5 lg:col-span-2">
           <div className="flex flex-wrap items-center gap-2">
             <Badge tone={scheme.badgeTone}>{scheme.statusLabel}</Badge>
             <span className="text-xs text-slate-500">Reference: {scheme.id}</span>
@@ -40,11 +44,24 @@ export function ApplicantSchemeDetailPage() {
           <dl className="mt-6 grid gap-4 border-y border-slate-100 py-5 sm:grid-cols-3">
             {scheme.stats.map((stat) => <div key={stat.label}><dt className="text-xs text-slate-500">{stat.label}</dt><dd className="mt-1 text-sm font-semibold text-slate-800">{stat.value}</dd></div>)}
           </dl>
+          <div className="mt-5 rounded border border-amber-200 bg-amber-50 p-4 text-sm leading-relaxed text-amber-950">
+            <p className="font-bold">Eligibility boundary</p>
+            <p className="mt-1">Your profile can be used to review likely fields, but this listing does not determine eligibility. Confirm the official notification and criteria when the service is connected.</p>
+          </div>
         </Card>
-        <Card className="h-fit p-5" accentClass="">
-          <h2 className="text-lg font-bold text-gov-blue-dark">Ready to apply?</h2>
-          <p className="mt-2 text-sm leading-relaxed text-slate-600">The application flow is represented in the applicant workspace for this demo.</p>
-          <Button className="mt-5 w-full" size="md" to={ROUTES.applicant.applications} variant="accent">View my applications</Button>
+
+        <Card className="h-fit scroll-mt-24 p-5" accentClass="border-l-4 border-gov-saffron" id="application-action">
+          <p className="text-xs font-bold uppercase tracking-wider text-gov-saffron-dark">Application action</p>
+          <h2 className="mt-1 text-lg font-bold text-gov-blue-dark">Ready to apply?</h2>
+          <p className="mt-2 text-sm leading-relaxed text-slate-600">The submission flow is represented in the applicant workspace for this demo, but no application can be submitted yet.</p>
+          {existingApplication ? (
+            <div className="mt-4 rounded border border-blue-200 bg-blue-50 p-3">
+              <p className="text-xs font-bold uppercase tracking-wide text-gov-blue">Existing sample record</p>
+              <div className="mt-2 flex items-center justify-between gap-3"><span className="text-sm font-semibold text-slate-800">{existingApplication.id}</span><ApplicationStatusBadge status={existingApplication.status} label={existingApplication.statusLabel} /></div>
+            </div>
+          ) : null}
+          <Button className="mt-5 w-full" disabled size="md" type="button" variant="primary">Apply unavailable in demo</Button>
+          <Button className="mt-2 w-full" size="md" to={ROUTES.applicant.applications} variant="outline">View my applications</Button>
         </Card>
       </div>
     </div>

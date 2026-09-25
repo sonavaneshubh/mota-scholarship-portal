@@ -12,6 +12,8 @@ export interface ApplicantAuthContextValue {
   profileError: string | null;
   loading: boolean;
   isAuthenticated: boolean;
+  signIn: (identifier: string) => boolean;
+  signOut: () => void;
   signIn: (email: string, password: string) => Promise<SignInResult>;
   signUp: (input: SignUpInput) => Promise<SignUpResult>;
   signOut: () => Promise<AuthResult>;

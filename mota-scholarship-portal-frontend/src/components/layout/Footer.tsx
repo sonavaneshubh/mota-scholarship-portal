@@ -4,17 +4,18 @@ import type { FooterLink } from '../../types';
 
 function renderFooterLink(link: FooterLink) {
   const className = 'hover:text-amber-400 transition';
+  const href = link.href.startsWith('#') ? `/${link.href}` : link.href;
 
-  if (link.href.startsWith('/')) {
+  if (href.startsWith('/')) {
     return (
-      <Link className={className} to={link.href}>
+      <Link className={className} to={href}>
         {link.label}
       </Link>
     );
   }
 
   return (
-    <a className={className} href={link.href}>
+    <a className={className} href={href}>
       {link.label}
     </a>
   );

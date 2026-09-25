@@ -1,22 +1,14 @@
-import { Badge } from '../ui/Badge';
-import type { BadgeTone } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { applicantApplicationPath } from '../../lib/constants';
-import type { ApplicantApplication, ApplicantApplicationStatus } from '../../types';
+import type { ApplicantApplication } from '../../types';
+import { ApplicationStatusBadge } from './StatusBadge';
 
 interface ApplicationCardProps {
   application: ApplicantApplication;
 }
 
-const statusToneMap: Record<ApplicantApplicationStatus, BadgeTone> = {
-  draft: 'slate',
-  submitted: 'blue',
-  'under-review': 'purple',
-  'action-required': 'amber',
-  approved: 'green',
-  rejected: 'red',
-};
+
 
 export function ApplicationCard({ application }: ApplicationCardProps) {
   return (
@@ -26,7 +18,7 @@ export function ApplicationCard({ application }: ApplicationCardProps) {
           <p className="text-xs font-semibold text-slate-500">{application.id}</p>
           <h2 className="mt-1 text-lg font-bold text-gov-blue-dark">{application.schemeName}</h2>
         </div>
-        <Badge tone={statusToneMap[application.status]}>{application.statusLabel}</Badge>
+        <ApplicationStatusBadge status={application.status} label={application.statusLabel} />
       </div>
       <p className="mt-3 text-sm leading-relaxed text-slate-600">{application.nextStep}</p>
       <div className="mt-4 grid gap-3 border-y border-slate-100 py-3 text-xs sm:grid-cols-3">
