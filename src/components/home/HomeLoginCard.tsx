@@ -300,7 +300,7 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
   const cardClassName = `bg-white/95 text-slate-900 rounded-lg shadow-lg border border-slate-200 scroll-mt-24 ${
     isRegistration
       ? 'p-3 lg:col-span-6 lg:h-auto lg:overflow-visible lg:flex lg:flex-col'
-      : 'p-4 lg:col-span-4 lg:h-[34rem] lg:overflow-hidden lg:flex lg:flex-col'
+      : 'p-4 lg:col-span-4 lg:h-auto lg:overflow-visible lg:flex lg:flex-col'
   }`;
 
   useEffect(() => {
@@ -769,7 +769,7 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
         </form>
       ) : (
         <form
-          className="space-y-3 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-1"
+          className="space-y-2 lg:min-h-0 lg:overflow-visible"
           aria-labelledby="home-authentication-card-heading"
           noValidate
           onSubmit={handleLoginSubmit}
@@ -864,11 +864,11 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
         </form>
       )}
 
-      <div className={`${isRegistration ? 'mt-2 pt-2' : 'mt-4 pt-3'} border-t border-slate-200 lg:shrink-0`}>
+      <div className={`${isRegistration ? 'mt-2 pt-2' : 'mt-1 pt-1'} border-t border-slate-200 lg:shrink-0`}>
         {isRegistration ? (
           <div className={isRegistration ? 'space-y-1.5' : 'space-y-2'}>
             <p className="text-center text-[11px] font-medium text-slate-600">Already have an account?</p>
-            <div className={`grid gap-2 sm:grid-cols-2${isRegistration ? '' : ' lg:grid-cols-1'}`}>
+            <div className="grid gap-0 sm:grid-cols-2">
               <Button
                 className="w-full justify-center rounded"
                 onClick={() => switchMode('applicant')}
