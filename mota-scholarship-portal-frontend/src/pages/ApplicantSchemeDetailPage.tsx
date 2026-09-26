@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { APPLICANT_APPLICATIONS } from '../data/applicantData';
 import { fetchSchemeDetail } from '../services/schemes';
+import type { EligibilityEvaluation, SchemeDetailResponse } from '../lib/supabase';
 import { evaluateEligibility, buildApplicantProfile } from '../services/eligibility';
 import { useApplicantAuth } from '../context/useApplicantAuth';
 import { ApplicantPageHeader } from '../components/applicant/ApplicantPageHeader';
@@ -16,14 +17,9 @@ export function ApplicantSchemeDetailPage() {
   const { user } = useApplicantAuth();
 
   const [loading, setLoading] = useState(true);
-  const [schemeData, setSchemeData] = useState<any | null>(null);
+  const [schemeData, setSchemeData] = useState<SchemeDetailResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [eligibilityEval, setEligibilityEval] = useState<{
-    result: 'ELIGIBLE' | 'NOT_ELIGIBLE' | 'NEEDS_REVIEW';
-    reasons: string[];
-    matched: string[];
-    missing: string[];
-  } | null>(null);
+  const [eligibilityEval, setEligibilityEval] = useState<EligibilityEvaluation | null>(null);
 
   useEffect(() => {
     async function loadScheme() {

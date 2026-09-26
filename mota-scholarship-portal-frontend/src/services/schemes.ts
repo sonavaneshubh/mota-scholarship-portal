@@ -1,9 +1,10 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import type { SchemeDetailResponse, SchemeFilters, SchemeListResponse } from '../lib/supabase';
 
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 100;
 
-export async function fetchSchemes(filters: any = {}): Promise<any> {
+export async function fetchSchemes(filters: SchemeFilters = {}): Promise<SchemeListResponse> {
   if (!isSupabaseConfigured || !supabase) {
     return { schemes: [], total: 0, page: 1, limit: DEFAULT_LIMIT };
   }
@@ -53,7 +54,7 @@ export async function fetchSchemes(filters: any = {}): Promise<any> {
   };
 }
 
-export async function fetchSchemeDetail(schemeId: string): Promise<any | null> {
+export async function fetchSchemeDetail(schemeId: string): Promise<SchemeDetailResponse | null> {
   if (!supabase) {
     return null;
   }
@@ -222,7 +223,7 @@ export async function fetchAcademicYears() {
     return [];
   }
 
-  const years = [...new Set(data?.map(s => s.academic_year) || [])];
+  const years = Array.from(new Set<string>((data ?? []).map((row) => row.academic_year)));
   return years.sort((a, b) => b.localeCompare(a));
 }
 

@@ -70,6 +70,13 @@ export interface Scheme {
   scheme_categories?: SchemeCategory;
 }
 
+// Scheme row as returned by the list/detail queries, which only select a subset
+// of the joined department/category columns.
+export type SchemeWithRelations = Scheme & {
+  departments?: Pick<Department, 'id' | 'name' | 'code'> | null;
+  scheme_categories?: Pick<SchemeCategory, 'id' | 'name'> | null;
+};
+
 export interface SchemeEligibility {
   id: string;
   scheme_id: string;
@@ -144,7 +151,7 @@ export interface SchemeVersion {
   id: string;
   scheme_id: string;
   academic_year: string;
-  data_snapshot: Record<string, any>;
+  data_snapshot: Record<string, unknown>;
   source_url: string | null;
   verified_at: string | null;
   verified_by: string | null;
@@ -153,14 +160,14 @@ export interface SchemeVersion {
 
 // API Response types
 export interface SchemeListResponse {
-  schemes: Scheme[];
+  schemes: SchemeWithRelations[];
   total: number;
   page: number;
   limit: number;
 }
 
 export interface SchemeDetailResponse {
-  scheme: Scheme;
+  scheme: SchemeWithRelations;
   eligibility: SchemeEligibility | null;
   benefits: SchemeBenefit[];
   documents: SchemeDocument[];
@@ -198,7 +205,7 @@ export interface ApplicantScheme {
 }
 
 // Helper to convert DB scheme to frontend format
-export function mapSchemeToFrontend(scheme: Scheme & { departments?: Department; scheme_categories?: SchemeCategory }): ApplicantScheme {
+export function mapSchemeToFrontend(scheme: SchemeWithRelations): ApplicantScheme {
   const categoryMap: Record<string, { label: string; tone: ApplicantScheme['badgeTone'] }> = {
     'Post Matric Scholarship': { label: 'Scholarship', tone: 'amber' },
     'Pre Matric Scholarship': { label: 'Scholarship', tone: 'blue' },

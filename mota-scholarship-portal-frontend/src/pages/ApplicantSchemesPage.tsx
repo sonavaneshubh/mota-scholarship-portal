@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { 
   fetchSchemes, 
@@ -7,7 +7,7 @@ import {
   fetchAcademicYears,
   mapSchemeToFrontend,
 } from '../services/schemes';
-import type { Scheme } from '../lib/supabase';
+import type { Scheme, SchemeFilters } from '../lib/supabase';
 import { ApplicantPageHeader } from '../components/applicant/ApplicantPageHeader';
 import { ApplicantSchemeCard } from '../components/applicant/ApplicantSchemeCard';
 import { Button } from '../components/ui/Button';
@@ -105,10 +105,10 @@ export function ApplicantSchemesPage() {
     }
   }
 
-  async function loadSchemes() {
+  const loadSchemes = useCallback(async () => {
     setLoading(true);
     try {
-      const filters: Record<string, any> = {
+      const filters: SchemeFilters = {
         page: page,
         limit: 12,
       };
@@ -128,7 +128,7 @@ export function ApplicantSchemesPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [page, category, academicYear, departmentId, search]);
 
   useEffect(() => {
     loadReferenceData();
@@ -136,7 +136,7 @@ export function ApplicantSchemesPage() {
 
   useEffect(() => {
     loadSchemes();
-  }, [page, category, academicYear, departmentId, search]);
+  }, [loadSchemes]);
 
   const filteredSchemes = useMemo(() => {
     return schemes.map(mapSchemeToFrontend);
