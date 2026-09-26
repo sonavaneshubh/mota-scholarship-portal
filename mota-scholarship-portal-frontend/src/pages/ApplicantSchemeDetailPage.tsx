@@ -1,6 +1,7 @@
 import { useParams } from 'react-router-dom';
 import { APPLICANT_APPLICATIONS } from '../data/applicantData';
 import { SCHEMES } from '../data/mockData';
+import { PORTAL_SCHEMES } from '../data/portalSchemes';
 import { ApplicantPageHeader } from '../components/applicant/ApplicantPageHeader';
 import { ApplicationStatusBadge } from '../components/applicant/StatusBadge';
 import { Badge } from '../components/ui/Badge';
@@ -11,6 +12,43 @@ import { ROUTES } from '../lib/constants';
 export function ApplicantSchemeDetailPage() {
   const { id } = useParams<{ id: string }>();
   const scheme = SCHEMES.find((item) => item.id === id);
+  const portalScheme = PORTAL_SCHEMES.find((item) => item.id === id);
+
+  if (!scheme && portalScheme) {
+    return (
+      <div className="space-y-4 py-1 sm:py-2">
+        <ApplicantPageHeader
+          action={<Button size="md" to={ROUTES.applicant.dashboard} variant="outline">Back to Home</Button>}
+          description={`${portalScheme.department} · ${portalScheme.type}`}
+          eyebrow="Suggested eligible scheme"
+          title={portalScheme.name}
+        />
+        <div className="grid gap-4 lg:grid-cols-3">
+          <Card className="scroll-mt-24 p-5 lg:col-span-2" id="guidelines">
+            <h2 className="text-base font-bold text-gov-blue-dark">Scheme guidelines (GR)</h2>
+            <p className="mt-2 text-sm leading-relaxed text-slate-600">
+              Official government resolutions for this scheme are not connected in this prototype. Confirm the
+              notification and criteria on the Maharashtra scholarship portal before applying.
+            </p>
+          </Card>
+          <Card accentClass="border-l-4 border-gov-saffron" className="h-fit scroll-mt-24 p-5" id="application-action">
+            <p className="text-xs font-bold uppercase tracking-wider text-gov-saffron-dark">Application action</p>
+            <h2 className="mt-1 text-base font-bold text-gov-blue-dark">Ready to apply?</h2>
+            <p className="mt-2 text-sm leading-relaxed text-slate-600">
+              The submission flow is represented in the applicant workspace for this demo, but no application can be
+              submitted yet.
+            </p>
+            <Button className="mt-4 w-full" disabled size="md" type="button" variant="primary">
+              Apply unavailable in demo
+            </Button>
+            <Button className="mt-2 w-full" size="md" to={ROUTES.applicant.applications} variant="outline">
+              View my applications
+            </Button>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   if (!scheme) {
     return (

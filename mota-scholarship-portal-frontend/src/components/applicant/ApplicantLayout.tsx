@@ -177,7 +177,7 @@ export function ApplicantLayout() {
         </aside>
 
         <main className="flex-1 min-w-0 overflow-y-auto" id={SECTION_IDS.MAIN_CONTENT.replace('#', '')}>
-          <div className="p-3 sm:p-4 lg:p-6">
+          <div className="p-2">
             <Outlet />
           </div>
         </main>
