@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import type { FormEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { ROUTES } from '../../lib/constants';
 import { AdminDialog } from '../../components/admin/AdminDialog';
 import { AdminIcon } from '../../components/admin/AdminIcon';
 import { AdminPageHeader } from '../../components/admin/AdminPageHeader';
@@ -99,7 +101,14 @@ function toForm(scheme: Scheme): SchemeFormState {
   };
 }
 
-export function ScholarshipSchemes() {
+interface ScholarshipSchemesProps {
+  openCreateOnMount?: boolean;
+}
+
+const SCHEMES_UNAVAILABLE_MESSAGE = 'Schemes cannot be loaded because the database connection is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY to enable this workspace.';
+
+export function ScholarshipSchemes({ openCreateOnMount = false }: ScholarshipSchemesProps) {
+  const navigate = useNavigate();
   const [schemes, setSchemes] = useState<Scheme[]>([]);
   const [departments, setDepartments] = useState<Array<{id: string; name: string; code: string}>>([]);
   const [categories, setCategories] = useState<Array<{id: string; name: string}>>([]);
@@ -113,15 +122,22 @@ export function ScholarshipSchemes() {
 
   async function loadData() {
     setLoading(true);
+    if (!supabase) {
+      setSchemes([]);
+      setDepartments([]);
+      setCategories([]);
+      setLoading(false);
+      return;
+    }
     try {
       const [schemesRes, deptsRes, catsRes] = await Promise.all([
-        supabase!.from('schemes').select(`
+        supabase.from('schemes').select(`
           *,
           departments (id, name, code),
           scheme_categories (id, name)
         `).order('created_at', { ascending: false }),
-        supabase!.from('departments').select('id, name, code').eq('is_active', true).order('name'),
-        supabase!.from('scheme_categories').select('id, name').eq('is_active', true).order('name'),
+        supabase.from('departments').select('id, name, code').eq('is_active', true).order('name'),
+        supabase.from('scheme_categories').select('id, name').eq('is_active', true).order('name'),
       ]);
 
       if (schemesRes.error) throw schemesRes.error;
@@ -142,6 +158,16 @@ export function ScholarshipSchemes() {
     loadData();
   }, []);
 
+  useEffect(() => {
+    if (!openCreateOnMount) {
+      return;
+    }
+    setEditingId(null);
+    setForm(emptyForm);
+    setErrors({});
+    setDialogOpen(true);
+  }, [openCreateOnMount]);
+
   function openAdd() {
     setEditingId(null);
     setForm(emptyForm);
@@ -159,6 +185,9 @@ export function ScholarshipSchemes() {
   function closeForm() {
     setDialogOpen(false);
     setErrors({});
+    if (openCreateOnMount) {
+      navigate(ROUTES.admin.scholarships, { replace: true });
+    }
   }
 
   function updateField<Key extends keyof SchemeFormState>(key: Key, value: SchemeFormState[Key]) {
@@ -181,16 +210,21 @@ export function ScholarshipSchemes() {
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
 
+    if (!supabase) {
+      setErrors({ submit: SCHEMES_UNAVAILABLE_MESSAGE });
+      return;
+    }
+
     try {
       if (editingId) {
-        const { error } = await supabase!
+        const { error } = await supabase
           .from('schemes')
           .update({ ...form, updated_at: new Date().toISOString() })
           .eq('id', editingId);
         if (error) throw error;
         setNotice('Scholarship scheme updated successfully.');
       } else {
-        const { error } = await supabase!
+        const { error } = await supabase
           .from('schemes')
           .insert(form);
         if (error) throw error;
@@ -206,11 +240,16 @@ export function ScholarshipSchemes() {
 
   function confirmStatusChange() {
     if (!statusScheme) return;
+    if (!supabase) {
+      setStatusScheme(null);
+      setNotice(SCHEMES_UNAVAILABLE_MESSAGE);
+      return;
+    }
     const isPublished = statusScheme.status === 'published';
     const nextStatus = isPublished ? 'inactive' : 'published';
     const displayStatus = isPublished ? 'Inactive' : 'Active';
-    
-    supabase!
+
+    supabase
       .from('schemes')
       .update({ status: nextStatus })
       .eq('id', statusScheme.id)
@@ -247,6 +286,12 @@ export function ScholarshipSchemes() {
       />
 
       {notice ? <div aria-live="polite" className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">{notice}</div> : null}
+
+      {!supabase ? (
+        <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-relaxed text-amber-900">
+          {SCHEMES_UNAVAILABLE_MESSAGE}
+        </div>
+      ) : null}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {schemes.map((scheme) => (
@@ -340,7 +385,7 @@ export function ScholarshipSchemes() {
             </div>
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-600" htmlFor="scheme-scheme_type">Scheme Type</label>
-              <select className="mt-1.5 min-h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm outline-none focus:border-gov-blue focus:ring-2 focus:ring-blue-100" id="scheme-verification_status" value={form.verification_status} onChange={(event) => updateField('verification_status', event.target.value as any)}>
+              <select className="mt-1.5 min-h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm outline-none focus:border-gov-blue focus:ring-2 focus:ring-blue-100" id="scheme-verification_status" value={form.verification_status} onChange={(event) => updateField('verification_status', event.target.value as SchemeFormState['verification_status'])}>
                 <option value="pending_review">Pending Review</option>
                 <option value="verified">Verified</option>
                 <option value="rejected">Rejected</option>
@@ -402,7 +447,7 @@ export function ScholarshipSchemes() {
             </div>
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-600" htmlFor="scheme-status">Status</label>
-              <select className="mt-1.5 min-h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm outline-none focus:border-gov-blue focus:ring-2 focus:ring-blue-100" id="scheme-status" value={form.status} onChange={(event) => updateField('status', event.target.value as any)}>
+              <select className="mt-1.5 min-h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm outline-none focus:border-gov-blue focus:ring-2 focus:ring-blue-100" id="scheme-status" value={form.status} onChange={(event) => updateField('status', event.target.value as SchemeFormState['status'])}>
                 <option value="draft">Draft</option>
                 <option value="review">Under Review</option>
                 <option value="published">Published</option>
@@ -411,7 +456,7 @@ export function ScholarshipSchemes() {
             </div>
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-600" htmlFor="scheme-verification_status">Verification</label>
-              <select className="mt-1.5 min-h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm outline-none focus:border-gov-blue focus:ring-2 focus:ring-blue-100" id="scheme-verification_status" value={form.verification_status} onChange={(event) => updateField('verification_status', event.target.value as any)}>
+              <select className="mt-1.5 min-h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm outline-none focus:border-gov-blue focus:ring-2 focus:ring-blue-100" id="scheme-verification_status" value={form.verification_status} onChange={(event) => updateField('verification_status', event.target.value as SchemeFormState['verification_status'])}>
                 <option value="pending_review">Pending Review</option>
                 <option value="verified">Verified</option>
                 <option value="rejected">Rejected</option>

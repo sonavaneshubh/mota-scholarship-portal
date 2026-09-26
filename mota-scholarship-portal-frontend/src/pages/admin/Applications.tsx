@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { ADMIN_APPLICATIONS } from '../../data/adminMockData';
 import { ROUTES } from '../../lib/constants';
 import type { AdminApplication, AdminApplicationStatus } from '../../types/admin';
@@ -20,10 +21,16 @@ type PendingAction = {
 const pageSize = 6;
 const statusOptions: StatusFilter[] = ['All statuses', 'Pending', 'Under Review', 'Approved', 'Rejected', 'Documents Required'];
 
+function toStatusFilter(value: string | null): StatusFilter {
+  const match = statusOptions.find((option) => option === value);
+  return match ?? 'All statuses';
+}
+
 export function Applications() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [applications, setApplications] = useState<AdminApplication[]>(ADMIN_APPLICATIONS);
   const [search, setSearch] = useState('');
-  const [status, setStatus] = useState<StatusFilter>('All statuses');
+  const status = toStatusFilter(searchParams.get('status'));
   const [category, setCategory] = useState('All categories');
   const [scheme, setScheme] = useState('All schemes');
   const [dateFilter, setDateFilter] = useState<DateFilter>('all');
@@ -72,9 +79,25 @@ export function Applications() {
     setSortDirection('asc');
   }
 
+  function setStatusFilter(next: StatusFilter) {
+    setSearchParams(
+      (current) => {
+        const params = new URLSearchParams(current);
+        if (next === 'All statuses') {
+          params.delete('status');
+        } else {
+          params.set('status', next);
+        }
+        return params;
+      },
+      { replace: true },
+    );
+    setPage(1);
+  }
+
   function clearFilters() {
     setSearch('');
-    setStatus('All statuses');
+    setStatusFilter('All statuses');
     setCategory('All categories');
     setScheme('All schemes');
     setDateFilter('all');
@@ -168,7 +191,7 @@ export function Applications() {
           </div>
           <div>
             <label className="sr-only" htmlFor="application-status">Filter by status</label>
-            <select className="min-h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-xs text-slate-700 outline-none focus:border-gov-blue focus:ring-2 focus:ring-blue-100" id="application-status" value={status} onChange={(event) => { setStatus(event.target.value as StatusFilter); setPage(1); }}>
+            <select className="min-h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-xs text-slate-700 outline-none focus:border-gov-blue focus:ring-2 focus:ring-blue-100" id="application-status" value={status} onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}>
               {statusOptions.map((option) => <option key={option}>{option}</option>)}
             </select>
           </div>
