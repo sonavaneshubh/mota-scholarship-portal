@@ -19,3 +19,8 @@ dist-ssr
 
 # Downloaded Stitch design exports (reference artifacts, not source)
 stitch_*/
+
+# Scratch folder holding the original scheme guideline PDFs. The served copies
+# live in mota-scholarship-portal-frontend/public/guidelines/ and are committed
+# from there, so this folder would only duplicate ~9.7 MB in the history.
+mota-scholarship-portal-frontend/GR PDF/

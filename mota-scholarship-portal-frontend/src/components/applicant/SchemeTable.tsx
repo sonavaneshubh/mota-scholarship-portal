@@ -40,16 +40,25 @@ function SchemeRow({ scheme }: { scheme: ApplicantScheme }) {
         </Link>
       </td>
       <td className="w-[10%] border-b border-slate-200 px-2.5 py-2">
-        {scheme.guidelinesAvailable ? (
-          <Link
+        {scheme.guidelineUrl ? (
+          <a
             className="inline-flex items-center gap-1 text-[11.5px] font-medium leading-none text-red-600 hover:text-red-700 hover:underline"
-            to={`${detailPath}#guidelines`}
+            download
+            href={scheme.guidelineUrl}
+            rel="noopener noreferrer"
+            target="_blank"
+            title={`Download guidelines (PDF) - ${scheme.name}`}
           >
             <PdfIcon />
             PDF
-          </Link>
+          </a>
         ) : (
-          <span className="text-[11.5px] text-slate-400">Not available</span>
+          <span
+            className="text-[11.5px] text-slate-400"
+            title="No guideline document has been published for this scheme yet."
+          >
+            Not published
+          </span>
         )}
       </td>
     </tr>

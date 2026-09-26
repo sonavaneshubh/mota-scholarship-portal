@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { resolveGuidelineUrl } from '../data/schemeGuidelines';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.trim() ?? '';
 const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim() || import.meta.env.VITE_SUPABASE_ANON_KEY?.trim() || '';
@@ -197,8 +198,14 @@ export interface ApplicantScheme {
   statusLabel: string;
   statusActive: boolean;
   demo: boolean;
-  department: string;
-  guidelinesAvailable: boolean;
+    department: string;
+    guidelinesAvailable: boolean;
+    /**
+     * Resolved guideline download URL, or an empty string when the scheme has
+     * no document. Prefer this over re-deriving availability from
+     * `guidelinesAvailable`, so the link and the label can never disagree.
+     */
+    guidelineUrl: string;
   description: string;
   stats: { label: string; value: string; emphasize?: boolean }[];
   applyHref: string;
@@ -221,7 +228,8 @@ export function mapSchemeToFrontend(scheme: SchemeWithRelations): ApplicantSchem
 
   const catInfo = categoryMap[scheme.scheme_categories?.name || ''] || { label: 'Other', tone: 'slate' };
   const deptName = scheme.departments?.name || 'Unknown Department';
-
+  const guidelineUrl = resolveGuidelineUrl(scheme.gr_url, scheme.scheme_code);
+  
   return {
     id: scheme.id,
     name: scheme.name,
@@ -233,7 +241,8 @@ export function mapSchemeToFrontend(scheme: SchemeWithRelations): ApplicantSchem
     statusActive: scheme.status === 'published' && scheme.verification_status === 'verified',
     demo: false,
     department: deptName,
-    guidelinesAvailable: !!scheme.gr_url,
+      guidelinesAvailable: guidelineUrl !== '',
+      guidelineUrl,
     description: scheme.description || scheme.overview || '',
     stats: [
       { label: 'Academic Year', value: scheme.academic_year, emphasize: true },
