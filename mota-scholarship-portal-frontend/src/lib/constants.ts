@@ -53,6 +53,7 @@ export const ROUTES = {
     applicationDetail: '/admin/applications/:id',
     documentVerification: '/admin/document-verification',
     scholarships: '/admin/scholarships',
+    scholarshipNew: '/admin/scholarships/new',
     reports: '/admin/reports',
     users: '/admin/users',
     notifications: '/admin/notifications',

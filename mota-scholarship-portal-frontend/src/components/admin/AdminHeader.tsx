@@ -3,6 +3,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { ROUTES } from '../../lib/constants';
 import type { AdminUser } from '../../types/admin';
 import { AdminIcon } from './AdminIcon';
+import { getAdminPageTitle } from './adminNavigation';
 
 interface AdminHeaderProps {
   user: AdminUser;
@@ -13,21 +14,10 @@ interface AdminHeaderProps {
   isMobile: boolean;
 }
 
-function getPageTitle(pathname: string) {
-  if (pathname.includes('/applications')) return 'Application management';
-  if (pathname.includes('/document-verification')) return 'Document verification';
-  if (pathname.includes('/scholarships')) return 'Scholarship schemes';
-  if (pathname.includes('/reports')) return 'Reports & analytics';
-  if (pathname.includes('/users')) return 'Admin users';
-  if (pathname.includes('/notifications')) return 'Notifications';
-  if (pathname.includes('/settings')) return 'Portal settings';
-  return 'Dashboard overview';
-}
-
 export function AdminHeader({ user, unreadNotifications, onMenuClick, onLogout, sidebarOpen, isMobile }: AdminHeaderProps) {
   const location = useLocation();
   const [profileOpen, setProfileOpen] = useState(false);
-  const title = getPageTitle(location.pathname);
+  const title = getAdminPageTitle(location.pathname, location.search);
 
   function handleLogout() {
     setProfileOpen(false);

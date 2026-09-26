@@ -43,6 +43,7 @@ export default function App() {
               <Route path={ROUTES.admin.applicationDetail} element={<ApplicationDetails />} />
               <Route path={ROUTES.admin.documentVerification} element={<DocumentVerification />} />
               <Route path={ROUTES.admin.scholarships} element={<ScholarshipSchemes />} />
+              <Route path={ROUTES.admin.scholarshipNew} element={<ScholarshipSchemes openCreateOnMount />} />
               <Route path={ROUTES.admin.reports} element={<Reports />} />
               <Route path={ROUTES.admin.users} element={<AdminUsers />} />
               <Route path={ROUTES.admin.notifications} element={<Notifications />} />
