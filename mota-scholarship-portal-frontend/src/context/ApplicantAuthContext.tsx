@@ -46,8 +46,12 @@ function toApplicantProfile(authUser: User, profile: AuthProfile | null): Applic
   const category = getMetadataString(authUser, 'category');
   const course = getMetadataString(authUser, 'course');
   const institution = getMetadataString(authUser, 'institution');
-  const completedFields = [name, email, mobile, state, district, category, course, institution].filter(Boolean).length;
 
+  // No completion percentage is derived here on purpose. Counting the handful of
+  // registration-metadata fields would report 100% for an applicant whose profile
+  // is empty, which is exactly the number the portal must never show. The real
+  // figure comes from public.applicant_profile_completeness() via
+  // services/profileService.fetchCompleteness().
   return {
     id: authUser.id,
     name,
@@ -59,7 +63,6 @@ function toApplicantProfile(authUser: User, profile: AuthProfile | null): Applic
     course,
     institution,
     avatarInitials: getInitials(name),
-    profileCompletion: Math.round((completedFields / 8) * 100),
   };
 }
 
