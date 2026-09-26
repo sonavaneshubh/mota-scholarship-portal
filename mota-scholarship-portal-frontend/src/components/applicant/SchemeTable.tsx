@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { applicantSchemePath } from '../../lib/constants';
-import type { PortalScheme } from '../../data/portalSchemes';
+import type { ApplicantScheme } from '../../lib/supabase';
 import { Pagination } from './Pagination';
 import { SchemeTypeBadge } from './SchemeTypeBadge';
 
-const TOTAL_PAGES = 2;
+const PAGE_SIZE = 10;
 
 function PdfIcon() {
   return (
@@ -15,7 +15,7 @@ function PdfIcon() {
   );
 }
 
-function SchemeRow({ scheme }: { scheme: PortalScheme }) {
+function SchemeRow({ scheme }: { scheme: ApplicantScheme }) {
   const detailPath = applicantSchemePath(scheme.id);
 
   return (
@@ -29,7 +29,7 @@ function SchemeRow({ scheme }: { scheme: PortalScheme }) {
         {scheme.department}
       </td>
       <td className="w-[13%] border-b border-slate-200 px-2.5 py-2">
-        <SchemeTypeBadge type={scheme.type} />
+        <SchemeTypeBadge type={scheme.categoryLabel} />
       </td>
       <td className="w-[10%] border-b border-slate-200 px-2.5 py-2">
         <Link
@@ -40,20 +40,55 @@ function SchemeRow({ scheme }: { scheme: PortalScheme }) {
         </Link>
       </td>
       <td className="w-[10%] border-b border-slate-200 px-2.5 py-2">
-        <Link
-          className="inline-flex items-center gap-1 text-[11.5px] font-medium leading-none text-red-600 hover:text-red-700 hover:underline"
-          to={`${detailPath}#guidelines`}
-        >
-          <PdfIcon />
-          PDF
-        </Link>
+        {scheme.guidelinesAvailable ? (
+          <Link
+            className="inline-flex items-center gap-1 text-[11.5px] font-medium leading-none text-red-600 hover:text-red-700 hover:underline"
+            to={`${detailPath}#guidelines`}
+          >
+            <PdfIcon />
+            PDF
+          </Link>
+        ) : (
+          <span className="text-[11.5px] text-slate-400">Not available</span>
+        )}
       </td>
     </tr>
   );
 }
 
-export function SchemeTable({ schemes }: { schemes: PortalScheme[] }) {
+interface SchemeTableProps {
+  schemes: ApplicantScheme[];
+  loading?: boolean;
+}
+
+export function SchemeTable({ schemes, loading = false }: SchemeTableProps) {
   const [currentPage, setCurrentPage] = useState(1);
+  const totalPages = Math.max(1, Math.ceil(schemes.length / PAGE_SIZE));
+  const visibleSchemes = schemes.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  if (loading) {
+    return (
+      <div className="border border-slate-200 bg-white px-2.5 py-2">
+        <div aria-busy="true" className="space-y-2" role="status">
+          {Array.from({ length: 5 }, (_, index) => (
+            <div className="h-8 animate-pulse rounded bg-slate-100" key={index} />
+          ))}
+          <span className="sr-only">Loading schemes</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (schemes.length === 0) {
+    return (
+      <div className="border border-dashed border-slate-300 bg-white px-4 py-10 text-center">
+        <p className="text-[13px] font-semibold text-[#0B2A4A]">No schemes available</p>
+        <p className="mt-1 text-[12px] text-slate-600">
+          There are no published scholarship schemes at the moment. Please check back later.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="border border-slate-200 bg-white">
@@ -79,14 +114,20 @@ export function SchemeTable({ schemes }: { schemes: PortalScheme[] }) {
             </tr>
           </thead>
           <tbody>
-            {schemes.map((scheme) => (
+            {visibleSchemes.map((scheme) => (
               <SchemeRow key={scheme.id} scheme={scheme} />
             ))}
           </tbody>
         </table>
       </div>
 
-      <Pagination currentPage={currentPage} totalPages={TOTAL_PAGES} onPageChange={setCurrentPage} />
+      {totalPages > 1 ? (
+        <Pagination
+          currentPage={currentPage}
+          onPageChange={setCurrentPage}
+          totalPages={totalPages}
+        />
+      ) : null}
     </div>
   );
 }

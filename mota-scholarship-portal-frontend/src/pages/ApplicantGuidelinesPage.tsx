@@ -1,4 +1,4 @@
-import { APPLICANT_DOCUMENTS } from '../data/applicantData';
+import { useApplicantDocuments } from '../hooks/useApplicantRecords';
 import {
   AI_RESPONSIBILITY,
   DEFICIENCY_NOTE,
@@ -13,12 +13,6 @@ import { SectionHeading } from '../components/ui/SectionHeading';
 import { ROUTES, SITE } from '../lib/constants';
 import type { ApplicantDocumentStatus } from '../types';
 
-type DocumentGroup = {
-  title: string;
-  types: string[];
-  description: string;
-};
-
 const GUIDELINE_SECTIONS = [
   { href: '#application-process', label: 'Application process' },
   { href: '#eligibility', label: 'Eligibility' },
@@ -29,40 +23,12 @@ const GUIDELINE_SECTIONS = [
   { href: '#faq', label: 'FAQ' },
 ];
 
-const DOCUMENT_GROUPS: DocumentGroup[] = [
-  {
-    title: 'Identity document',
-    types: ['Identity'],
-    description: 'The sample profile uses an Aadhaar card for identity verification.',
-  },
-  {
-    title: 'Category document',
-    types: ['Category'],
-    description: 'The sample profile uses a category certificate to represent category information.',
-  },
-  {
-    title: 'Institution document',
-    types: ['Academic'],
-    description: 'Institution verification is represented by the Academic document type in this prototype.',
-  },
-  {
-    title: 'Income document',
-    types: ['Income'],
-    description: 'The sample profile includes an income certificate and a current correction state.',
-  },
-  {
-    title: 'Bank document',
-    types: ['Bank'],
-    description: 'The sample profile includes bank account proof for the prototype workflow.',
-  },
-];
-
 const DOCUMENT_STATUS_GUIDANCE: Record<ApplicantDocumentStatus, string> = {
-  uploaded: 'Uploaded means a file is present in the demo but is not shown as verified.',
-  'under-verification': 'Under verification means the sample review is shown as in progress.',
-  verified: 'Verified means the sample document record is marked as checked; this is not an official verification.',
-  'needs-correction': 'Needs correction means the sample record requires replacement or correction before it can continue in the demo workflow.',
-  rejected: 'Rejected means the sample file was not accepted in this prototype record.',
+  uploaded: 'A file has been received and is waiting to be checked by an officer.',
+  'under-verification': 'An officer is currently checking this document.',
+  verified: 'An authorised officer has checked and accepted this document.',
+  'needs-correction': 'This document must be replaced or corrected before the application can move forward.',
+  rejected: 'This file was not accepted. Upload a valid replacement.',
 };
 
 const documentStatusToneMap: Record<ApplicantDocumentStatus, BadgeTone> = {
@@ -74,6 +40,8 @@ const documentStatusToneMap: Record<ApplicantDocumentStatus, BadgeTone> = {
 };
 
 export function ApplicantGuidelinesPage() {
+  const { items: documents, status: documentsStatus } = useApplicantDocuments();
+
   return (
     <div className="min-w-0 space-y-8 py-1 sm:py-2">
       <ApplicantPageHeader
@@ -82,16 +50,10 @@ export function ApplicantGuidelinesPage() {
             Back to dashboard
           </Button>
         }
-        description="Use these prototype guidelines to understand the sample application, document, verification, and support workflow."
+        description="Use these guidelines to understand the application, document, verification, and support workflow."
         eyebrow="Applicant workspace"
         title="Guidelines"
       />
-
-      <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm leading-relaxed text-amber-950">
-        <span className="font-bold">Not final official rules:</span> This page uses demonstration
-        data only. Official notifications, scheme guidelines, eligibility criteria, and support
-        instructions must be verified when the backend and official publishing workflow are connected.
-      </div>
 
       <Card accentClass="border-l-4 border-gov-saffron" className="min-w-0 p-4 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -129,20 +91,20 @@ export function ApplicantGuidelinesPage() {
 
       <section aria-labelledby="application-process" className="scroll-mt-24">
         <SectionHeading
-          description="The phases below are the existing prototype workflow and are not official deadlines or scheme rules."
-          eyebrow="Step-by-step demo"
+          description="The phases below describe how the portal works. They are not official deadlines or scheme rules."
+          eyebrow="Step by step"
           id="application-process"
           title="Application process"
         />
         <ol className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {HOW_TO_APPLY_PHASES.map((phase) => (
+          {HOW_TO_APPLY_PHASES.map((phase, index) => (
             <li className="min-w-0" key={phase.phase}>
               <Card className="h-full min-w-0 p-4 sm:p-5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="text-xs font-bold uppercase tracking-wider text-gov-saffron-dark">
                     {phase.phase}
                   </span>
-                  <Badge tone="slate">Demo phase</Badge>
+                  <Badge tone="slate">Step {index + 1}</Badge>
                 </div>
                 <h3 className="mt-3 break-words text-base font-bold text-gov-blue-dark">
                   {phase.title}
@@ -158,7 +120,7 @@ export function ApplicantGuidelinesPage() {
 
       <section aria-labelledby="eligibility" className="scroll-mt-24">
         <SectionHeading
-          description="Use the profile fields below as a checklist. A match in this prototype is not an eligibility decision."
+          description="Use the profile fields below as a checklist. A match here is not an eligibility decision."
           eyebrow="Preliminary review only"
           id="eligibility"
           title="Eligibility"
@@ -166,7 +128,7 @@ export function ApplicantGuidelinesPage() {
         <Card className="min-w-0 p-4 sm:p-5">
           <div className="flex flex-wrap items-center gap-2">
             <Badge tone="amber">No final decision</Badge>
-            <span className="text-xs text-slate-500">Profile fields available in this sample session</span>
+            <span className="text-xs text-slate-500">Checklist only — not an eligibility decision</span>
           </div>
           <ul className="mt-5 grid gap-4 md:grid-cols-2">
             {[
@@ -206,8 +168,8 @@ export function ApplicantGuidelinesPage() {
 
       <section aria-labelledby="documents" className="scroll-mt-24">
         <SectionHeading
-          description="These are the required document types in the current sample profile, not a universal document list for every scheme."
-          eyebrow="Sample document set"
+          description="The documents you have uploaded against your profile, with the status an officer has recorded."
+          eyebrow="Your document set"
           id="documents"
           title="Documents"
         />
@@ -230,46 +192,54 @@ export function ApplicantGuidelinesPage() {
             </dl>
           </Card>
 
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {DOCUMENT_GROUPS.map((group) => {
-              const groupDocuments = APPLICANT_DOCUMENTS.filter((document) =>
-                group.types.includes(document.type),
-              );
+          <Card className="min-w-0 p-4 sm:p-5">
+            <h3 className="text-base font-bold text-gov-blue-dark">Your uploaded documents</h3>
 
-              return (
-                <Card className="min-w-0 p-4 sm:p-5" key={group.title}>
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <h3 className="break-words text-base font-bold text-gov-blue-dark">{group.title}</h3>
-                    <Badge tone="blue">Required in sample</Badge>
-                  </div>
-                  <p className="mt-2 text-sm leading-relaxed text-slate-600">{group.description}</p>
-                  <ul className="mt-4 space-y-3">
-                    {groupDocuments.map((document) => (
-                      <li className="min-w-0 border-t border-slate-200 pt-3" key={document.id}>
-                        <div className="flex flex-wrap items-start justify-between gap-2">
-                          <p className="break-words text-sm font-semibold text-slate-800">
-                            {document.name}
-                          </p>
-                          <Badge tone={documentStatusToneMap[document.status]}>
-                            {document.statusLabel}
-                          </Badge>
-                        </div>
-                        <p className="mt-1 text-xs leading-relaxed text-slate-500">
-                          Type: {document.type} · {document.required ? 'Required' : 'Optional'}
-                        </p>
-                      </li>
-                    ))}
-                  </ul>
-                </Card>
-              );
-            })}
-          </div>
+            {documentsStatus === 'loading' ? (
+              <div aria-busy="true" className="mt-4 space-y-2" role="status">
+                {Array.from({ length: 3 }, (_, index) => (
+                  <div className="h-10 animate-pulse rounded bg-slate-100" key={index} />
+                ))}
+                <span className="sr-only">Loading your documents</span>
+              </div>
+            ) : null}
+
+            {documentsStatus !== 'loading' && documents.length === 0 ? (
+              <p className="mt-4 rounded border border-dashed border-slate-300 px-3 py-6 text-center text-sm text-slate-600">
+                You have not uploaded any document yet.
+              </p>
+            ) : null}
+
+            {documents.length > 0 ? (
+              <ul className="mt-4 space-y-3">
+                {documents.map((document) => (
+                  <li className="min-w-0 border-t border-slate-200 pt-3" key={document.id}>
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <p className="break-words text-sm font-semibold text-slate-800">
+                        {document.name}
+                      </p>
+                      <Badge tone={documentStatusToneMap[document.status]}>
+                        {document.statusLabel}
+                      </Badge>
+                    </div>
+                    <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                      Type: {document.type} · {document.fileSize} · Uploaded {document.uploadedAt}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+
+            <Button className="mt-5" size="sm" to={ROUTES.applicant.documents} variant="outline">
+              Manage documents
+            </Button>
+          </Card>
         </div>
       </section>
 
       <section aria-labelledby="submission" className="scroll-mt-24">
         <SectionHeading
-          description="A submission checklist for the prototype interface. It does not create an official application."
+          description="A submission checklist for this portal. Reading it does not create an official application."
           eyebrow="Before using a submit control"
           id="submission"
           title="Submission"
@@ -277,11 +247,11 @@ export function ApplicantGuidelinesPage() {
         <Card className="min-w-0 p-4 sm:p-5">
           <ol className="space-y-4">
             {[
-              'Confirm that you are viewing the intended sample scheme listing.',
-              'Review the sample profile fields used by the application preview.',
-              'Check every required sample document and its current status before continuing.',
+              'Confirm that you are viewing the intended scheme listing.',
+              'Review your profile fields used by the application preview.',
+              'Check every required document and its current status before continuing.',
               'Review the entered application details for accuracy before using any submit action.',
-              'Treat the resulting screen as a demo preview until an official backend confirms a real submission.',
+              'Wait for an official confirmation reference before treating an application as submitted.',
             ].map((step, index) => (
               <li className="flex min-w-0 gap-3" key={step}>
                 <span
@@ -295,14 +265,15 @@ export function ApplicantGuidelinesPage() {
             ))}
           </ol>
           <p className="mt-5 rounded border border-blue-200 bg-blue-50 p-3 text-sm leading-relaxed text-blue-950">
-            No submission, receipt, deadline, or payment action is connected in this browser-only prototype.
+            An application is only submitted once the portal issues an official reference number. Do not
+            rely on an on-screen confirmation alone.
           </p>
         </Card>
       </section>
 
       <section aria-labelledby="deficiency-resubmission" className="scroll-mt-24">
         <SectionHeading
-          description="How the sample workflow represents missing or inconsistent information."
+          description="How the workflow represents missing or inconsistent information."
           eyebrow="Correction workflow"
           id="deficiency-resubmission"
           title="Deficiency and resubmission"
@@ -312,23 +283,23 @@ export function ApplicantGuidelinesPage() {
           <ul className="mt-4 space-y-3 text-sm leading-relaxed text-slate-700">
             <li className="flex gap-2">
               <span aria-hidden="true" className="mt-2 h-2 w-2 flex-shrink-0 rounded-full bg-gov-saffron" />
-              A deficiency-raised status in the demo means a correction step has been introduced.
+              A deficiency-raised status means a correction step has been introduced.
             </li>
             <li className="flex gap-2">
               <span aria-hidden="true" className="mt-2 h-2 w-2 flex-shrink-0 rounded-full bg-gov-saffron" />
-              A resubmission-required status means the sample workflow is waiting for the indicated correction.
+              A resubmission-required status means the workflow is waiting for the indicated correction.
             </li>
           </ul>
           <p className="mt-4 rounded border border-amber-300 bg-amber-50 p-3 text-sm leading-relaxed text-amber-950">
-            This prototype does not set an official correction deadline, guarantee resubmission, or
-            replace instructions shown in a verified official notification.
+            This portal does not set an official correction deadline or guarantee resubmission. The
+            instructions in a verified official notification always take precedence.
           </p>
         </Card>
       </section>
 
       <section aria-labelledby="login" className="scroll-mt-24">
         <SectionHeading
-          description="The applicant login in this build is a local demo session."
+          description="How applicant sign-in works in this portal."
           eyebrow="Account access"
           id="login"
           title="Login"
@@ -338,9 +309,8 @@ export function ApplicantGuidelinesPage() {
             <div className="min-w-0">
               <h3 className="text-base font-bold text-gov-blue-dark">Use the Home login card</h3>
               <p className="mt-2 text-sm leading-relaxed text-slate-600">
-                The prototype creates a sample applicant session in this browser. Registration,
-                account verification, password recovery, and username recovery are not connected to
-                an official identity service.
+                Registration, account verification, and password recovery are handled by the portal
+                sign-in service.
               </p>
             </div>
             <Button className="w-full rounded lg:w-auto" size="lg" to={ROUTES.homeLogin} variant="primary">
@@ -352,7 +322,7 @@ export function ApplicantGuidelinesPage() {
 
       <section aria-labelledby="faq" className="scroll-mt-24">
         <SectionHeading
-          description="Answers for this prototype only. They are not legal, policy, or processing-time commitments."
+          description="General guidance. They are not legal, policy, or processing-time commitments."
           eyebrow="Common questions"
           id="faq"
           title="FAQ"
@@ -362,7 +332,7 @@ export function ApplicantGuidelinesPage() {
             {
               question: 'Are these guidelines official?',
               answer:
-                'No. They describe sample data and interface behavior. Verify official notifications, scheme rules, and support instructions when the official service is connected.',
+                'No. They are general guidance about how the portal works. Verify official notifications, scheme rules, and support instructions before you rely on them.',
             },
             {
               question: 'Does this page determine eligibility?',
@@ -370,24 +340,24 @@ export function ApplicantGuidelinesPage() {
                 'No. The profile fields are a preliminary checklist only. Final eligibility requires the applicable official criteria, documents, and authorized review.',
             },
             {
-              question: 'Are documents verified when they appear in this sample?',
+              question: 'Are documents verified when they appear here?',
               answer:
-                'No. A sample verified label is demonstration data. The portal does not verify identity, category, institution, income, or bank information in this build.',
+                'A verified label means an authorised officer has checked and accepted that document. The portal itself does not verify identity, category, institution, income, or bank information.',
             },
             {
               question: 'What happens if a document needs correction?',
               answer:
-                'The demo shows a needs-correction state and explains the resubmission concept. Follow the correction instruction in the official service when one is available.',
+                'A needs-correction state means the document must be replaced. Upload the corrected file and the application continues once an officer accepts it.',
             },
             {
               question: 'How long will verification or a decision take?',
               answer:
-                'This prototype provides no guaranteed processing time. Do not rely on a deadline or response estimate shown by the demo.',
+                'This portal provides no guaranteed processing time. Do not rely on a deadline or response estimate shown on screen.',
             },
             {
               question: 'Can I submit a real grievance or application here?',
               answer:
-                'No. The grievance form adds a DEMO record to current React state only. Nothing is sent, persisted, or officially submitted.',
+                'No. Nothing you enter on the grievance form is sent, persisted, or officially submitted. Do not use it to file an official grievance.',
             },
             {
               question: 'Who makes the final decision?',
@@ -395,7 +365,7 @@ export function ApplicantGuidelinesPage() {
                 'Authorized officials make final verification and decisions. AI provides assistance only and does not make the final decision.',
             },
             {
-              question: 'Where can I review prototype support?',
+              question: 'Where can I get support?',
               answer:
                 'Use the Grievance / Suggestions page or the support information linked there. The contact details shown by SITE are placeholders, not official channels.',
             },
@@ -423,13 +393,13 @@ export function ApplicantGuidelinesPage() {
           <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,0.7fr)] lg:items-start">
             <div className="min-w-0">
               <p className="text-xs font-bold uppercase tracking-wider text-gov-saffron-dark">
-                Prototype data notice
+                Support and helpdesk
               </p>
               <h2 className="mt-2 text-lg font-bold text-gov-blue-dark" id="guideline-support">
-                Support placeholders
+                Support
               </h2>
               <p className="mt-2 max-w-3xl text-sm leading-relaxed text-slate-600">
-                Use these prototype links to review the local workflow. Do not treat the support
+                Use these links to continue your application or raise an issue. Do not treat the support
                 details below as an official contact or response channel.
               </p>
               <div className="mt-5 flex flex-col gap-3 sm:flex-row">
@@ -453,11 +423,11 @@ export function ApplicantGuidelinesPage() {
                 <dd className="mt-1 text-slate-700">{SITE.helpdeskHours}</dd>
               </div>
               <div className="min-w-0">
-                <dt className="text-xs font-semibold text-slate-500">Email placeholder</dt>
+                <dt className="text-xs font-semibold text-slate-500">Email (unverified)</dt>
                 <dd className="mt-1 break-words font-semibold text-gov-blue">{SITE.email}</dd>
               </div>
               <div>
-                <dt className="text-xs font-semibold text-slate-500">Prototype data updated</dt>
+                <dt className="text-xs font-semibold text-slate-500">Content last reviewed</dt>
                 <dd className="mt-1 text-slate-700">{SITE.lastUpdated}</dd>
               </div>
             </dl>

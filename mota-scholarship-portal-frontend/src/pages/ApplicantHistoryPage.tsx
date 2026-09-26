@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { APPLICANT_APPLICATIONS } from '../data/applicantData';
+import { useApplicantApplications } from '../hooks/useApplicantRecords';
 import { ApplicantPageHeader } from '../components/applicant/ApplicantPageHeader';
 import { Badge } from '../components/ui/Badge';
 import type { BadgeTone } from '../components/ui/Badge';
@@ -38,13 +38,14 @@ const statusToneMap: Record<ApplicantApplicationStatus, BadgeTone> = {
 };
 
 export function ApplicantHistoryPage() {
+  const { items, status, error } = useApplicantApplications();
   const [statusFilter, setStatusFilter] = useState<HistoryStatusFilter>('all');
   const [search, setSearch] = useState('');
 
   const filteredApplications = useMemo(() => {
     const query = search.trim().toLowerCase();
 
-    return APPLICANT_APPLICATIONS.filter((application) => {
+    return items.filter((application) => {
       const matchesStatus = statusFilter === 'all' || application.status === statusFilter;
       const matchesSearch =
         !query ||
@@ -54,7 +55,7 @@ export function ApplicantHistoryPage() {
 
       return matchesStatus && matchesSearch;
     });
-  }, [search, statusFilter]);
+  }, [items, search, statusFilter]);
 
   const hasActiveFilters = statusFilter !== 'all' || search.trim().length > 0;
 
@@ -71,15 +72,10 @@ export function ApplicantHistoryPage() {
             Current applications
           </Button>
         }
-        description="Review the sample applications in this browser-only workspace. History, status changes, and documents shown here are demonstration data."
+        description="A record of every scholarship and fellowship application you have submitted."
         eyebrow="Applicant workspace"
         title="Application History"
       />
-
-      <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm leading-relaxed text-amber-950">
-        <span className="font-bold">Prototype notice:</span> These entries are sample data. They are not
-        persisted, officially submitted, or connected to an application service.
-      </div>
 
       <Card className="min-w-0 p-4 sm:p-5">
         <div className="grid min-w-0 gap-4 md:grid-cols-[minmax(0,1fr)_16rem]">
@@ -114,8 +110,9 @@ export function ApplicantHistoryPage() {
         </div>
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4">
           <p aria-live="polite" className="text-sm text-slate-600">
-            Showing {filteredApplications.length} sample application
-            {filteredApplications.length === 1 ? '' : 's'}
+            {status === 'ready'
+              ? `Showing ${filteredApplications.length} application${filteredApplications.length === 1 ? '' : 's'}`
+              : ' '}
           </p>
           {hasActiveFilters ? (
             <button
@@ -129,7 +126,58 @@ export function ApplicantHistoryPage() {
         </div>
       </Card>
 
-      {filteredApplications.length > 0 ? (
+      {status === 'loading' ? (
+        <Card aria-busy="true" className="space-y-2 p-5" role="status">
+          {Array.from({ length: 4 }, (_, index) => (
+            <div className="h-10 animate-pulse rounded bg-slate-100" key={index} />
+          ))}
+          <span className="sr-only">Loading application history</span>
+        </Card>
+      ) : null}
+
+      {status === 'error' ? (
+        <Card className="px-5 py-10 text-center">
+          <h2 className="text-lg font-bold text-gov-blue-dark">History could not be loaded</h2>
+          <p className="mx-auto mt-2 max-w-xl text-sm leading-relaxed text-slate-600">
+            {error ?? 'Please try again later.'}
+          </p>
+        </Card>
+      ) : null}
+
+      {status === 'unavailable' ? (
+        <Card className="px-5 py-10 text-center">
+          <h2 className="text-lg font-bold text-gov-blue-dark">No application history yet</h2>
+          <p className="mx-auto mt-2 max-w-xl text-sm leading-relaxed text-slate-600">
+            Applications you submit will be listed here with their current status and latest update.
+          </p>
+        </Card>
+      ) : null}
+
+      {status === 'ready' && items.length === 0 ? (
+        <Card className="px-5 py-10 text-center">
+          <h2 className="text-lg font-bold text-gov-blue-dark">No application history yet</h2>
+          <p className="mx-auto mt-2 max-w-xl text-sm leading-relaxed text-slate-600">
+            Applications you submit will be listed here with their current status and latest update.
+          </p>
+          <Button className="mt-5 rounded" size="md" to={ROUTES.applicant.schemes} variant="primary">
+            Explore schemes
+          </Button>
+        </Card>
+      ) : null}
+
+      {status === 'ready' && items.length > 0 && filteredApplications.length === 0 ? (
+        <Card className="px-5 py-10 text-center">
+          <h2 className="text-lg font-bold text-gov-blue-dark">No applications match these filters</h2>
+          <p className="mx-auto mt-2 max-w-xl text-sm leading-relaxed text-slate-600">
+            Change the search term or status filter to see your other applications.
+          </p>
+          <Button className="mt-5 rounded" onClick={clearFilters} size="md" variant="outline">
+            Clear filters
+          </Button>
+        </Card>
+      ) : null}
+
+      {status === 'ready' && filteredApplications.length > 0 ? (
         <>
           <section aria-labelledby="history-table-heading" className="hidden min-w-0 lg:block">
             <h2 className="sr-only" id="history-table-heading">
@@ -139,7 +187,7 @@ export function ApplicantHistoryPage() {
               <div className="min-w-0 overflow-x-auto">
                 <table className="w-full table-fixed border-collapse text-left">
                   <caption className="sr-only">
-                    Sample application history with status, documents, dates, and details links
+                    Application history with status, documents, dates, and details links
                   </caption>
                   <colgroup>
                     <col className="w-[14%]" />
@@ -197,7 +245,9 @@ export function ApplicantHistoryPage() {
                           </Badge>
                         </td>
                         <td className="min-w-0 break-words px-3 py-4 text-xs font-semibold text-slate-700">
-                          {application.documentsComplete} of {application.documentsTotal} complete
+                          {application.documentsTotal > 0
+                            ? `${application.documentsComplete} of ${application.documentsTotal} complete`
+                            : '—'}
                         </td>
                         <td className="min-w-0 px-3 py-4">
                           <Button
@@ -250,7 +300,9 @@ export function ApplicantHistoryPage() {
                   <div className="min-w-0">
                     <dt className="font-semibold text-slate-500">Documents</dt>
                     <dd className="mt-1 font-semibold text-slate-800">
-                      {application.documentsComplete} of {application.documentsTotal} complete
+                      {application.documentsTotal > 0
+                        ? `${application.documentsComplete} of ${application.documentsTotal} complete`
+                        : '—'}
                     </dd>
                   </div>
                   <div className="min-w-0">
@@ -273,17 +325,7 @@ export function ApplicantHistoryPage() {
             ))}
           </section>
         </>
-      ) : (
-        <Card className="px-5 py-10 text-center">
-          <h2 className="text-lg font-bold text-gov-blue-dark">No applications found</h2>
-          <p className="mx-auto mt-2 max-w-xl text-sm leading-relaxed text-slate-600">
-            No sample applications match the current search and status filters.
-          </p>
-          <Button className="mt-5 rounded" onClick={clearFilters} size="md" variant="outline">
-            Clear filters
-          </Button>
-        </Card>
-      )}
+      ) : null}
     </div>
   );
 }

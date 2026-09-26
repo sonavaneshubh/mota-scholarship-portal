@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { PORTAL_ACADEMIC_YEAR } from '../../data/portalSchemes';
 import { fetchCompleteness } from '../../services/profileService';
 import { supabase } from '../../lib/supabase';
 import { EMPTY_PROFILE_COMPLETENESS } from '../../types/profile';
@@ -54,7 +53,7 @@ export function ProfileStatus() {
             }`}
           />
           <h2 className="truncate text-[14px] font-bold text-[#0B2A4A]">
-            Profile Status (AY {PORTAL_ACADEMIC_YEAR})
+            Profile Status
           </h2>
         </div>
 

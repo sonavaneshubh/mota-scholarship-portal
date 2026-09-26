@@ -196,8 +196,8 @@ export function ApplicantSchemesPage() {
     <div className="space-y-6 py-2 sm:py-4">
       <ApplicantPageHeader
         action={<Button size="md" to={ROUTES.applicant.dashboard} variant="outline">Back to dashboard</Button>}
-        description={isSuggestedView 
-          ? 'These are sample listings suggested based on your profile. Confirm official criteria before applying.'
+        description={isSuggestedView
+          ? 'Schemes published on this portal. Confirm the official criteria in the scheme notification before applying.'
           : 'Browse verified scholarship and fellowship listings from official sources. Filter by department, category, or academic year.'}
         eyebrow="Applicant workspace"
         title={isSuggestedView ? 'Suggested eligible schemes' : 'Scholarships & Fellowships'}
@@ -205,7 +205,8 @@ export function ApplicantSchemesPage() {
 
       {isSuggestedView ? (
         <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm leading-relaxed text-amber-950">
-          <span className="font-bold">Suggested review:</span> These listings are suggested based on your profile. Confirm official criteria before applying.
+          <span className="font-bold">Not an eligibility decision:</span> These are the schemes published
+          on this portal. Confirm the official criteria in the scheme notification before applying.
         </div>
       ) : null}
 

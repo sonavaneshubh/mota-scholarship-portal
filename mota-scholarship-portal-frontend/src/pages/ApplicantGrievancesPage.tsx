@@ -2,13 +2,11 @@ import { useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { ApplicantPageHeader } from '../components/applicant/ApplicantPageHeader';
 import { Badge } from '../components/ui/Badge';
-import type { BadgeTone } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { ROUTES, SITE } from '../lib/constants';
 
 type EntryMode = 'grievance' | 'suggestion';
-type DemoEntryStatus = 'Demo submitted' | 'Demo response added' | 'Demo awaiting response';
 
 type FormValues = {
   category: string;
@@ -18,15 +16,6 @@ type FormValues = {
 };
 
 type FormErrors = Partial<Record<keyof FormValues, string>>;
-
-type DemoEntry = {
-  id: string;
-  date: string;
-  typeLabel: 'Grievance' | 'Suggestion';
-  subject: string;
-  status: DemoEntryStatus;
-  responsePreview: string;
-};
 
 const EMPTY_FORM: FormValues = {
   category: '',
@@ -42,51 +31,13 @@ const CATEGORY_OPTIONS = [
   'Portal experience',
 ];
 
-const INITIAL_DEMO_ENTRIES: DemoEntry[] = [
-  {
-    id: 'DEMO-GRV-001',
-    date: '23 September 2026',
-    typeLabel: 'Grievance',
-    subject: 'Document correction sample for APP-2026-002',
-    status: 'Demo response added',
-    responsePreview:
-      'Sample response: The correction workflow is represented in this prototype. No official action has been taken.',
-  },
-  {
-    id: 'DEMO-SUG-001',
-    date: '18 September 2026',
-    typeLabel: 'Suggestion',
-    subject: 'Clearer sample document status labels',
-    status: 'Demo awaiting response',
-    responsePreview:
-      'No response is available. This record shows a suggestion state only and was not sent to an official service.',
-  },
-];
-
-const statusToneMap: Record<DemoEntryStatus, BadgeTone> = {
-  'Demo submitted': 'blue',
-  'Demo response added': 'green',
-  'Demo awaiting response': 'amber',
-};
-
 const fieldClassName =
   'block w-full min-w-0 rounded border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 focus:border-gov-blue focus:outline-none focus:ring-2 focus:ring-blue-100';
-
-function formatDemoDate() {
-  return new Intl.DateTimeFormat('en-IN', {
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric',
-  }).format(new Date());
-}
 
 export function ApplicantGrievancesPage() {
   const [mode, setMode] = useState<EntryMode>('grievance');
   const [values, setValues] = useState<FormValues>({ ...EMPTY_FORM });
   const [errors, setErrors] = useState<FormErrors>({});
-  const [statusMessage, setStatusMessage] = useState('');
-  const [entries, setEntries] = useState<DemoEntry[]>(() => [...INITIAL_DEMO_ENTRIES]);
-  const [nextReference, setNextReference] = useState(3);
   const categoryRef = useRef<HTMLSelectElement>(null);
   const subjectRef = useRef<HTMLInputElement>(null);
   const detailsRef = useRef<HTMLTextAreaElement>(null);
@@ -99,13 +50,11 @@ export function ApplicantGrievancesPage() {
       delete nextErrors[field];
       return nextErrors;
     });
-    setStatusMessage('');
   }
 
   function changeMode(nextMode: EntryMode) {
     setMode(nextMode);
     setErrors({});
-    setStatusMessage('');
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -117,18 +66,9 @@ export function ApplicantGrievancesPage() {
     const details = values.details.trim();
     const email = values.email.trim();
 
-    if (!category) {
-      nextErrors.category = 'Select a category.';
-    }
-
-    if (!subject) {
-      nextErrors.subject = 'Enter a subject.';
-    }
-
-    if (!details) {
-      nextErrors.details = 'Enter the details of your grievance or suggestion.';
-    }
-
+    if (!category) nextErrors.category = 'Select a category.';
+    if (!subject) nextErrors.subject = 'Enter a subject.';
+    if (!details) nextErrors.details = 'Enter the details of your grievance or suggestion.';
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       nextErrors.email = 'Enter a valid email address or leave this field blank.';
     }
@@ -139,51 +79,22 @@ export function ApplicantGrievancesPage() {
       categoryRef.current?.focus();
       return;
     }
-
     if (nextErrors.subject) {
       subjectRef.current?.focus();
       return;
     }
-
     if (nextErrors.details) {
       detailsRef.current?.focus();
       return;
     }
-
     if (nextErrors.email) {
       emailRef.current?.focus();
-      return;
     }
-
-    const prefix = mode === 'grievance' ? 'GRV' : 'SUG';
-    const id = `DEMO-${prefix}-${String(nextReference).padStart(3, '0')}`;
-    const entry: DemoEntry = {
-      id,
-      date: formatDemoDate(),
-      typeLabel: mode === 'grievance' ? 'Grievance' : 'Suggestion',
-      subject,
-      status: 'Demo submitted',
-      responsePreview:
-        'No response is available because this demo entry was not sent to any service.',
-    };
-
-    setEntries((current) => [entry, ...current]);
-    setNextReference((current) => current + 1);
-    setValues({ ...EMPTY_FORM });
-    setErrors({});
-    setStatusMessage(
-      `${id} was added to this page only. Nothing was sent or persisted, and no official submission was created.`,
-    );
   }
 
   function handleReset() {
     setValues({ ...EMPTY_FORM });
     setErrors({});
-    setEntries([...INITIAL_DEMO_ENTRIES]);
-    setNextReference(3);
-    setStatusMessage(
-      'The form and locally added demo entries were reset. Nothing was sent or persisted.',
-    );
   }
 
   const hasErrors = Object.keys(errors).length > 0;
@@ -196,15 +107,23 @@ export function ApplicantGrievancesPage() {
             Back to dashboard
           </Button>
         }
-        description="Create a sample grievance or suggestion and review demo status records. This form has no backend and does not create an official case."
+        description="Prepare a grievance or suggestion for the support channel."
         eyebrow="Applicant support"
         title="Grievance / Suggestions"
       />
 
+      {/*
+        There is no grievances table and no intake endpoint, so nothing can be
+        filed from here. The previous version generated references like
+        "DEMO-GRV-003" and showed them as case records — a fabricated case number
+        is indistinguishable from a real one to an applicant, so it must not be
+        generated. The form is kept for layout only, and submission is refused
+        with an explicit message instead of pretending to succeed.
+      */}
       <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm leading-relaxed text-amber-950">
-        <span className="font-bold">Prototype only:</span> Do not enter real identity, financial, or
-        contact information. Entries exist only in current React state and disappear on reset,
-        refresh, or navigation.
+        <span className="font-bold">Online filing is not available yet:</span> This portal has no
+        grievance intake service. Nothing you type here is sent, stored, or given a reference number.
+        Do not use this form for an official complaint.
       </div>
 
       <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(18rem,0.6fr)] lg:items-start">
@@ -212,9 +131,9 @@ export function ApplicantGrievancesPage() {
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <p className="text-xs font-bold uppercase tracking-wider text-gov-saffron-dark">
-                Add a demo record
+                Draft your message
               </p>
-              <h2 className="mt-2 text-xl font-bold text-gov-blue-dark">Grievance or suggestion form</h2>
+              <h2 className="mt-2 text-xl font-bold text-gov-blue-dark">Grievance or suggestion</h2>
             </div>
             <Badge tone="amber">Not submitted</Badge>
           </div>
@@ -227,7 +146,7 @@ export function ApplicantGrievancesPage() {
                   const label = option === 'grievance' ? 'Grievance' : 'Suggestion';
                   const description =
                     option === 'grievance'
-                      ? 'Report a problem with a sample workflow'
+                      ? 'Report a problem with the portal or your application'
                       : 'Share an idea for the portal';
 
                   return (
@@ -308,7 +227,7 @@ export function ApplicantGrievancesPage() {
                 Details <span aria-hidden="true" className="text-gov-saffron-dark">*</span>
               </label>
               <p className="mt-1 text-xs leading-relaxed text-slate-600">
-                Describe the issue or idea without including real personal or financial data.
+                Describe the issue or idea. Do not include Aadhaar, bank, or other sensitive numbers.
               </p>
               <textarea
                 aria-describedby={errors.details ? 'entry-details-error' : 'entry-details-help'}
@@ -337,7 +256,7 @@ export function ApplicantGrievancesPage() {
                 Contact email <span className="font-normal text-slate-500">(optional)</span>
               </label>
               <p className="mt-1 text-xs leading-relaxed text-slate-600">
-                Use a sample address only. This prototype does not send email.
+                No email is sent from this form.
               </p>
               <input
                 aria-describedby={errors.email ? 'entry-email-error' : undefined}
@@ -365,26 +284,16 @@ export function ApplicantGrievancesPage() {
                 className="rounded border border-red-300 bg-red-50 px-3 py-2 text-sm font-semibold text-red-800"
                 role="alert"
               >
-                Please correct the highlighted required fields. No demo entry was added.
-              </p>
-            ) : null}
-
-            {statusMessage ? (
-              <p
-                aria-live="polite"
-                className="break-words rounded border border-blue-200 bg-blue-50 px-3 py-2 text-sm leading-relaxed text-blue-900"
-                role="status"
-              >
-                {statusMessage}
+                Please correct the highlighted required fields.
               </p>
             ) : null}
 
             <div className="flex flex-col gap-3 border-t border-slate-200 pt-5 sm:flex-row">
               <Button className="w-full rounded sm:w-auto" size="lg" type="submit">
-                Add DEMO {mode}
+                Check my draft
               </Button>
               <Button className="w-full rounded sm:w-auto" onClick={handleReset} size="lg" variant="outline">
-                Reset demo
+                Clear
               </Button>
             </div>
           </form>
@@ -392,11 +301,12 @@ export function ApplicantGrievancesPage() {
 
         <Card className="min-w-0 p-4 sm:p-5">
           <p className="text-xs font-bold uppercase tracking-wider text-gov-saffron-dark">
-            Prototype support
+            Support
           </p>
-          <h2 className="mt-2 text-lg font-bold text-gov-blue-dark">Support placeholders</h2>
+          <h2 className="mt-2 text-lg font-bold text-gov-blue-dark">Where to send this</h2>
           <p className="mt-2 text-sm leading-relaxed text-slate-600">
-            These details come from the prototype site data. They are not official grievance channels.
+            These details come from the site configuration. They are not verified official grievance
+            channels — confirm them on the ministry website before sending anything.
           </p>
           <dl className="mt-4 space-y-3 text-sm">
             <div>
@@ -410,7 +320,7 @@ export function ApplicantGrievancesPage() {
               <dd className="mt-1 text-slate-700">{SITE.helpdeskHours}</dd>
             </div>
             <div className="min-w-0">
-              <dt className="text-xs font-semibold text-slate-500">Email</dt>
+              <dt className="text-xs font-semibold text-slate-500">Email (unverified)</dt>
               <dd className="mt-1 break-words font-semibold text-gov-blue">{SITE.email}</dd>
             </div>
           </dl>
@@ -425,52 +335,26 @@ export function ApplicantGrievancesPage() {
         </Card>
       </div>
 
-      <section aria-labelledby="demo-entry-list-heading" className="min-w-0 space-y-4">
+      <section aria-labelledby="entry-list-heading" className="min-w-0 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-xs font-bold uppercase tracking-wider text-gov-saffron-dark">
-              Current React state
+              Your cases
             </p>
-            <h2 className="mt-1 text-xl font-bold text-gov-blue-dark" id="demo-entry-list-heading">
-              Demo grievance and suggestion status
+            <h2 className="mt-1 text-xl font-bold text-gov-blue-dark" id="entry-list-heading">
+              Grievance and suggestion status
             </h2>
           </div>
-          <Badge tone="slate">{entries.length} sample records</Badge>
+          <Badge tone="slate">0 records</Badge>
         </div>
 
-        {entries.map((entry) => (
-          <Card className="min-w-0 p-4 sm:p-5" key={entry.id}>
-            <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="break-all font-mono text-xs font-semibold text-slate-600">{entry.id}</p>
-                <h3 className="mt-1 break-words text-base font-bold text-gov-blue-dark">
-                  {entry.subject}
-                </h3>
-              </div>
-              <Badge tone={statusToneMap[entry.status]}>{entry.status}</Badge>
-            </div>
-            <dl className="mt-4 grid gap-4 border-y border-slate-200 py-4 text-sm sm:grid-cols-3">
-              <div className="min-w-0">
-                <dt className="text-xs font-semibold text-slate-500">Prototype reference</dt>
-                <dd className="mt-1 break-all font-semibold text-slate-800">{entry.id}</dd>
-              </div>
-              <div className="min-w-0">
-                <dt className="text-xs font-semibold text-slate-500">Date</dt>
-                <dd className="mt-1 font-semibold text-slate-800">{entry.date}</dd>
-              </div>
-              <div className="min-w-0">
-                <dt className="text-xs font-semibold text-slate-500">Type</dt>
-                <dd className="mt-1 font-semibold text-slate-800">{entry.typeLabel}</dd>
-              </div>
-            </dl>
-            <div className="mt-4 rounded border border-slate-200 bg-gov-slate-bg p-3">
-              <p className="text-xs font-bold text-slate-600">Response preview</p>
-              <p className="mt-1 break-words text-sm leading-relaxed text-slate-700">
-                {entry.responsePreview}
-              </p>
-            </div>
-          </Card>
-        ))}
+        <Card className="px-5 py-10 text-center">
+          <h3 className="text-base font-bold text-gov-blue-dark">No grievances or suggestions</h3>
+          <p className="mx-auto mt-2 max-w-xl text-sm leading-relaxed text-slate-600">
+            Nothing has been filed from this portal. Once a case is submitted through an official
+            channel, its reference number and current status will be listed here.
+          </p>
+        </Card>
       </section>
     </div>
   );

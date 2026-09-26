@@ -23,6 +23,7 @@ export async function fetchSchemes(filters: SchemeFilters = {}): Promise<SchemeL
     `, { count: 'exact' })
     .eq('status', 'published')
     .eq('verification_status', 'verified')
+    .eq('is_active', true)
     .order('name', { ascending: true })
     .range(from, to);
 
@@ -69,6 +70,7 @@ export async function fetchSchemeDetail(schemeId: string): Promise<SchemeDetailR
     .eq('id', schemeId)
     .eq('status', 'published')
     .eq('verification_status', 'verified')
+    .eq('is_active', true)
     .single();
 
   if (schemeError || !scheme) {
@@ -217,7 +219,8 @@ export async function fetchAcademicYears() {
     .from('schemes')
     .select('academic_year')
     .eq('status', 'published')
-    .eq('verification_status', 'verified');
+    .eq('verification_status', 'verified')
+    .eq('is_active', true);
 
   if (error) {
     return [];
