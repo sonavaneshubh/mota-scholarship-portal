@@ -68,7 +68,7 @@ export const PORTAL_SCHEMES: PortalScheme[] = [
     id: 'rajarshi-merit-11-12',
     name: 'Rajarshi Chhatrapati Shahu Maharaj Merit Scholarship for students studying in 11th & 12th standard of VJNT & SBC category',
     department: 'OBC, SEBC, VJNT & SBC Welfare Department',
-    type: 'Merit Scheme',
+    type: 'Scholarship',
     guidelinesAvailable: true,
   },
   {

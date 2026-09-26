@@ -111,7 +111,7 @@ function ChevronIcon({ direction }: { direction: 'left' | 'right' }) {
 }
 
 const navigationItems = [
-  { id: 'dashboard', icon: 'dashboard', label: 'Dashboard', to: ROUTES.applicant.dashboard },
+  { id: 'dashboard', icon: 'dashboard', label: 'Home', to: ROUTES.applicant.dashboard },
   { id: 'profile', icon: 'profile', label: 'My Profile', to: ROUTES.applicant.profile },
   { id: 'scholarships', icon: 'scholarships', label: 'Scholarships & Fellowships', to: ROUTES.applicant.schemes },
   {
