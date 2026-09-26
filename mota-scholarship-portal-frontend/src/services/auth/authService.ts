@@ -1,6 +1,6 @@
 import type { Session, User } from '@supabase/supabase-js';
 import { ROUTES } from '../../lib/constants';
-import { supabase, DEMO_MODE, DEMO_USERS } from '../../lib/supabase';
+import { supabase, DEMO_MODE } from '../../lib/supabase';
 import type { AuthProfile, UserRole } from '../../types';
 
 export interface SignUpInput {
@@ -34,6 +34,31 @@ interface ProfileResult {
 
 const notConfiguredMessage =
   'Supabase authentication is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY to .env.local.';
+
+const DEMO_USERS = [
+  {
+    email: 'demo@applicant.test',
+    password: 'demo123',
+    fullName: 'Demo Applicant',
+    mobile: '9876543210',
+    state: 'Maharashtra',
+    district: 'Mumbai',
+    category: 'ST',
+    course: 'B.Tech Computer Science',
+    institution: 'IIT Mumbai',
+  },
+  {
+    email: 'student@test.com',
+    password: 'student123',
+    fullName: 'Test Student',
+    mobile: '9123456789',
+    state: 'Delhi',
+    district: 'New Delhi',
+    category: 'SC',
+    course: 'MBBS',
+    institution: 'AIIMS Delhi',
+  },
+];
 
 function createMockUser(demoUser: typeof DEMO_USERS[0]) {
   const mockUser: User = {
@@ -214,7 +239,7 @@ export async function getCurrentUser(): Promise<{ user: User | null; error: stri
 
 export async function getProfile(userId: string): Promise<ProfileResult> {
   if (DEMO_MODE) {
-    const demoUser = DEMO_USERS.find((u) => `demo-${u.email}` === userId);
+    const demoUser = DEMO_USERS.find((u: typeof DEMO_USERS[0]) => `demo-${u.email}` === userId);
     if (demoUser) {
       const { mockProfile } = createMockUser(demoUser);
       return { profile: mockProfile, error: null };
@@ -388,7 +413,7 @@ export async function signUp(input: SignUpInput): Promise<SignUpResult> {
 
 export async function signIn(email: string, password: string): Promise<SignInResult> {
   if (DEMO_MODE) {
-    const demoUser = DEMO_USERS.find((u) => u.email === email.trim() && u.password === password);
+    const demoUser = DEMO_USERS.find((u: typeof DEMO_USERS[0]) => u.email === email.trim() && u.password === password);
     if (demoUser) {
       const { mockUser, mockSession, mockProfile } = createMockUser(demoUser);
       return {
@@ -467,7 +492,7 @@ export async function signOut(): Promise<AuthResult> {
 
 export async function resetPassword(email: string): Promise<AuthResult> {
   if (DEMO_MODE) {
-    const demoUser = DEMO_USERS.find((u) => u.email === email.trim());
+    const demoUser = DEMO_USERS.find((u: typeof DEMO_USERS[0]) => u.email === email.trim());
     if (demoUser) {
       return { success: true, error: null };
     }

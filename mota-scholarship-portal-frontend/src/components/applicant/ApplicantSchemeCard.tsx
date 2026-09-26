@@ -2,10 +2,24 @@ import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { applicantSchemePath } from '../../lib/constants';
-import type { Scheme } from '../../types';
 
 interface ApplicantSchemeCardProps {
-  scheme: Scheme;
+  scheme: {
+    id: string;
+    name: string;
+    shortName: string;
+    category: string;
+    categoryLabel: string;
+    badgeTone: 'blue' | 'purple' | 'green' | 'amber';
+    statusLabel: string;
+    statusActive: boolean;
+    demo: boolean;
+    department: string;
+    guidelinesAvailable: boolean;
+    description: string;
+    stats: { label: string; value: string; emphasize?: boolean }[];
+    applyHref: string;
+  };
 }
 
 export function ApplicantSchemeCard({ scheme }: ApplicantSchemeCardProps) {
