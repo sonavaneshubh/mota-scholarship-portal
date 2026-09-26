@@ -143,13 +143,13 @@ export function PersonalSection({
       </Fieldset>
 
       <Fieldset
-        description="Your Aadhaar is sent once to an encrypted writer, then discarded. Only a masked value and the last four digits are kept, so it cannot be read back or leaked from a backup."
+        description="Your Aadhaar is sent once to an encrypted writer, then discarded. Only a masked value and the last four digits are kept, so it cannot be read back or leaked from a backup. Until the writer is enabled, only the mask and last four are kept on this device, and the number will need to be entered again later."
         legend="Aadhaar identification"
       >
         <div className={FORM_GRID_CLASS}>
           <MaskedSecretField
             error={errors.aadhaar}
-            hint="Enter the 12-digit Aadhaar of the applicant."
+            hint="Enter the applicant's Aadhaar number. The format is checked at verification."
             inputMode="numeric"
             label="Aadhaar number"
             maxLength={14}

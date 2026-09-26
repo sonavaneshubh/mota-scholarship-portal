@@ -21,6 +21,8 @@
  */
 
 import { supabase } from '../lib/supabase';
+import { messageFromError } from '../lib/dbErrorMessage';
+import { saveLocalAadhaar, saveLocalAccountNumber } from '../lib/localSecretStore';
 import type {
   AddressFormValues,
   AddressDetailsRecord,
@@ -49,6 +51,14 @@ export interface ServiceResult<T> {
   ok: boolean;
   data?: T;
   error?: string;
+  /**
+   * Write-only fields that were accepted but are NOT on the applicant's profile,
+   * because the SECURITY DEFINER writer for them is not deployed. Present only on
+   * success, and never a substitute for `error`: the save really did succeed, and
+   * the caller needs to say so precisely rather than implying the whole thing
+   * failed. Values are 'aadhaar' and/or 'account'.
+   */
+  pendingLocally?: readonly ('aadhaar' | 'account')[];
 }
 
 const PROFILE_TABLE = 'applicant_profiles';
@@ -62,9 +72,12 @@ function requireClient() {
   return supabase;
 }
 
-function messageFromError(error: { message: string } | null, fallback: string): string {
-  return error?.message?.trim() ? error.message : fallback;
-}
+/**
+ * Applicant-facing database errors are filtered in one place, not per call site.
+ * The two services that write applicant data used to carry identical private
+ * copies of this helper, so the filter had to be corrected in both and a third
+ * copy would have reintroduced the raw-message behaviour.
+ */
 
 /** Empty string means "not answered"; store NULL so the completeness engine agrees. */
 function text(value: string | null | undefined): string | null {
@@ -291,23 +304,59 @@ export interface PersonalSaveInput {
 export async function savePersonalSection(
   applicantId: string,
   { values, ids, documentIds }: PersonalSaveInput,
+  options: { localSecretKey?: string } = {},
 ): Promise<ServiceResult<ApplicantProfileRecord>> {
   const client = requireClient();
   const { data: auth } = await client.auth.getUser();
 
+  const localSecretKey = options.localSecretKey ?? auth.user?.id ?? null;
+  const degraded: string[] = [];
+
   // Sensitive values first: they go through the SECURITY DEFINER writers and are
   // never part of the column payloads below.
+  //
+  // Both writers live in 20260926090100_applicant_profile_security.sql, which is
+  // not applied to the deployed project, so each call currently fails with
+  // PostgREST PGRST202. That used to abort the whole section, leaving the
+  // applicant unable to save their name, date of birth or address because a
+  // function was missing.
+  //
+  // So a writer failure is no longer fatal. The number is recorded against a
+  // device-local placeholder (mask and last four only -- see localSecretStore) and
+  // the section save continues, with the shortfall reported back so the page can
+  // tell the applicant their number is not yet on their profile.
   if (values.aadhaar.trim() !== '') {
     const { error } = await client.rpc('set_applicant_aadhaar', { p_aadhaar: values.aadhaar });
     if (error) {
-      return { ok: false, error: messageFromError(error, 'Could not save the Aadhaar number.') };
+      const remembered = localSecretKey ? saveLocalAadhaar(localSecretKey, values.aadhaar) : null;
+      if (remembered) {
+        degraded.push('aadhaar');
+        console.error(
+          'Aadhaar writer unavailable; kept a device-local mask only. Apply 20260926090100_applicant_profile_security.sql to store it on the profile.',
+          { code: error.code ?? null, message: error.message },
+        );
+      } else {
+        // No local slot either (storage disabled, or no key): this one is fatal,
+        // because silently discarding a number the applicant typed is worse than
+        // telling them it did not save.
+        return { ok: false, error: messageFromError(error, 'Could not save the Aadhaar number.') };
+      }
     }
   }
 
   if (values.account_number.trim() !== '') {
     const { error } = await client.rpc('set_bank_account', { p_account_number: values.account_number });
     if (error) {
-      return { ok: false, error: messageFromError(error, 'Could not save the bank account number.') };
+      const remembered = localSecretKey ? saveLocalAccountNumber(localSecretKey, values.account_number) : null;
+      if (remembered) {
+        degraded.push('account');
+        console.error(
+          'Bank account writer unavailable; kept a device-local last-four only. Apply 20260926090100_applicant_profile_security.sql to store it on the profile.',
+          { code: error.code ?? null, message: error.message },
+        );
+      } else {
+        return { ok: false, error: messageFromError(error, 'Could not save the bank account number.') };
+      }
     }
   }
 
@@ -402,7 +451,11 @@ export async function savePersonalSection(
   );
   if (!bank.ok) return { ok: false, error: bank.error };
 
-  return { ok: true, data: profileResult.data as ApplicantProfileRecord };
+  return {
+    ok: true,
+    data: profileResult.data as ApplicantProfileRecord,
+    ...(degraded.length > 0 ? { pendingLocally: degraded as ('aadhaar' | 'account')[] } : {}),
+  };
 }
 
 /* -------------------------------------------------------------------------- */

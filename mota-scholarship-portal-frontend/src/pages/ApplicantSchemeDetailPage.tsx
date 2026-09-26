@@ -1,26 +1,31 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useApplicantApplications } from '../hooks/useApplicantRecords';
 import { fetchSchemeDetail } from '../services/schemes';
 import type { EligibilityEvaluation, SchemeDetailResponse } from '../lib/supabase';
 import { evaluateEligibility, buildApplicantProfile } from '../services/eligibility';
+import { createOrResumeApplication } from '../services/applicantRecords';
+import { applicationRouteHandle } from '../lib/applicationHandle';
 import { useApplicantAuth } from '../context/useApplicantAuth';
 import { ApplicantPageHeader } from '../components/applicant/ApplicantPageHeader';
 import { ApplicationStatusBadge } from '../components/applicant/StatusBadge';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
-import { ROUTES } from '../lib/constants';
+import { applicantApplicationPath, ROUTES } from '../lib/constants';
 
 export function ApplicantSchemeDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const { user } = useApplicantAuth();
-  const { items: applications } = useApplicantApplications();
+  const { items: applications, reload: reloadApplications } = useApplicantApplications();
 
   const [loading, setLoading] = useState(true);
   const [schemeData, setSchemeData] = useState<SchemeDetailResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [eligibilityEval, setEligibilityEval] = useState<EligibilityEvaluation | null>(null);
+  const [applying, setApplying] = useState(false);
+  const [applyError, setApplyError] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadScheme() {
@@ -96,6 +101,62 @@ export function ApplicantSchemeDetailPage() {
 
   const { scheme, benefits } = schemeData;
   const existingApplication = applications.find((app) => app.schemeId === scheme.id);
+
+  /**
+   * Apply Now.
+   *
+   * Creates a real `applications` row, or resumes the one that already exists
+   * for this applicant and scheme, then navigates to that row's form. On any
+   * failure it stays on this page, shows a retryable message, and navigates
+   * nowhere — the applicant must never be dropped into a form for an application
+   * that does not exist.
+   */
+  async function handleApplyNow() {
+    if (applying) return;
+
+    if (!user) {
+      setApplyError('Please sign in to apply for this scheme.');
+      return;
+    }
+
+    setApplying(true);
+    setApplyError(null);
+
+    const outcome = await createOrResumeApplication(scheme.id);
+
+    if (!outcome.ok) {
+      setApplying(false);
+      console.error('Apply Now failed', outcome.cause);
+      setApplyError(outcome.message);
+      return;
+    }
+
+    // The list behind this page is now stale, so refresh it before leaving;
+    // otherwise returning here would not show the application we just created.
+    reloadApplications();
+
+    // The uuid, via applicationRouteHandle(). The previous `application_number ||
+    // id` is what produced "Application not found" on Apply: the || only guarded
+    // null and '', so a reference in any unconfirmed format was preferred, and
+    // the form page then rejected it as neither a uuid nor an APP-… reference.
+    // applicationRouteHandle returns null rather than a value that is known to
+    // fail, so a bad row is reported here — where the applicant can retry —
+    // instead of on the next page as a missing application.
+    const handle = applicationRouteHandle(outcome.application);
+
+    if (!handle) {
+      setApplying(false);
+      console.error('Application row has no usable identifier', outcome.application);
+      setApplyError(
+        'Your application was created but could not be opened. Please use My Applications to continue it.',
+      );
+      return;
+    }
+
+    // Keep the button disabled through the navigation, so a second click cannot
+    // start another create while this one is still resolving.
+    navigate(applicantApplicationPath(handle));
+  }
 
   const getEligibilityStatus = (): { label: string; tone: 'blue' | 'amber' | 'green' | 'red' | 'purple' } => {
     if (!eligibilityEval) {
@@ -272,7 +333,11 @@ export function ApplicantSchemeDetailPage() {
           )}
         </Card>
 
-        <Card className="h-fit p-5" accentClass="border-l-4 border-gov-saffron">
+        <Card
+          className="h-fit p-5"
+          accentClass="border-l-4 border-gov-saffron"
+          id="application-action"
+        >
           <p className="text-xs font-bold uppercase tracking-wider text-gov-saffron-dark">Application action</p>
           
           {eligibilityEval && (
@@ -288,35 +353,60 @@ export function ApplicantSchemeDetailPage() {
 
           <p className="mt-4 text-lg font-bold text-gov-blue-dark">Ready to apply?</p>
           <p className="mt-2 text-sm leading-relaxed text-slate-600">
-            Click below to proceed to the official application portal or view your existing application.
+            Applying creates an application in your account with its own reference number. You can save it as a
+            draft and come back to it, and reapplying will reopen the same application rather than starting a
+            new one.
           </p>
 
           {existingApplication ? (
             <div className="mt-4 rounded border border-blue-200 bg-blue-50 p-3">
               <p className="text-xs font-bold uppercase tracking-wide text-gov-blue">Existing application</p>
               <div className="mt-2 flex items-center justify-between gap-3">
-                <span className="text-sm font-semibold text-slate-800">{existingApplication.id}</span>
+                <span className="text-sm font-semibold text-slate-800">{existingApplication.referenceNumber}</span>
                 <ApplicationStatusBadge status={existingApplication.status} label={existingApplication.statusLabel} />
               </div>
             </div>
           ) : null}
 
+          {applyError ? (
+            <div className="mt-4 rounded border border-red-200 bg-red-50 p-3" role="alert">
+              <p className="text-sm font-semibold text-red-800">{applyError}</p>
+            </div>
+          ) : null}
+
+          <Button
+            className="mt-4 w-full"
+            disabled={applying}
+            size="md"
+            type="button"
+            variant="primary"
+            onClick={handleApplyNow}
+          >
+            {applying
+              ? existingApplication
+                ? 'Opening your application…'
+                : 'Creating your application…'
+              : existingApplication
+                ? 'Continue application'
+                : 'Apply Now'}
+          </Button>
+
+          {!user ? (
+            <p className="mt-2 text-center text-xs text-slate-500">Sign in to apply. Your application is saved to your account.</p>
+          ) : null}
+
           {scheme.official_application_url ? (
             <a
+              className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-300"
               href={scheme.official_application_url}
-              target="_blank"
               rel="noopener noreferrer"
-              className="mt-4 w-full inline-flex items-center justify-center gap-2 rounded-lg bg-gov-blue px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-gov-blue-dark focus:outline-none focus:ring-2 focus:ring-blue-300"
+              target="_blank"
             >
-              Apply Now
+              Official government portal
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
             </a>
-          ) : (
-            <Button className="mt-4 w-full" disabled size="md" type="button" variant="primary">
-              Apply unavailable
-            </Button>
-          )}
-          
+          ) : null}
+
           <Button className="mt-2 w-full" size="md" to={ROUTES.applicant.applications} variant="outline">
             View my applications
           </Button>

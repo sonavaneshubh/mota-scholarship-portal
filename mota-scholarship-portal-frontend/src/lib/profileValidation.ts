@@ -32,7 +32,6 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const MOBILE_PATTERN = /^[6-9]\d{9}$/;
 const IFSC_PATTERN = /^[A-Z]{4}0[A-Z0-9]{6}$/;
 const PINCODE_PATTERN = /^\d{6}$/;
-const AADHAAR_PATTERN = /^\d{12}$/;
 const CURRENT_YEAR = new Date().getFullYear();
 
 export const GENDER_OPTIONS = ['Male', 'Female', 'Other', 'Transgender'] as const;
@@ -189,15 +188,22 @@ export function validatePersonal(
 
   // Aadhaar. Write-only: once saved, the server returns only a mask, so the
   // field is legitimately empty on a later visit and must not be re-required.
+  //
+  // The 12-digit and repeated-digit rules are deliberately NOT applied. The
+  // database writer that enforced them (set_applicant_aadhaar) is not deployed on
+  // this project, and a client-side rule that the server does not also enforce
+  // rejects input the system would otherwise accept. Aadhaar format checking
+  // belongs with the verification flow that will own aadhaar_verified_at, not with
+  // a field that only records a number of digits.
+  //
+  // What is still enforced: not empty when nothing is saved yet, and at least one
+  // digit once something is typed, so a field of letters or punctuation is not
+  // recorded as an Aadhaar number.
   if (!context.hasSavedAadhaar) {
-    if (f.required('aadhaar', 'Aadhaar number', values.aadhaar)) {
-      f.pattern('aadhaar', 'Aadhaar number', values.aadhaar, AADHAAR_PATTERN, 'Aadhaar must be exactly 12 digits.');
-      if (/^(\d)\1{11}$/.test(values.aadhaar.trim())) {
-        f.errors.aadhaar = 'Aadhaar number is not valid.';
-      }
-    }
-  } else if (present(values.aadhaar) && !AADHAAR_PATTERN.test(values.aadhaar.trim())) {
-    f.errors.aadhaar = 'Aadhaar must be exactly 12 digits.';
+    f.required('aadhaar', 'Aadhaar number', values.aadhaar);
+  }
+  if (present(values.aadhaar) && !/\d/.test(values.aadhaar)) {
+    f.errors.aadhaar = 'Aadhaar number must contain digits.';
   }
 
   // Domicile

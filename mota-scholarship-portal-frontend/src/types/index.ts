@@ -188,7 +188,15 @@ export interface ApplicantProfile {
 }
 
 export interface ApplicantApplication {
-  id: string;
+  /**
+   * The row's `applications.id` uuid, or null when the row could not be read.
+   *
+   * Nullable rather than a placeholder string because this value is used to build
+   * URLs. An em-dash or empty string here produces a link that is guaranteed to
+   * render "Application not found", so a caller with no usable id must be able to
+   * tell that and not render a link at all.
+   */
+  id: string | null;
   schemeId: string;
   schemeName: string;
   submittedAt: string;

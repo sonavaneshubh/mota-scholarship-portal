@@ -8,15 +8,19 @@
  *    half-finished section 1, so nothing is auto-saved on navigation.
  *  - "Save and continue" runs the same save as "Save" and only advances the
  *    stepper when the write actually succeeded.
- *  - Completeness is always the number the database computes. The browser copy is
- *    used only to decide whether a Save should be blocked, never to display a
- *    percentage.
+ *  - Completeness prefers the number the database computes, via
+ *    applicant_profile_completeness(). That function is in the undeployed
+ *    20260926090100 and currently 404s, so localCompleteness recomputes the same
+ *    figure from the loaded rows; the server's value wins as soon as it exists.
+ *    The browser copy is otherwise used only to decide whether a Save should be
+ *    blocked.
  *  - Leaving with unsaved edits warns first, including the browser's own
  *    beforeunload dialog, because a half-typed Aadhaar or bank detail silently
  *    lost is worse than an extra click.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useApplicantAuth } from '../context/useApplicantAuth';
 import { ApplicantPageHeader } from '../components/applicant/ApplicantPageHeader';
 import { Badge } from '../components/ui/Badge';
@@ -30,6 +34,10 @@ import { CurrentCourseSection } from '../components/profile/sections/CurrentCour
 import { PastQualificationSection } from '../components/profile/sections/PastQualificationSection';
 import { HostelSection } from '../components/profile/sections/HostelSection';
 import { ROUTES } from '../lib/constants';
+import { resolveContinueTarget, type ContinueTarget } from '../lib/continueTarget';
+import { fetchApplicantApplications } from '../services/applicantRecords';
+import { readLocalAadhaar, readLocalAccountNumber } from '../lib/localSecretStore';
+import { computeLocalCompleteness } from '../lib/localCompleteness';
 import {
   ensureApplicantProfile,
   fetchCompleteness,
@@ -124,6 +132,7 @@ type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 export function ApplicantProfilePage() {
   const { user, authUser } = useApplicantAuth();
   const userId = authUser?.id ?? null;
+  const navigate = useNavigate();
 
   const [active, setActive] = useState<ProfileSectionId>('personal');
   const [applicantId, setApplicantId] = useState<string | null>(null);
@@ -135,6 +144,30 @@ export function ApplicantProfilePage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<SaveState>('idle');
   const [saveError, setSaveError] = useState<string | null>(null);
+  /**
+   * Set when a section saved successfully but a write-only field inside it could
+   * not reach the database. Kept separate from `saveError` on purpose: the save
+   * genuinely succeeded, and reporting it as a failure would be as wrong as
+   * hiding it. It has to be visible, because the applicant's number is not on
+   * their profile and a scholarship application depends on that.
+   *
+   * Tagged with its section rather than cleared on navigation, so "Save and
+   * continue" does not show a note about the personal section while the applicant
+   * is filling in their address, and returning to Personal still shows it.
+   */
+  const [pendingNotice, setPendingNotice] = useState<{
+    section: ProfileSectionId;
+    text: string;
+  } | null>(null);
+
+  /**
+   * Where the header's "continue" action points. Starts on the scheme list so the
+   * button is never dead, and is upgraded to the applicant's draft application as
+   * soon as one is known to exist.
+   */
+  const [continueTarget, setContinueTarget] = useState<ContinueTarget>(() =>
+    resolveContinueTarget(null),
+  );
   const [dirty, setDirty] = useState(false);
   const [uploadBusy, setUploadBusy] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -153,10 +186,20 @@ export function ApplicantProfilePage() {
   });
   const [hostelCertificate, setHostelCertificate] = useState<ApplicantDocumentRecord | null>(null);
 
-  const aadhaarMask = data.profile?.aadhaar_masked ?? null;
-  const accountMask = data.bank?.account_number_last4
-    ? `•••• •••• ${data.bank.account_number_last4}`
-    : null;
+  // Prefer what the database holds. When the SECURITY DEFINER writers are not
+  // deployed the save falls back to a device-local placeholder, and the field must
+  // still read as "already entered" -- otherwise the applicant is made to retype a
+  // number they just saved. Only a mask and last four are ever available locally,
+  // so the write-only property still holds.
+  //
+  // Held as primitives, not the objects localSecretStore returns, so their
+  // identity is stable across renders and does not churn the save callback.
+  const localAadhaarMask = authUser?.id ? (readLocalAadhaar(authUser.id)?.mask ?? null) : null;
+  const localAccountLast4 = authUser?.id ? (readLocalAccountNumber(authUser.id)?.last4 ?? null) : null;
+
+  const aadhaarMask = data.profile?.aadhaar_masked ?? localAadhaarMask;
+  const accountLast4 = data.bank?.account_number_last4 ?? localAccountLast4;
+  const accountMask = accountLast4 ? `•••• •••• ${accountLast4}` : null;
 
   /* ------------------------------------------------------------------ load */
 
@@ -208,7 +251,11 @@ export function ApplicantProfilePage() {
         return;
       }
 
-      const [loaded, pct] = await Promise.all([loadProfile(anchor.data.id), fetchCompleteness()]);
+      const [loaded, pct, applications] = await Promise.all([
+        loadProfile(anchor.data.id),
+        fetchCompleteness(),
+        fetchApplicantApplications(),
+      ]);
       if (!activeEffect) return;
 
       if (!loaded.ok || !loaded.data) {
@@ -221,7 +268,20 @@ export function ApplicantProfilePage() {
       setApplicantId(anchor.data.id);
       setApplicantReference(loaded.data.profile?.applicant_id ?? anchor.data.applicant_id ?? null);
       hydrateRef.current(loaded.data);
-      setCompleteness(pct.ok && pct.data ? pct.data : EMPTY_PROFILE_COMPLETENESS);
+      setContinueTarget(resolveContinueTarget(applications.data));
+      // Server number when the RPC exists, local recomputation otherwise. Reading
+      // the device-local placeholders directly rather than through the derived
+      // masks above keeps this effect keyed on userId alone, which the comment
+      // below explains is deliberate.
+      setCompleteness(
+        pct.ok && pct.data
+          ? pct.data
+          : computeLocalCompleteness({
+              data: loaded.data,
+              localAadhaarPresent: userId ? readLocalAadhaar(userId) !== null : false,
+              localAccountPresent: userId ? readLocalAccountNumber(userId) !== null : false,
+            }),
+      );
       setLoading(false);
     })();
 
@@ -257,6 +317,7 @@ export function ApplicantProfilePage() {
       setErrors({});
       setSaveState('idle');
       setSaveError(null);
+      setPendingNotice(null);
       setActive(id);
     },
     [active, dirty],
@@ -299,17 +360,41 @@ export function ApplicantProfilePage() {
     markDirty();
   }
 
+  // Declared before the callbacks below that depend on it: a useCallback
+  // dependency array is evaluated at its call site, so referencing `busy` from a
+  // callback defined above this line would throw on the temporal dead zone.
+  const busy = saveState === 'saving' || uploadBusy;
+
   const reloadAfterSave = useCallback(async () => {
     if (!applicantId) return;
-    const [loaded, pct] = await Promise.all([loadProfile(applicantId), fetchCompleteness()]);
+    const [loaded, pct, applications] = await Promise.all([
+      loadProfile(applicantId),
+      fetchCompleteness(),
+      fetchApplicantApplications(),
+    ]);
     if (loaded.ok && loaded.data) {
       setData(loaded.data);
     }
+    // Re-resolved after every save, so starting an application elsewhere in the
+    // app is reflected here without a manual reload.
+    setContinueTarget(resolveContinueTarget(applications.data));
     if (pct.ok && pct.data) {
       setCompleteness(pct.data);
+    } else if (loaded.ok && loaded.data) {
+      // applicant_profile_completeness() is in the undeployed 20260926090100, so
+      // the RPC 404s. Recomputing from the rows just loaded is what makes the bar
+      // respond to a save instead of sitting at 0%; the server's own number is
+      // still preferred above and takes over once the migration is applied.
+      setCompleteness(
+        computeLocalCompleteness({
+          data: loaded.data,
+          localAadhaarPresent: localAadhaarMask !== null,
+          localAccountPresent: localAccountLast4 !== null,
+        }),
+      );
     }
     await refreshCachedCompleteness();
-  }, [applicantId]);
+  }, [applicantId, localAadhaarMask, localAccountLast4]);
 
   const saveSection = useCallback(
     async (section: ProfileSectionId): Promise<boolean> => {
@@ -318,13 +403,17 @@ export function ApplicantProfilePage() {
       setSaveState('saving');
       setSaveError(null);
 
-      let result: { ok: boolean; error?: string } = { ok: true };
+      let result: { ok: boolean; error?: string; pendingLocally?: readonly ('aadhaar' | 'account')[] } = {
+        ok: true,
+      };
 
       switch (section) {
         case 'personal': {
           const validation = validatePersonal(personal, {
             hasSavedAadhaar: Boolean(aadhaarMask),
-            hasSavedAccount: Boolean(data.bank?.account_number_last4),
+            // Also true when only the device-local placeholder exists, so a
+            // bank account that failed to reach the database is not re-required.
+            hasSavedAccount: Boolean(accountMask),
             hasDomicileDocument: Boolean(certificates.domicile),
             hasIncomeDocument: Boolean(certificates.income),
             hasCasteDocument: Boolean(certificates.caste),
@@ -353,12 +442,33 @@ export function ApplicantProfilePage() {
               caste: certificates.caste?.id ?? null,
               disability: certificates.disability?.id ?? null,
             },
-          });
+          }, authUser ? { localSecretKey: authUser.id } : {});
 
           // The two write-only fields must not survive a successful save, even
           // in memory, so a later re-render cannot resubmit them.
           if (result.ok) {
             setPersonal((current) => ({ ...current, aadhaar: '', account_number: '' }));
+
+            // Survived the save, but is not on the profile. Say so in the field's
+            // own terms: only a mask and the last four digits were kept, on this
+            // device, and the number must be entered again once the writer exists.
+            const pending = result.pendingLocally ?? [];
+            if (pending.length > 0) {
+              const labels = pending
+                .map((field) => (field === 'aadhaar' ? 'Aadhaar number' : 'Bank account number'))
+                .join(' and ');
+              setPendingNotice({
+                section: 'personal',
+                text: `${labels} saved for this session only. It is not yet on your profile — re-enter it later, once verification is available.`,
+              });
+            } else if (!localAadhaarMask && !localAccountLast4) {
+              // This save reached the writers and nothing is left over from an
+              // earlier fallback, so any standing warning is now false. Cleared
+              // here rather than at the start of the save, because a re-save that
+              // types no new number must not silently retract the warning while the
+              // number is still absent from the profile.
+              setPendingNotice(null);
+            }
           }
           break;
         }
@@ -447,14 +557,18 @@ export function ApplicantProfilePage() {
       return true;
     },
     [
+      accountMask,
       address,
       aadhaarMask,
       applicantId,
+      authUser,
       certificates,
       course,
       data,
       hostel,
       hostelCertificate,
+      localAccountLast4,
+      localAadhaarMask,
       otherInfo,
       personal,
       qualifications,
@@ -476,6 +590,37 @@ export function ApplicantProfilePage() {
       setActive(next.id);
     }
   }, [active, saveSection]);
+
+  /**
+   * Last section: save, then leave for the application form.
+   *
+   * Navigating only after a successful save is the point. An unsaved section that
+   * failed validation must keep the applicant on the page with their input intact,
+   * not bounce them to the form and lose it. This is why it cannot be a plain
+   * link the way the header action is.
+   */
+  const handleSaveAndGoToApplication = useCallback(async () => {
+    const saved = await saveSection(active);
+    if (!saved) return;
+    setDirty(false);
+    navigate(continueTarget.to);
+  }, [active, saveSection, continueTarget.to, navigate]);
+
+  /**
+   * Header action: leave for the application form without saving.
+   *
+   * Deliberately a button rather than a link. A react-router Link changes the URL
+   * in place, so beforeunload never fires and unsaved edits would be dropped
+   * silently -- the same hazard switchSection guards against. This reuses that
+   * guard so both ways out of the page behave the same.
+   */
+  const goToApplication = useCallback(() => {
+    if (busy) return;
+    if (dirty && !window.confirm('You have unsaved changes on this section. Leave without saving?')) {
+      return;
+    }
+    navigate(continueTarget.to);
+  }, [busy, dirty, continueTarget.to, navigate]);
 
   /* ---------------------------------------------------------------- render */
 
@@ -525,8 +670,6 @@ export function ApplicantProfilePage() {
     );
   }
 
-  const busy = saveState === 'saving' || uploadBusy;
-
   return (
     <div className="space-y-5 py-2 sm:py-4">
       <ApplicantPageHeader
@@ -535,6 +678,9 @@ export function ApplicantProfilePage() {
             {applicantReference ? (
               <Badge tone="blue">Applicant ID: {applicantReference}</Badge>
             ) : null}
+            <Button disabled={busy} onClick={() => void goToApplication()} variant="primary">
+              {continueTarget.label}
+            </Button>
             <Button size="md" to={ROUTES.applicant.dashboard} variant="outline">
               Back to dashboard
             </Button>
@@ -595,6 +741,7 @@ export function ApplicantProfilePage() {
         <div aria-live="polite" className="sr-only">
           {saveState === 'saved' ? `${activeDefinition.heading} saved.` : null}
           {saveState === 'error' && saveError ? saveError : null}
+          {pendingNotice?.section === active ? pendingNotice.text : null}
         </div>
 
         {saveState === 'saved' ? (
@@ -612,6 +759,17 @@ export function ApplicantProfilePage() {
             role="alert"
           >
             {saveError}
+          </p>
+        ) : null}
+
+        {/* Amber, not red: the section did save. This exists to stop a "saved"
+            message from implying the Aadhaar is on the profile when it is not. */}
+        {pendingNotice?.section === active ? (
+          <p
+            className="mt-3 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] leading-relaxed font-medium text-amber-900"
+            role="status"
+          >
+            {pendingNotice.text}
           </p>
         ) : null}
 
@@ -715,9 +873,19 @@ export function ApplicantProfilePage() {
             <Button disabled={busy} onClick={() => void saveSection(active)} variant="outline">
               Save
             </Button>
-            <Button disabled={busy} onClick={() => void handleSaveAndContinue()} variant="primary">
-              {isLastSection ? 'Save section' : 'Save and continue'}
-            </Button>
+            {isLastSection ? (
+              <Button
+                disabled={busy}
+                onClick={() => void handleSaveAndGoToApplication()}
+                variant="primary"
+              >
+                {continueTarget.resumes ? 'Save and continue application' : 'Save and find a scheme'}
+              </Button>
+            ) : (
+              <Button disabled={busy} onClick={() => void handleSaveAndContinue()} variant="primary">
+                Save and continue
+              </Button>
+            )}
           </div>
         </div>
       </Card>

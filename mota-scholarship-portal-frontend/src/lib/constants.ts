@@ -76,7 +76,10 @@ export function applicantSchemePath(schemeId: string) {
 }
 
 export function applicantApplicationPath(applicationId: string) {
-  return ROUTES.applicant.application.replace(':id', encodeURIComponent(applicationId));
+  return ROUTES.applicant.application.replace(
+    ':applicationId',
+    encodeURIComponent(applicationId),
+  );
 }
 
 export function applicantStatusPath(applicationId: string) {
