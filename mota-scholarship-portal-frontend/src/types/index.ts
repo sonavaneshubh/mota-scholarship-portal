@@ -233,6 +233,12 @@ export interface ApplicantDocument {
   uploadedAt: string;
   updatedAt: string;
   required: boolean;
+  /**
+   * Private-bucket object path. Only ever handed to documentService.createViewUrl,
+   * which exchanges it for a 60-second signed URL. Never render it, never put it
+   * in a link the applicant could share.
+   */
+  storagePath?: string | null;
 }
 
 export interface ApplicantQuickAction {

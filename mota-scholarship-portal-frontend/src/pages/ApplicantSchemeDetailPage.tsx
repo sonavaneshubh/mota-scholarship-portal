@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { APPLICANT_APPLICATIONS } from '../data/applicantData';
+import { useApplicantApplications } from '../hooks/useApplicantRecords';
 import { fetchSchemeDetail } from '../services/schemes';
 import { evaluateEligibility, buildApplicantProfile } from '../services/eligibility';
 import { useApplicantAuth } from '../context/useApplicantAuth';
@@ -14,6 +14,7 @@ import { ROUTES } from '../lib/constants';
 export function ApplicantSchemeDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { user } = useApplicantAuth();
+  const { items: applications } = useApplicantApplications();
 
   const [loading, setLoading] = useState(true);
   const [schemeData, setSchemeData] = useState<any | null>(null);
@@ -98,7 +99,7 @@ export function ApplicantSchemeDetailPage() {
   }
 
   const { scheme, benefits } = schemeData;
-  const existingApplication = APPLICANT_APPLICATIONS.find((app) => app.schemeId === scheme.id);
+  const existingApplication = applications.find((app) => app.schemeId === scheme.id);
 
   const getEligibilityStatus = (): { label: string; tone: 'blue' | 'amber' | 'green' | 'red' | 'purple' } => {
     if (!eligibilityEval) {

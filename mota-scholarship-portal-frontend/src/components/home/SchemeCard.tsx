@@ -1,8 +1,8 @@
 import { Link } from 'react-router-dom';
 import { ROUTES } from '../../lib/constants';
-import type { Scheme, SchemeBadgeTone } from '../../types';
+import type { ApplicantScheme } from '../../lib/supabase';
 
-const badgeToneClass: Record<SchemeBadgeTone, string> = {
+const badgeToneClass: Record<ApplicantScheme['badgeTone'], string> = {
   blue: 'bg-blue-100 text-gov-blue',
   purple: 'bg-purple-100 text-purple-800',
   green: 'bg-emerald-100 text-gov-green',
@@ -10,7 +10,7 @@ const badgeToneClass: Record<SchemeBadgeTone, string> = {
 };
 
 export interface SchemeCardProps {
-  scheme: Scheme;
+  scheme: ApplicantScheme;
 }
 
 export function SchemeCard({ scheme }: SchemeCardProps) {
@@ -25,7 +25,7 @@ export function SchemeCard({ scheme }: SchemeCardProps) {
           </span>
           {scheme.demo ? (
             <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-300">
-              DEMO / Prototype
+              Unverified
             </span>
           ) : null}
           <span
@@ -62,15 +62,26 @@ export function SchemeCard({ scheme }: SchemeCardProps) {
       </div>
 
       <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
-        <Link className="text-xs font-semibold text-gov-blue hover:underline" to={ROUTES.guidelinesNotices}>
-          Guidelines (Draft)
-        </Link>
-        <a
-          className="px-3 py-1 bg-gov-blue hover:bg-gov-blue-dark text-white text-xs font-semibold rounded transition"
-          href={scheme.applyHref}
+        <Link
+          className={`text-xs font-semibold ${scheme.guidelinesAvailable ? 'text-gov-blue hover:underline' : 'text-slate-400'}`}
+          to={ROUTES.guidelinesNotices}
         >
-          Apply Now
-        </a>
+          {scheme.guidelinesAvailable ? 'Guidelines' : 'Guidelines unavailable'}
+        </Link>
+        {scheme.applyHref ? (
+          <a
+            className="px-3 py-1 bg-gov-blue hover:bg-gov-blue-dark text-white text-xs font-semibold rounded transition"
+            href={scheme.applyHref}
+            rel="noopener noreferrer"
+            target="_blank"
+          >
+            Apply Now
+          </a>
+        ) : (
+          <span className="px-3 py-1 rounded bg-slate-100 text-slate-500 text-xs font-semibold">
+            Apply offline
+          </span>
+        )}
       </div>
     </div>
   );

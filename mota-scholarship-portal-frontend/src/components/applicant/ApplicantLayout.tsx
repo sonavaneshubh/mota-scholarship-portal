@@ -1,11 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useApplicantAuth } from '../../context/useApplicantAuth';
-import {
-  APPLICANT_APPLICATIONS,
-  APPLICANT_DOCUMENTS,
-  APPLICANT_NOTIFICATIONS,
-} from '../../data/applicantData';
+import { useApplicantDocuments } from '../../hooks/useApplicantRecords';
 import { ROUTES, SECTION_IDS } from '../../lib/constants';
 import { Footer } from '../layout/Footer';
 import { Masthead } from '../layout/Masthead';
@@ -14,6 +10,7 @@ import { ApplicantSidebar } from './ApplicantSidebar';
 
 export function ApplicantLayout() {
   const { session, user, role, loading, signOut } = useApplicantAuth();
+  const { items: documents } = useApplicantDocuments();
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -140,8 +137,10 @@ export function ApplicantLayout() {
     return <Navigate replace state={{ from: location }} to={ROUTES.applicant.login} />;
   }
 
-  const unreadNotificationCount = APPLICANT_NOTIFICATIONS.filter((notification) => notification.unread).length;
-  const documentAttentionCount = APPLICANT_DOCUMENTS.filter((document) =>
+  // There is no notifications table yet, so the badge stays at zero rather than
+  // counting sample rows.
+  const unreadNotificationCount = 0;
+  const documentAttentionCount = documents.filter((document) =>
     ['needs-correction', 'rejected'].includes(document.status),
   ).length;
 
@@ -167,7 +166,7 @@ export function ApplicantLayout() {
           style={{ width: sidebarCollapsed ? '4rem' : '16rem' }}
         >
           <ApplicantSidebar
-            applicationCount={APPLICANT_APPLICATIONS.length}
+            applicationCount={0}
             documentAttentionCount={documentAttentionCount}
             unreadNotificationCount={unreadNotificationCount}
             onLogout={handleLogout}
@@ -202,7 +201,7 @@ export function ApplicantLayout() {
             tabIndex={-1}
           >
             <ApplicantSidebar
-              applicationCount={APPLICANT_APPLICATIONS.length}
+              applicationCount={0}
               documentAttentionCount={documentAttentionCount}
               unreadNotificationCount={unreadNotificationCount}
               onClose={closeSidebar}

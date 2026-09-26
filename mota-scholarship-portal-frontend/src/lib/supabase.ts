@@ -233,7 +233,9 @@ export function mapSchemeToFrontend(scheme: Scheme & { departments?: Department;
       { label: 'Department', value: deptName },
       { label: 'Status', value: scheme.status },
     ],
-    applyHref: scheme.official_application_url || '#apply-placeholder',
+    // Empty string means "no official application URL is published". A placeholder
+    // href would render a working-looking Apply button that leads nowhere.
+    applyHref: scheme.official_application_url ?? '',
   };
 }
 

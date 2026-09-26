@@ -7,7 +7,6 @@ import type {
   HowToApplyPhase,
   MinistryStat,
   QuickAction,
-  Scheme,
   WorkflowStep,
 } from '../types';
 
@@ -90,123 +89,6 @@ export const APPLICATION_GLANCE: AtGlanceItem[] = [
   { id: 'glance-3', number: '03', title: 'Submit Application' },
   { id: 'glance-4', number: '04', title: 'Document Verification' },
   { id: 'glance-5', number: '05', title: 'Track Decision' },
-];
-
-export const SCHEMES: Scheme[] = [
-  {
-    id: 'demo-higher-ed',
-    name: 'Demo — Higher Education Scholarship (ST Students)',
-    shortName: 'HE Scholarship',
-    category: 'higher-education',
-    categoryLabel: 'Higher Education',
-    badgeTone: 'blue',
-    statusLabel: 'Prototype Listing',
-    statusActive: true,
-    demo: true,
-    department: 'Directorate of Higher Education (sample)',
-    guidelinesAvailable: true,
-    description:
-      'Sample configuration for an undergraduate/postgraduate scholarship with tuition assistance. Shown for prototype illustration only.',
-    stats: [
-      { label: 'Level', value: 'UG / PG (sample)' },
-      { label: 'Coverage', value: 'Tuition & maintenance (sample)', emphasize: true },
-      { label: 'Applicants', value: 'As per rules (demo)' },
-    ],
-    applyHref: '#apply-placeholder',
-  },
-  {
-    id: 'demo-fellowship',
-    name: 'Demo — Research Fellowship (ST Researchers)',
-    shortName: 'Research Fellowship',
-    category: 'fellowship',
-    categoryLabel: 'Fellowship',
-    badgeTone: 'blue',
-    statusLabel: 'Prototype Listing',
-    statusActive: true,
-    demo: true,
-    department: 'Ministry of Tribal Affairs — Research Division (sample)',
-    guidelinesAvailable: true,
-    description:
-      'Sample configuration for a research fellowship supporting ST researchers in full-time M.Phil / Ph.D programmes. Illustration only.',
-    stats: [
-      { label: 'Level', value: 'M.Phil / Ph.D (sample)' },
-      { label: 'Support', value: 'Fellowship + contingency (sample)', emphasize: true },
-      { label: 'Duration', value: 'Up to 5 years (sample)' },
-    ],
-    applyHref: '#apply-placeholder',
-  },
-  {
-    id: 'demo-post-matric',
-    name: 'Demo — Post-Matric Scholarship',
-    shortName: 'Post-Matric',
-    category: 'scholarship',
-    categoryLabel: 'Scholarship',
-    badgeTone: 'amber',
-    statusLabel: 'Prototype Listing',
-    statusActive: true,
-    demo: true,
-    department: 'Directorate of School Education (sample)',
-    guidelinesAvailable: true,
-    description:
-      'Sample configuration for a post-matric scholarship covering late school and college stages. Prototype illustration, not an official scheme detail.',
-    stats: [
-      { label: 'Level', value: 'Class 11 – PG (sample)' },
-      { label: 'Coverage', value: 'Tuition & maintenance (sample)', emphasize: true },
-      { label: 'Mode', value: 'Web-based application (demo)' },
-    ],
-    applyHref: '#apply-placeholder',
-  },
-  {
-    id: 'demo-research',
-    name: 'Demo — Tribal Research Grant',
-    shortName: 'Research Grant',
-    category: 'research',
-    categoryLabel: 'Research',
-    badgeTone: 'purple',
-    statusLabel: 'Prototype Listing',
-    statusActive: true,
-    demo: true,
-    department: 'National Tribal Research Institute (sample)',
-    guidelinesAvailable: false,
-    description:
-      'Sample configuration for research grants focused on tribal studies and related themes. Prototype illustration only.',
-    stats: [
-      { label: 'Focus', value: 'Tribal studies (sample)' },
-      { label: 'Duration', value: 'Up to 3 years (sample)' },
-      { label: 'Deliverable', value: 'Report / publication (sample)' },
-    ],
-    applyHref: '#apply-placeholder',
-  },
-  {
-    id: 'demo-overseas',
-    name: 'Demo — Overseas Study Support',
-    shortName: 'Overseas Support',
-    category: 'overseas',
-    categoryLabel: 'Overseas',
-    badgeTone: 'green',
-    statusLabel: 'Prototype Listing',
-    statusActive: true,
-    demo: true,
-    department: 'Directorate of Overseas Studies (sample)',
-    guidelinesAvailable: true,
-    description:
-      'Sample configuration for support to candidates pursuing study abroad. Prototype illustration, not an official programme.',
-    stats: [
-      { label: 'Level', value: 'PG / Ph.D abroad (sample)' },
-      { label: 'Support', value: 'Tuition + living (sample)', emphasize: true },
-      { label: 'Intake', value: 'As per notification (demo)' },
-    ],
-    applyHref: '#apply-placeholder',
-  },
-];
-
-export const SCHEME_FILTERS: { id: Exclude<import('../types').SchemeCategory, 'all'> | 'all'; label: string }[] = [
-  { id: 'all', label: 'All' },
-  { id: 'scholarship', label: 'Scholarship' },
-  { id: 'fellowship', label: 'Fellowship' },
-  { id: 'higher-education', label: 'Higher Education' },
-  { id: 'research', label: 'Research' },
-  { id: 'overseas', label: 'Overseas' },
 ];
 
 export const WORKFLOW_STEPS: WorkflowStep[] = [
