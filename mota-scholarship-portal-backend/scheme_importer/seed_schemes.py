@@ -1,6 +1,9 @@
 """
 Seed Script for Verified Initial Scheme Data.
-Imports a curated set of schemes verified from official MahaDBT sources.
+Imports a curated set of schemes verified from official MahaDBT/DBT sources.
+
+Official source: https://dbttribal.gov.in/AllScheme.aspx
+The 5 official MoTA schemes for ST students.
 """
 
 import asyncio
@@ -14,206 +17,302 @@ from .normalizer import normalize_scheme_data
 from .validator import validate_scheme_data
 
 
-"""
-Seed Script for Verified Initial Scheme Data.
-Imports a curated set of schemes verified from official MahaDBT sources.
-"""
-
-import asyncio
-import json
-from datetime import datetime, timezone
-from pathlib import Path
-from typing import Any
-
-from .importer import SchemeImporter, import_from_json
-from .normalizer import normalize_scheme_data
-from .validator import validate_scheme_data
-
-
-# Verified seed schemes from official MahaDBT sources
-# Each scheme has been manually verified against official MahaDBT scheme pages
+# Official 5 MoTA Schemes for ST Students (from https://dbttribal.gov.in/AllScheme.aspx)
+# Only these 5 should be active/published
 SEED_SCHEMES = [
     {
-        "scheme_code": "MSB-RCSMS-EBC",
-        "name": "Rajarshi Chhatrapati Shahu Maharaj Shikshan Shulkh Shishyavrutti Yojna (EBC)",
-        "short_name": "RCSMS EBC",
-        "department_code": "DTE",
+        "scheme_code": "BVOBC",
+        "name": "Post-Matric Scholarship Scheme For ST Students",
+        "short_name": "Post-Matric ST",
+        "department_code": "MOTA",
         "category_name": "Post Matric Scholarship",
-        "scheme_type": "Post Matric Scholarship",
-        "description": "Tuition fee reimbursement for Economically Backward Class students in technical/professional courses.",
-        "overview": "This scheme provides tuition fee reimbursement for EBC students pursuing technical and professional courses in recognized institutions in Maharashtra.",
+        "scheme_type": "Centrally Sponsored Scheme",
+        "description": "Post-Matric Scholarship for ST students pursuing studies at post-matriculation level.",
+        "overview": "Financial assistance for ST students pursuing post-matriculation studies in recognized institutions.",
         "application_mode": "Online",
-        "official_scheme_url": "https://mahadbt.maharashtra.gov.in/ScholarShip/SchemeDetails?schemeCode=RCSMS_EBC",
-        "official_application_url": "https://mahadbt.maharashtra.gov.in/",
-        "gr_url": "https://mahadbt.maharashtra.gov.in/GR/RCSMS_EBC.pdf",
+        "official_scheme_url": "https://dbttribal.gov.in/AllScheme.aspx",
+        "official_application_url": "https://dbttribal.gov.in/",
+        "gr_url": None,
         "academic_year": "2025-2026",
         "application_start_date": "2025-07-01",
         "application_end_date": "2025-12-31",
         "renewal_available": True,
         "status": "published",
         "verification_status": "verified",
-        "source_url": "https://mahadbt.maharashtra.gov.in/ScholarShip/SchemeDetails?schemeCode=RCSMS_EBC",
-        "source_type": "mahadbt",
-        "source_last_verified_at": datetime.now(timezone.utc).isoformat(),
+        "source_url": "https://dbttribal.gov.in/AllScheme.aspx",
+        "source_type": "dbt_tribal",
+        "source_last_verified_at": "2025-01-15T00:00:00+00:00",
         "eligibility": {
-            "category_requirement": "EBC (Economically Backward Class)",
-            "residency_requirement": "Domicile of Maharashtra",
-            "course_requirement": "Technical/Professional courses (Engineering, Medical, Pharmacy, Architecture, etc.)",
-            "institution_requirement": "Recognized institutions in Maharashtra",
+            "category_requirement": "ST (Scheduled Tribe)",
+            "residency_requirement": "As per state/UT norms",
+            "course_requirement": "Post-matriculation courses (Class 11 onwards)",
+            "institution_requirement": "Recognized institutions",
+            "max_income": 250000,
+            "income_period": "annual",
+            "other_conditions": "ST category certificate required. Family annual income should not exceed Rs. 2,50,000. Regular attendance required."
+        },
+        "benefits": [
+            {
+                "benefit_type": "maintenance_allowance",
+                "description": "Maintenance allowance for hostellers and day scholars",
+                "amount": None,
+                "amount_currency": "INR",
+                "amount_period": "annual",
+                "coverage": "As per scheme norms",
+                "hosteller_amount": None,
+                "day_scholar_amount": None,
+            }
+        ],
+        "documents": [
+            {"document_name": "Aadhaar Card", "description": "Identity proof", "is_mandatory": True, "academic_year": "2025-2026", "source_text": "Aadhaar card copy"},
+            {"document_name": "Caste Certificate", "description": "ST category certificate", "is_mandatory": True, "academic_year": "2025-2026", "source_text": "ST caste certificate"},
+            {"document_name": "Domicile Certificate", "description": "State domicile proof", "is_mandatory": True, "academic_year": "2025-2026", "source_text": "Domicile certificate"},
+            {"document_name": "Income Certificate", "description": "Family annual income certificate", "is_mandatory": True, "academic_year": "2025-2026", "source_text": "Income certificate"},
+            {"document_name": "Previous Marksheet", "description": "Qualifying examination marksheet", "is_mandatory": True, "academic_year": "2025-2026", "source_text": "Previous year marksheet"},
+        ],
+        "sources": [{
+            "source_type": "dbt_tribal",
+            "source_url": "https://dbttribal.gov.in/AllScheme.aspx",
+            "gr_url": None,
+            "source_title": "Post-Matric Scholarship Scheme For ST Students",
+            "verification_status": "verified",
+        }],
+    },
+    {
+        "scheme_code": "BPVGK",
+        "name": "Pre-Matric Scholarship Scheme For ST Student",
+        "short_name": "Pre-Matric ST",
+        "department_code": "MOTA",
+        "category_name": "Pre Matric Scholarship",
+        "scheme_type": "Centrally Sponsored Scheme",
+        "description": "Pre-Matric Scholarship for ST students studying in Class 9 and 10.",
+        "overview": "Financial assistance for ST students studying in Class 9 and 10 to reduce dropout rates.",
+        "application_mode": "Online",
+        "official_scheme_url": "https://dbttribal.gov.in/AllScheme.aspx",
+        "official_application_url": "https://dbttribal.gov.in/",
+        "gr_url": None,
+        "academic_year": "2025-2026",
+        "application_start_date": "2025-07-01",
+        "application_end_date": "2025-12-31",
+        "renewal_available": True,
+        "status": "published",
+        "verification_status": "verified",
+        "source_url": "https://dbttribal.gov.in/AllScheme.aspx",
+        "source_type": "dbt_tribal",
+        "source_last_verified_at": "2025-01-15T00:00:00+00:00",
+        "eligibility": {
+            "category_requirement": "ST (Scheduled Tribe)",
+            "residency_requirement": "As per state/UT norms",
+            "course_requirement": "Class 9 and 10",
+            "institution_requirement": "Recognized schools",
+            "max_income": 200000,
+            "income_period": "annual",
+            "other_conditions": "ST category certificate required. Family annual income should not exceed Rs. 2,00,000. Regular attendance required."
+        },
+        "benefits": [
+            {
+                "benefit_type": "maintenance_allowance",
+                "description": "Monthly maintenance allowance for hostellers and day scholars",
+                "amount": None,
+                "amount_currency": "INR",
+                "amount_period": "monthly",
+                "coverage": "As per scheme norms",
+                "hosteller_amount": None,
+                "day_scholar_amount": None,
+            }
+        ],
+        "documents": [
+            {"document_name": "Aadhaar Card", "description": "Identity proof", "is_mandatory": True, "academic_year": "2025-2026", "source_text": "Aadhaar card copy"},
+            {"document_name": "Caste Certificate", "description": "ST category certificate", "is_mandatory": True, "academic_year": "2025-2026", "source_text": "ST caste certificate"},
+            {"document_name": "Domicile Certificate", "description": "State domicile proof", "is_mandatory": True, "academic_year": "2025-2026", "source_text": "Domicile certificate"},
+            {"document_name": "Income Certificate", "description": "Family annual income certificate", "is_mandatory": True, "academic_year": "2025-2026", "source_text": "Income certificate"},
+        ],
+        "sources": [{
+            "source_type": "dbt_tribal",
+            "source_url": "https://dbttribal.gov.in/AllScheme.aspx",
+            "gr_url": None,
+            "source_title": "Pre-Matric Scholarship Scheme For ST Student",
+            "verification_status": "verified",
+        }],
+    },
+    {
+        "scheme_code": "A023B",
+        "name": "Top Class Education For ST Students",
+        "short_name": "Top Class ST",
+        "department_code": "MOTA",
+        "category_name": "Fellowship",
+        "scheme_type": "Central Sector Scheme",
+        "description": "Top Class Education scheme for ST students pursuing professional courses in premier institutions.",
+        "overview": "Financial support for meritorious ST students pursuing professional courses in premier institutions like IITs, IIMs, NITs, etc.",
+        "application_mode": "Online",
+        "official_scheme_url": "https://dbttribal.gov.in/AllScheme.aspx",
+        "official_application_url": "https://dbttribal.gov.in/",
+        "gr_url": None,
+        "academic_year": "2025-2026",
+        "application_start_date": "2025-07-01",
+        "application_end_date": "2025-12-31",
+        "renewal_available": True,
+        "status": "published",
+        "verification_status": "verified",
+        "source_url": "https://dbttribal.gov.in/AllScheme.aspx",
+        "source_type": "dbt_tribal",
+        "source_last_verified_at": "2025-01-15T00:00:00+00:00",
+        "eligibility": {
+            "category_requirement": "ST (Scheduled Tribe)",
+            "residency_requirement": "As per scheme norms",
+            "course_requirement": "Professional courses in notified institutions (IITs, IIMs, NITs, etc.)",
+            "institution_requirement": "Notified top-class institutions",
             "max_income": 800000,
             "income_period": "annual",
-            "other_conditions": "Applicant must be Maharashtra domicile. Family annual income should not exceed Rs. 8,00,000. Admission through CAP round. Not applicable for management quota seats."
+            "other_conditions": "Admission in notified institutions. Family annual income should not exceed Rs. 8,00,000. Merit-based selection."
         },
         "benefits": [
             {
                 "benefit_type": "tuition_fee",
-                "description": "Full tuition fee reimbursement as approved by Fee Regulating Authority",
-                "amount": 150000,
+                "description": "Full tuition fee and non-refundable charges",
+                "amount": None,
                 "amount_currency": "INR",
                 "amount_period": "annual",
-                "coverage": "Full tuition fee",
+                "coverage": "Full tuition fee as per actuals",
+            },
+            {
+                "benefit_type": "living_expenses",
+                "description": "Living expenses allowance",
+                "amount": None,
+                "amount_currency": "INR",
+                "amount_period": "annual",
+                "coverage": "As per scheme norms",
+            }
+        ],
+        "documents": [
+            {"document_name": "Aadhaar Card", "description": "Identity proof", "is_mandatory": True, "academic_year": "2025-2026", "source_text": "Aadhaar card copy"},
+            {"document_name": "Caste Certificate", "description": "ST category certificate", "is_mandatory": True, "academic_year": "2025-2026", "source_text": "ST caste certificate"},
+            {"document_name": "Income Certificate", "description": "Family annual income certificate", "is_mandatory": True, "academic_year": "2025-2026", "source_text": "Income certificate"},
+            {"document_name": "Admission Letter", "description": "Admission proof in notified institution", "is_mandatory": True, "academic_year": "2025-2026", "source_text": "Admission letter from notified institution"},
+        ],
+        "sources": [{
+            "source_type": "dbt_tribal",
+            "source_url": "https://dbttribal.gov.in/AllScheme.aspx",
+            "gr_url": None,
+            "source_title": "Top Class Education For ST Students",
+            "verification_status": "verified",
+        }],
+    },
+    {
+        "scheme_code": "ARG45",
+        "name": "National Fellowship for ST Students",
+        "short_name": "National Fellowship ST",
+        "department_code": "MOTA",
+        "category_name": "Fellowship",
+        "scheme_type": "Central Sector Scheme",
+        "description": "National Fellowship for ST students pursuing M.Phil/Ph.D. in universities/institutions.",
+        "overview": "Fellowship for ST students pursuing higher research studies (M.Phil/Ph.D.) in recognized universities.",
+        "application_mode": "Online",
+        "official_scheme_url": "https://dbttribal.gov.in/AllScheme.aspx",
+        "official_application_url": "https://dbttribal.gov.in/",
+        "gr_url": None,
+        "academic_year": "2025-2026",
+        "application_start_date": "2025-07-01",
+        "application_end_date": "2025-12-31",
+        "renewal_available": True,
+        "status": "published",
+        "verification_status": "verified",
+        "source_url": "https://dbttribal.gov.in/AllScheme.aspx",
+        "source_type": "dbt_tribal",
+        "source_last_verified_at": "2025-01-15T00:00:00+00:00",
+        "eligibility": {
+            "category_requirement": "ST (Scheduled Tribe)",
+            "residency_requirement": "As per scheme norms",
+            "course_requirement": "M.Phil/Ph.D. in recognized universities",
+            "institution_requirement": "Recognized universities/institutions",
+            "max_income": None,
+            "income_period": "annual",
+            "other_conditions": "For M.Phil/Ph.D. students. NET/JRF qualified or as per UGC norms. No income ceiling for fellowship."
+        },
+        "benefits": [
+            {
+                "benefit_type": "fellowship",
+                "description": "Monthly fellowship amount for research scholars",
+                "amount": None,
+                "amount_currency": "INR",
+                "amount_period": "monthly",
+                "coverage": "As per UGC norms for JRF/SRF",
+            }
+        ],
+        "documents": [
+            {"document_name": "Aadhaar Card", "description": "Identity proof", "is_mandatory": True, "academic_year": "2025-2026", "source_text": "Aadhaar card copy"},
+            {"document_name": "Caste Certificate", "description": "ST category certificate", "is_mandatory": True, "academic_year": "2025-2026", "source_text": "ST caste certificate"},
+            {"document_name": "Income Certificate", "description": "Family annual income certificate", "is_mandatory": True, "academic_year": "2025-2026", "source_text": "Income certificate (if applicable)"},
+            {"document_name": "Admission Letter", "description": "Proof of admission in M.Phil/Ph.D.", "is_mandatory": True, "academic_year": "2025-2026", "source_text": "Admission letter from university"},
+        ],
+        "sources": [{
+            "source_type": "dbt_tribal",
+            "source_url": "https://dbttribal.gov.in/AllScheme.aspx",
+            "gr_url": None,
+            "source_title": "National Fellowship for ST Students",
+            "verification_status": "verified",
+        }],
+    },
+    {
+        "scheme_code": "AZKMI",
+        "name": "National Overseas Scholarship Scheme",
+        "short_name": "Overseas Scholarship ST",
+        "department_code": "MOTA",
+        "category_name": "Fellowship",
+        "scheme_type": "Central Sector Scheme",
+        "description": "National Overseas Scholarship for ST students for higher studies abroad.",
+        "overview": "Financial assistance for ST students selected for higher studies (Masters/Ph.D.) abroad in specified fields.",
+        "application_mode": "Online",
+        "official_scheme_url": "https://dbttribal.gov.in/AllScheme.aspx",
+        "official_application_url": "https://dbttribal.gov.in/",
+        "gr_url": None,
+        "academic_year": "2025-2026",
+        "application_start_date": "2025-07-01",
+        "application_end_date": "2025-12-31",
+        "renewal_available": True,
+        "status": "published",
+        "verification_status": "verified",
+        "source_url": "https://dbttribal.gov.in/AllScheme.aspx",
+        "source_type": "dbt_tribal",
+        "source_last_verified_at": "2025-01-15T00:00:00+00:00",
+        "eligibility": {
+            "category_requirement": "ST (Scheduled Tribe)",
+            "residency_requirement": "Indian national",
+            "course_requirement": "Masters/Ph.D. in specified fields abroad",
+            "institution_requirement": "Accredited foreign universities",
+            "max_income": 800000,
+            "income_period": "annual",
+            "other_conditions": "For Masters/Ph.D. abroad in specified fields. Family income should not exceed Rs. 8,00,000. Age limit as per scheme guidelines."
+        },
+        "benefits": [
+            {
+                "benefit_type": "tuition_fee",
+                "description": "Tuition fee as per actuals",
+                "amount": None,
+                "amount_currency": "INR",
+                "amount_period": "annual",
+                "coverage": "Actual tuition fee",
             },
             {
                 "benefit_type": "maintenance_allowance",
-                "description": "Maintenance allowance for hostellers and day scholars",
-                "amount": 12000,
+                "description": "Monthly maintenance allowance",
+                "amount": None,
                 "amount_currency": "INR",
-                "amount_period": "annual",
-                "coverage": "Hostellers: Rs. 1,200/month; Day scholars: Rs. 550/month",
-                "hosteller_amount": 14400,
-                "day_scholar_amount": 6600,
+                "amount_period": "monthly",
+                "coverage": "As per scheme norms",
             }
         ],
         "documents": [
             {"document_name": "Aadhaar Card", "description": "Identity proof", "is_mandatory": True, "academic_year": "2025-2026", "source_text": "Aadhaar card copy"},
-            {"document_name": "Domicile Certificate", "description": "Maharashtra domicile proof", "is_mandatory": True, "academic_year": "2025-2026", "source_text": "Domicile certificate"},
-            {"document_name": "Income Certificate", "description": "Family annual income certificate", "is_mandatory": True, "academic_year": "2025-2026", "source_text": "Income certificate issued by competent authority"},
-            {"document_name": "Caste/EBC Certificate", "description": "EBC category certificate", "is_mandatory": True, "academic_year": "2025-2026", "source_text": "EBC certificate from competent authority"},
-            {"document_name": "Previous Marksheet", "description": "Qualifying examination marksheet", "is_mandatory": True, "academic_year": "2025-2026", "source_text": "Previous year marksheet"},
-            {"document_name": "Admission Receipt", "description": "Proof of admission through CAP", "is_mandatory": True, "academic_year": "2025-2026", "source_text": "Admission allotment letter"},
-            {"document_name": "Fee Receipt", "description": "College fee receipt", "is_mandatory": True, "academic_year": "2025-2026", "source_text": "Current year fee receipt"},
-            {"document_name": "Bank Passbook", "description": "Bank account details for DBT", "is_mandatory": True, "academic_year": "2025-2026", "source_text": "Cancelled cheque or bank passbook first page"},
-        ],
-        "sources": [{
-            "source_type": "mahadbt",
-            "source_url": "https://mahadbt.maharashtra.gov.in/ScholarShip/SchemeDetails?schemeCode=RCSMS_EBC",
-            "gr_url": "https://mahadbt.maharashtra.gov.in/GR/RCSMS_EBC.pdf",
-            "source_title": "Rajarshi Chhatrapati Shahu Maharaj Shikshan Shulkh Shishyavrutti Yojna (EBC)",
-            "verification_status": "verified",
-        }],
-    },
-    {
-        "scheme_code": "MSB-DPDD-DTE",
-        "name": "Dr. Panjabrao Deshmukh Vastigruh Nirvah Bhatta Yojna (DTE)",
-        "short_name": "Deshmukh Hostel Allowance DTE",
-        "department_code": "DTE",
-        "category_name": "Maintenance Allowance",
-        "scheme_type": "Maintenance Allowance",
-        "description": "Hostel maintenance allowance for students in technical education.",
-        "overview": "Provides hostel maintenance allowance to students pursuing technical education in recognized institutions.",
-        "application_mode": "Online",
-        "official_scheme_url": "https://mahadbt.maharashtra.gov.in/ScholarShip/SchemeDetails?schemeCode=DPDD_DTE",
-        "official_application_url": "https://mahadbt.maharashtra.gov.in/",
-        "gr_url": "https://mahadbt.maharashtra.gov.in/GR/DPDD_DTE.pdf",
-        "academic_year": "2025-2026",
-        "application_start_date": "2025-07-15",
-        "application_end_date": "2026-01-31",
-        "renewal_available": True,
-        "status": "published",
-        "verification_status": "verified",
-        "source_url": "https://mahadbt.maharashtra.gov.in/ScholarShip/SchemeDetails?schemeCode=DPDD_DTE",
-        "source_type": "mahadbt",
-        "source_last_verified_at": datetime.now(timezone.utc).isoformat(),
-        "eligibility": {
-            "category_requirement": "All categories",
-            "residency_requirement": "Domicile of Maharashtra",
-            "course_requirement": "Technical courses (Engineering, Pharmacy, Architecture, HMCT, etc.)",
-            "institution_requirement": "Recognized institutions in Maharashtra",
-            "income_period": "annual",
-            "max_income": 800000,
-            "other_conditions": "Student must be staying in hostel attached to the institution. Not applicable for day scholars. Family income should not exceed Rs. 8,00,000 per annum."
-        },
-        "benefits": [
-            {
-                "benefit_type": "hostel_allowance",
-                "description": "Monthly hostel maintenance allowance",
-                "amount": 30000,
-                "amount_currency": "INR",
-                "amount_period": "annual",
-                "coverage": "Rs. 3,000 per month for 10 months",
-                "hosteller_amount": 30000,
-                "day_scholar_amount": 0,
-            }
-        ],
-        "documents": [
-            {"document_name": "Aadhaar Card", "description": "Identity proof", "is_mandatory": True, "academic_year": "2025-2026", "source_text": "Aadhaar card copy"},
-            {"document_name": "Domicile Certificate", "description": "Maharashtra domicile proof", "is_mandatory": True, "academic_year": "2025-2026", "source_text": "Domicile certificate"},
+            {"document_name": "Caste Certificate", "description": "ST category certificate", "is_mandatory": True, "academic_year": "2025-2026", "source_text": "ST caste certificate"},
             {"document_name": "Income Certificate", "description": "Family annual income certificate", "is_mandatory": True, "academic_year": "2025-2026", "source_text": "Income certificate"},
-            {"document_name": "Hostel Admission Receipt", "description": "Proof of hostel admission", "is_mandatory": True, "academic_year": "2025-2026", "source_text": "Hostel admission/allotment letter"},
-            {"document_name": "Bonafide Certificate", "description": "Institution bonafide certificate", "is_mandatory": True, "academic_year": "2025-2026", "source_text": "Bonafide certificate from institution"},
+            {"document_name": "Admission Letter", "description": "Admission offer from foreign university", "is_mandatory": True, "academic_year": "2025-2026", "source_text": "Admission letter from accredited foreign university"},
         ],
         "sources": [{
-            "source_type": "mahadbt",
-            "source_url": "https://mahadbt.maharashtra.gov.in/ScholarShip/SchemeDetails?schemeCode=DPDD_DTE",
-            "gr_url": "https://mahadbt.maharashtra.gov.in/GR/DPDD_DTE.pdf",
-            "source_title": "Dr. Panjabrao Deshmukh Vastigruh Nirvah Bhatta Yojna (DTE)",
-            "verification_status": "verified",
-        }],
-    },
-    {
-        "scheme_code": "MSB-PMS-VJNT",
-        "name": "Post Matric Scholarship to VJNT Students",
-        "short_name": "PMS VJNT",
-        "department_code": "OBCW",
-        "category_name": "Post Matric Scholarship",
-        "scheme_type": "Post Matric Scholarship",
-        "description": "Post-matric scholarship for VJNT (Vimukta Jati, Nomadic Tribes) category students.",
-        "overview": "Financial assistance for VJNT students pursuing post-matriculation studies.",
-        "application_mode": "Online",
-        "official_scheme_url": "https://mahadbt.maharashtra.gov.in/ScholarShip/SchemeDetails?schemeCode=PMS_VJNT",
-        "official_application_url": "https://mahadbt.maharashtra.gov.in/",
-        "gr_url": "https://mahadbt.maharashtra.gov.in/GR/PMS_VJNT.pdf",
-        "academic_year": "2025-2026",
-        "application_start_date": "2025-06-15",
-        "application_end_date": "2026-01-31",
-        "renewal_available": True,
-        "status": "published",
-        "verification_status": "verified",
-        "source_url": "https://mahadbt.maharashtra.gov.in/ScholarShip/SchemeDetails?schemeCode=PMS_VJNT",
-        "source_type": "mahadbt",
-        "source_last_verified_at": datetime.now(timezone.utc).isoformat(),
-        "eligibility": {
-            "category_requirement": "VJNT (Vimukta Jati / Nomadic Tribes)",
-            "residency_requirement": "Domicile of Maharashtra",
-            "course_requirement": "Post-matriculation courses (Class 11 onwards)",
-            "institution_requirement": "Recognized institutions",
-            "max_income": 1000000,
-            "income_period": "annual",
-            "other_conditions": "VJNT category certificate required. Family annual income should not exceed Rs. 10,00,000. Regular attendance required."
-        },
-        "benefits": [
-            {
-                "benefit_type": "maintenance_allowance",
-                "description": "Maintenance allowance based on course type",
-                "amount": 20000,
-                "amount_currency": "INR",
-                "amount_period": "annual",
-                "coverage": "Variable based on course and hosteller/day scholar status",
-                "hosteller_amount": 25000,
-                "day_scholar_amount": 15000,
-            }
-        ],
-        "documents": [
-            {"document_name": "Aadhaar Card", "description": "Identity proof", "is_mandatory": True, "academic_year": "2025-2026", "source_text": "Aadhaar card copy"},
-            {"document_name": "VJNT Category Certificate", "description": "VJNT caste certificate", "is_mandatory": True, "academic_year": "2025-2026", "source_text": "VJNT category certificate"},
-            {"document_name": "Domicile Certificate", "description": "Maharashtra domicile proof", "is_mandatory": True, "academic_year": "2025-2026", "source_text": "Domicile certificate"},
-            {"document_name": "Income Certificate", "description": "Family annual income certificate", "is_mandatory": True, "academic_year": "2025-2026", "source_text": "Income certificate"},
-        ],
-        "sources": [{
-            "source_type": "mahadbt",
-            "source_url": "https://mahadbt.maharashtra.gov.in/ScholarShip/SchemeDetails?schemeCode=PMS_VJNT",
-            "gr_url": "https://mahadbt.maharashtra.gov.in/GR/PMS_VJNT.pdf",
-            "source_title": "Post Matric Scholarship to VJNT Students",
+            "source_type": "dbt_tribal",
+            "source_url": "https://dbttribal.gov.in/AllScheme.aspx",
+            "gr_url": None,
+            "source_title": "National Overseas Scholarship Scheme",
             "verification_status": "verified",
         }],
     },
@@ -226,6 +325,7 @@ async def run_seed_import(
     dry_run: bool = False,
 ) -> dict:
     """Run the seed import with verified schemes."""
+    from .importer import SchemeImporter
     importer = SchemeImporter(
         supabase_url=supabase_url,
         supabase_service_key=supabase_service_key,
@@ -237,11 +337,18 @@ async def run_seed_import(
 
 async def run_dry_run(supabase_url: str, supabase_service_key: str) -> dict:
     """Run seed import in dry-run mode."""
-    return await run_seed_import(supabase_url, supabase_service_key, dry_run=True)
+    from .importer import SchemeImporter
+    importer = SchemeImporter(
+        supabase_url=supabase_url,
+        supabase_service_key=supabase_service_key,
+        dry_run=True,
+    )
+    return await SchemeImporter(supabase_url, supabase_service_key, dry_run=True).import_batch(SEED_SCHEMES)
 
 
 if __name__ == "__main__":
     import os
+    import sys
     from dotenv import load_dotenv
     
     load_dotenv()
