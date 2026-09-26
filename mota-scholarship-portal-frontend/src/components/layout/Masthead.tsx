@@ -3,62 +3,93 @@ import logo from '../../assets/logo.png';
 
 export function Masthead() {
   return (
-    <header className="bg-white border-b border-slate-200 shadow-sm">
-      <div className="mx-auto max-w-full px-3 sm:px-4 lg:px-6">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 py-2.5">
-          <div className="flex items-center gap-3 flex-shrink-0 min-w-0">
+    <header className="masthead-gradient relative border-b border-slate-200 shadow-sm">
+      {/* No horizontal padding here on purpose: the 32px left and 20px right
+          insets are owned by columns 1 and 4, so container padding would
+          silently add to the edge spacing the spec asks for. */}
+      <div className="mx-auto max-w-full">
+        {/*
+          Four balanced columns in a single flex row, per spec.
+          Sizing, spacing and the portrait/nav gap all live in index.css
+          (.masthead-col-*); nothing here sets a dimension.
+
+            1. identity  32% cap  emblem + ministry text
+            2. title     22% cap  NATIONAL TRIBAL FELLOWSHIP / SCHOLARSHIP PORTAL
+            3. logos     26% cap  G20 + Azadi Ka Amrit Mahotsav
+            4. portrait  20% cap  Modi, bottom-right
+
+          The columns are content-sized and capped at those percentages, so
+          justify-content: space-between (set in CSS) spreads the leftover
+          width evenly and all three inter-column gaps come out equal. If they
+          were flex-basis percentages instead they would total 100%, leaving
+          space-between nothing to distribute and the gaps would be accidental
+          leftovers of each column's alignment - visibly uneven.
+        */}
+        <div className="masthead-hero">
+          {/* Column 1 - government emblem + ministry text */}
+          <div className="masthead-col masthead-col-identity">
             <div className="relative flex-shrink-0">
               <img
                 src={logo}
                 alt="Government of India Emblem"
-                className="h-16 w-auto object-contain sm:h-20"
+                className="masthead-emblem"
               />
             </div>
-            <div className="min-w-0 hidden sm:block">
-              <div className="flex items-center gap-2 text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-slate-600">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider text-slate-600">
                 <span>{SITE.govtLineHi}</span>
                 <span className="text-slate-400">|</span>
                 <span>{SITE.govtLineEn}</span>
               </div>
-              <h1 className="text-base sm:text-lg font-bold text-gov-blue-dark leading-tight mt-0.5">
-                {SITE.nameHi}
-              </h1>
-              <div className="text-sm font-semibold text-slate-800 leading-tight">{SITE.nameEn}</div>
-              <div className="text-[10px] sm:text-xs font-medium text-gov-saffron-dark mt-0.5">
-                {SITE.portalName}
-              </div>
+              <h1 className="text-base font-bold leading-tight text-gov-blue-dark">{SITE.nameHi}</h1>
+              <div className="text-sm font-semibold leading-tight text-slate-800">{SITE.nameEn}</div>
+              <div className="text-[10px] font-medium text-gov-saffron-dark">{SITE.portalName}</div>
             </div>
           </div>
 
-          <div className="hidden md:flex flex-1 items-center justify-center px-4">
-            <div className="text-center">
-              <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider bg-amber-50 border border-amber-200 text-amber-700 px-2 py-0.5 rounded">
-                <span className="w-1.5 h-1.5 rounded-full bg-gov-saffron" />
-                {SITE.prototypeLabel}
-              </span>
-              <div className="text-sm sm:text-base font-black text-gov-blue-dark tracking-wide mt-1">
-                {SITE.mastheadLine}
-              </div>
-              <div className="text-[10px] text-gov-green font-semibold">{SITE.mastheadSubline}</div>
-            </div>
+          {/* Column 2 - portal title, centred on both axes, on ONE row.
+              Serif (Georgia/Cambria) rather than the page sans, so the title
+              reads as a title instead of blending into the ministry text next
+              to it. The two phrases are separated by a middot rather than run
+              together, because a single 41-character uppercase serif run is
+              genuinely hard to parse without a visible phrase break.
+
+              This column carries no max-width cap (unlike columns 1, 3 and 4).
+              The 22% it was previously capped at came from the four-column
+              split, but a one-line title needs ~402px at 13px, which the 22%
+              cap - 282px at 1280px - would have forced to wrap. Nothing here
+              uses flex-grow, so dropping the cap simply lets the column size
+              to its content; the leftover width still goes to space-between. */}
+          <div className="masthead-col masthead-col-title hidden lg:flex">
+            <span className="font-serif text-[13px] font-bold uppercase leading-tight tracking-[0.06em] text-gov-blue-dark">
+              National Tribal Fellowship
+              <span className="mx-[0.45em] text-slate-400">·</span>
+              Scholarship Portal
+            </span>
           </div>
 
-          <div className="w-full sm:w-auto flex-shrink-0">
-            <div className="flex flex-col sm:flex-row items-end sm:items-center justify-end gap-2">
-              <div className="hidden sm:flex flex-col items-end gap-0.5 p-2 rounded-lg bg-amber-50 border border-amber-100">
-                <div className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-amber-700">
-                  <span className="w-1.5 h-1.5 rounded-full bg-gov-saffron" />
-                  {SITE.helpdeskLabel}
-                </div>
-                <div className="text-base font-bold text-gov-blue leading-none">{SITE.helpdeskPhone}</div>
-                <div className="text-[10px] text-slate-600">{SITE.helpdeskHours}</div>
-              </div>
-              <div className="flex items-center gap-1.5 p-2 rounded-lg bg-amber-50 border border-amber-100 sm:hidden w-full justify-center">
-                <span className="w-1.5 h-1.5 rounded-full bg-gov-saffron" />
-                <span className="text-[10px] font-bold text-amber-700">{SITE.helpdeskLabel}</span>
-                <span className="text-sm font-bold text-gov-blue">{SITE.helpdeskPhone}</span>
-              </div>
-            </div>
+          {/* Column 3 - G20 + Azadi Ka Amrit Mahotsav, side by side.
+              Dropped below 1280px: the pair needs 342px and stops fitting. */}
+          <div className="masthead-col masthead-col-logos hidden xl:flex">
+            <img
+              src="/images/g20-logo.png"
+              alt="G20 Presidency of India logo"
+              className="masthead-logo-g20"
+            />
+            <img
+              src="/images/azadi75.png"
+              alt="Azadi Ka Amrit Mahotsav logo"
+              className="masthead-logo-azadi"
+            />
+          </div>
+
+          {/* Column 4 - PM portrait, bottom-right, 6px clear of the nav bar */}
+          <div className="masthead-col masthead-col-portrait hidden sm:flex">
+            <img
+              src="/images/modi.png"
+              alt="Shri Narendra Modi, Prime Minister of India"
+              className="masthead-portrait"
+            />
           </div>
         </div>
       </div>

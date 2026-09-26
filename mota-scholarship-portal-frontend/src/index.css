@@ -30,6 +30,169 @@
     height: 4px;
   }
 
+  /* ---- Main hero header (Masthead) ---------------------------------------
+     Four balanced flex columns, as specified:
+
+       1. identity  (32% cap)  emblem + ministry text, 18px left padding
+       2. title     (uncapped)  NATIONAL TRIBAL FELLOWSHIP · SCHOLARSHIP PORTAL
+       3. logos     (26% cap)  G20 58px + Azadi 54px, 28px apart
+       4. portrait  (20% cap)  Modi, 96px, bottom-right, 20px right padding
+
+     --hero-h is the single source of truth for the bar's height, and the
+     portrait is derived from it as calc(--hero-h - --portrait-gap) rather than
+     being set independently. That coupling is what guarantees the photo can
+     never overlap the blue navigation bar: the portrait height, the gap above
+     the nav and the hero height are one unit, so changing --hero-h at any
+     breakpoint moves all three together. At the base size this resolves to
+     100px hero = 96px portrait + 4px gap.
+
+     The percentage widths above are applied as max-width CAPS rather than
+     flex-basis. With flex-basis the four columns always total 100%, which
+     leaves justify-content: space-between with no free space to distribute -
+     the gaps between columns would then be accidental leftovers of each
+     column's internal alignment and would be visibly unequal. Sizing columns to
+     their content and capping them at the stated percentages lets
+     space-between do its job, so all three gaps come out identical while the
+     32/22/26/20 proportions still act as the upper bound. */
+  .masthead-hero {
+    --hero-h: 100px;
+    --portrait-gap: 4px;
+    --g20-h: 58px;
+    --azadi-h: 54px;
+    --logo-pair-gap: 28px;
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: var(--hero-h);
+    gap: 1rem;
+  }
+
+  .masthead-col {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    flex: 0 1 auto;
+  }
+
+  /* Column 1 - emblem + ministry text, small left padding, text centred. */
+  .masthead-col-identity {
+    gap: 12px;
+    padding-left: 18px;
+  }
+
+  /* Column 2 - portal title, centred on both axes. Single line, so there is
+     no inter-line gap and nothing to justify: the one span is the whole
+     content, so align-items:stretch and text-align-last:justify would both be
+     no-ops. Plain centring is all this needs. */
+  .masthead-col-title {
+    flex-direction: column;
+    justify-content: center;
+    text-align: center;
+    padding: 0 20px;
+  }
+
+  /* Column 3 - the two emblem marks, side by side, optically centred. */
+  .masthead-col-logos {
+    justify-content: center;
+    gap: var(--logo-pair-gap);
+  }
+
+  /* Column 4 - portrait, bottom-right, 20px right padding. align-self:flex-end
+     overrides the row's align-items:center so the photo sits on the bottom
+     edge, and the bottom padding is the gap to the navigation bar. */
+  .masthead-col-portrait {
+    align-self: flex-end;
+    justify-content: flex-end;
+    align-items: flex-end;
+    padding-right: 20px;
+    padding-bottom: var(--portrait-gap);
+  }
+
+  .masthead-hero img {
+    width: auto;
+    max-width: 100%;
+    object-fit: contain;
+    flex-shrink: 0;
+  }
+
+  .masthead-emblem {
+    height: 40px;
+  }
+
+  .masthead-logo-g20 {
+    height: var(--g20-h);
+  }
+
+  .masthead-logo-azadi {
+    height: var(--azadi-h);
+  }
+
+  .masthead-portrait {
+    height: calc(var(--hero-h) - var(--portrait-gap));
+  }
+
+  /* Column caps, applied at >=1280px only. The title column is deliberately
+     absent: it is a single 41-character line needing ~402px at 13px, and the
+     22% it would otherwise be capped at resolves to 282px at 1280px, which
+     would wrap it. No column here uses flex-grow, so an uncapped column simply
+     sizes to its content and the leftover width still goes to space-between. */
+  @media (min-width: 1280px) {
+    .masthead-col-identity {
+      max-width: 32%;
+    }
+    .masthead-col-logos {
+      max-width: 26%;
+    }
+    .masthead-col-portrait {
+      max-width: 20%;
+    }
+  }
+
+  /* Government of India tricolour wash, per spec: #FDE7C2 -> #FFFFFF -> #DDF6D6.
+     The two extra intermediate stops are what make it read as slightly richer
+     than a bare three-stop ramp, while the endpoints and the white centre stay
+     exactly as specified. The diagonal wave is a separate ::before layer so it
+     can be tuned without touching the colour stops. */
+  .masthead-gradient {
+    position: relative;
+    background-color: #ffffff;
+    background-image: linear-gradient(
+      90deg,
+      #fde7c2 0%,
+      #fef4e4 28%,
+      #ffffff 52%,
+      #eaf7e2 74%,
+      #ddf6d6 100%
+    );
+  }
+
+  /* Very subtle diagonal wave: two repeating-linear-gradients crossed at
+     +60deg / -60deg. The crossing beats against itself to give a soft
+     wave-like interference instead of plain stripes. Low opacity, and
+     pointer-events:none so it can never eat a click on the header. */
+  .masthead-gradient::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.5;
+    background-image:
+      repeating-linear-gradient(
+        60deg,
+        rgba(255, 255, 255, 0) 0 16px,
+        rgba(255, 255, 255, 0.5) 16px 32px,
+        rgba(255, 255, 255, 0) 32px 48px
+      ),
+      repeating-linear-gradient(
+        -60deg,
+        rgba(255, 255, 255, 0) 0 16px,
+        rgba(255, 255, 255, 0.5) 16px 32px,
+        rgba(255, 255, 255, 0) 32px 48px
+      );
+  }
+
   .gov-link {
     color: #0b3b75;
     text-decoration: underline;
@@ -144,6 +307,36 @@
   }
   html {
     scroll-behavior: auto;
+  }
+}
+
+/* The hero is a single flex row: [text] [G20] [Azadi] [portrait]. The image
+   trio is right-weighted, and --masthead-gap keeps all three gaps identical.
+   Below lg the logo pair is hidden and only text + portrait remain. */
+/* Responsive ladder. Only --hero-h moves; the portrait is derived from it, so
+   the 6px gap to the navigation bar holds at every width. The logo pair is
+   hidden below 1280px (see the xl: classes in Masthead.tsx) because G20 95px +
+   Azadi 90px + 28px needs 342px, which stops fitting alongside the ministry
+   block and title at that width. */
+@media (max-width: 1279px) {
+  .masthead-hero {
+    --hero-h: 94px;
+  }
+}
+
+@media (max-width: 1023px) {
+  .masthead-hero {
+    --hero-h: 88px;
+  }
+}
+
+@media (max-width: 767px) {
+  .masthead-hero {
+    --hero-h: 80px;
+  }
+
+  .masthead-emblem {
+    height: 34px;
   }
 }
 
