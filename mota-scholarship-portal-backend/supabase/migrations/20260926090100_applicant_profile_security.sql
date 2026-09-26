@@ -463,148 +463,153 @@ begin
       v_total_weight := v_total_weight + greatest(v_rule.weight, 0);
 
       -- Presence check ---------------------------------------------------------
-      v_present := case v_rule.field_key
+      --
+      -- Matched on section AND field_key, not field_key alone. 'admission_date' is
+      -- seeded under both current_course and hostel, and a CASE *expression* does
+      -- not reject duplicate WHEN values -- PostgreSQL silently takes the first
+      -- match, which made the hostel rule read current_courses.admission_date.
+      v_present := case v_section || '.' || v_rule.field_key
         -- Personal
-        when 'full_name' then nullif(btrim(v_profile.full_name), '') is not null
-        when 'mobile_number' then nullif(btrim(v_profile.mobile_number), '') is not null
-        when 'email' then nullif(btrim(v_profile.email), '') is not null
-        when 'date_of_birth' then v_profile.date_of_birth is not null
-        when 'gender' then nullif(btrim(v_profile.gender), '') is not null
-        when 'religion' then nullif(btrim(v_profile.religion), '') is not null
-        when 'marital_status' then nullif(btrim(v_profile.marital_status), '') is not null
-        when 'applicant_full_name_as_per_marksheet' then nullif(btrim(v_profile.applicant_full_name_as_per_marksheet), '') is not null
-        when 'parent_guardian_mobile' then nullif(btrim(v_profile.parent_guardian_mobile), '') is not null
-        when 'aadhaar_last4' then nullif(btrim(v_profile.aadhaar_last4), '') is not null
+        when 'personal.full_name' then nullif(btrim(v_profile.full_name), '') is not null
+        when 'personal.mobile_number' then nullif(btrim(v_profile.mobile_number), '') is not null
+        when 'personal.email' then nullif(btrim(v_profile.email), '') is not null
+        when 'personal.date_of_birth' then v_profile.date_of_birth is not null
+        when 'personal.gender' then nullif(btrim(v_profile.gender), '') is not null
+        when 'personal.religion' then nullif(btrim(v_profile.religion), '') is not null
+        when 'personal.marital_status' then nullif(btrim(v_profile.marital_status), '') is not null
+        when 'personal.applicant_full_name_as_per_marksheet' then nullif(btrim(v_profile.applicant_full_name_as_per_marksheet), '') is not null
+        when 'personal.parent_guardian_mobile' then nullif(btrim(v_profile.parent_guardian_mobile), '') is not null
+        when 'personal.aadhaar_last4' then nullif(btrim(v_profile.aadhaar_last4), '') is not null
 
         -- Domicile
-        when 'is_maharashtra_domicile' then v_domicile.is_maharashtra_domicile is not null
-        when 'has_domicile_certificate' then v_domicile.has_domicile_certificate is not null
-        when 'domicile_certificate_number' then nullif(btrim(v_domicile.certificate_number), '') is not null
-        when 'domicile_certificate_holder_name' then nullif(btrim(v_domicile.certificate_holder_name), '') is not null
-        when 'domicile_issuing_authority' then nullif(btrim(v_domicile.issuing_authority), '') is not null
-        when 'domicile_date_of_issue' then v_domicile.date_of_issue is not null
-        when 'domicile_document' then v_domicile.document_id is not null
+        when 'personal.is_maharashtra_domicile' then v_domicile.is_maharashtra_domicile is not null
+        when 'personal.has_domicile_certificate' then v_domicile.has_domicile_certificate is not null
+        when 'personal.domicile_certificate_number' then nullif(btrim(v_domicile.certificate_number), '') is not null
+        when 'personal.domicile_certificate_holder_name' then nullif(btrim(v_domicile.certificate_holder_name), '') is not null
+        when 'personal.domicile_issuing_authority' then nullif(btrim(v_domicile.issuing_authority), '') is not null
+        when 'personal.domicile_date_of_issue' then v_domicile.date_of_issue is not null
+        when 'personal.domicile_document' then v_domicile.document_id is not null
 
         -- Income
-        when 'annual_income' then v_income.annual_income is not null
-        when 'has_income_certificate' then v_income.has_income_certificate is not null
-        when 'income_certificate_number' then nullif(btrim(v_income.certificate_number), '') is not null
-        when 'income_certificate_date' then v_income.certificate_date is not null
-        when 'income_issuing_authority' then nullif(btrim(v_income.issuing_authority), '') is not null
-        when 'income_document' then v_income.document_id is not null
+        when 'personal.annual_income' then v_income.annual_income is not null
+        when 'personal.has_income_certificate' then v_income.has_income_certificate is not null
+        when 'personal.income_certificate_number' then nullif(btrim(v_income.certificate_number), '') is not null
+        when 'personal.income_certificate_date' then v_income.certificate_date is not null
+        when 'personal.income_issuing_authority' then nullif(btrim(v_income.issuing_authority), '') is not null
+        when 'personal.income_document' then v_income.document_id is not null
 
         -- Personal eligibility
-        when 'is_salaried' then v_eligibility.is_salaried is not null
-        when 'job_type' then nullif(btrim(v_eligibility.job_type), '') is not null
-        when 'is_disabled' then v_eligibility.is_disabled is not null
-        when 'disability_type' then nullif(btrim(v_eligibility.disability_type), '') is not null
-        when 'has_disability_certificate' then v_eligibility.has_disability_certificate is not null
-        when 'disability_certificate_number' then nullif(btrim(v_eligibility.disability_certificate_number), '') is not null
-        when 'disability_document' then v_eligibility.disability_document_id is not null
-        when 'siblings_count' then v_eligibility.siblings_count is not null
+        when 'personal.is_salaried' then v_eligibility.is_salaried is not null
+        when 'personal.job_type' then nullif(btrim(v_eligibility.job_type), '') is not null
+        when 'personal.is_disabled' then v_eligibility.is_disabled is not null
+        when 'personal.disability_type' then nullif(btrim(v_eligibility.disability_type), '') is not null
+        when 'personal.has_disability_certificate' then v_eligibility.has_disability_certificate is not null
+        when 'personal.disability_certificate_number' then nullif(btrim(v_eligibility.disability_certificate_number), '') is not null
+        when 'personal.disability_document' then v_eligibility.disability_document_id is not null
+        when 'personal.siblings_count' then v_eligibility.siblings_count is not null
 
         -- Caste
-        when 'category' then nullif(btrim(v_caste.category), '') is not null
-        when 'caste' then nullif(btrim(v_caste.caste), '') is not null
-        when 'has_caste_certificate' then v_caste.has_caste_certificate is not null
-        when 'caste_certificate_number' then nullif(btrim(v_caste.certificate_number), '') is not null
-        when 'caste_certificate_holder_name' then nullif(btrim(v_caste.certificate_holder_name), '') is not null
-        when 'caste_issuing_authority' then nullif(btrim(v_caste.issuing_authority), '') is not null
-        when 'caste_date_of_issue' then v_caste.date_of_issue is not null
-        when 'caste_document' then v_caste.document_id is not null
+        when 'personal.category' then nullif(btrim(v_caste.category), '') is not null
+        when 'personal.caste' then nullif(btrim(v_caste.caste), '') is not null
+        when 'personal.has_caste_certificate' then v_caste.has_caste_certificate is not null
+        when 'personal.caste_certificate_number' then nullif(btrim(v_caste.certificate_number), '') is not null
+        when 'personal.caste_certificate_holder_name' then nullif(btrim(v_caste.certificate_holder_name), '') is not null
+        when 'personal.caste_issuing_authority' then nullif(btrim(v_caste.issuing_authority), '') is not null
+        when 'personal.caste_date_of_issue' then v_caste.date_of_issue is not null
+        when 'personal.caste_document' then v_caste.document_id is not null
 
         -- Bank
-        when 'aadhaar_linked' then exists (
+        when 'personal.aadhaar_linked' then exists (
           select 1 from public.bank_details b where b.applicant_id = v_applicant and b.aadhaar_linked is not null
         )
-        when 'bank_name' then exists (
+        when 'personal.bank_name' then exists (
           select 1 from public.bank_details b where b.applicant_id = v_applicant and nullif(btrim(b.bank_name), '') is not null
         )
-        when 'account_holder_name' then exists (
+        when 'personal.account_holder_name' then exists (
           select 1 from public.bank_details b where b.applicant_id = v_applicant and nullif(btrim(b.account_holder_name), '') is not null
         )
-        when 'account_number_last4' then exists (
+        when 'personal.account_number_last4' then exists (
           select 1 from public.bank_details b where b.applicant_id = v_applicant and nullif(btrim(b.account_number_last4), '') is not null
         )
-        when 'ifsc_code' then exists (
+        when 'personal.ifsc_code' then exists (
           select 1 from public.bank_details b where b.applicant_id = v_applicant and b.ifsc_code ~ '^[A-Z]{4}0[A-Z0-9]{6}$'
         )
-        when 'branch_name' then exists (
+        when 'personal.branch_name' then exists (
           select 1 from public.bank_details b where b.applicant_id = v_applicant and nullif(btrim(b.branch_name), '') is not null
         )
-        when 'account_type' then exists (
+        when 'personal.account_type' then exists (
           select 1 from public.bank_details b where b.applicant_id = v_applicant and nullif(btrim(b.account_type), '') is not null
         )
 
         -- Address
-        when 'permanent_address' then nullif(btrim(v_address.permanent_address), '') is not null
-        when 'permanent_state' then nullif(btrim(v_address.permanent_state), '') is not null
-        when 'permanent_district' then nullif(btrim(v_address.permanent_district), '') is not null
-        when 'permanent_taluka' then nullif(btrim(v_address.permanent_taluka), '') is not null
-        when 'permanent_village' then nullif(btrim(v_address.permanent_village), '') is not null
-        when 'permanent_pincode' then v_address.permanent_pincode ~ '^[0-9]{6}$'
-        when 'same_as_permanent' then v_address.same_as_permanent is not null
-        when 'correspondence_address' then nullif(btrim(v_address.correspondence_address), '') is not null
-        when 'correspondence_state' then nullif(btrim(v_address.correspondence_state), '') is not null
-        when 'correspondence_district' then nullif(btrim(v_address.correspondence_district), '') is not null
-        when 'correspondence_taluka' then nullif(btrim(v_address.correspondence_taluka), '') is not null
-        when 'correspondence_village' then nullif(btrim(v_address.correspondence_village), '') is not null
-        when 'correspondence_pincode' then v_address.correspondence_pincode ~ '^[0-9]{6}$'
+        when 'address.permanent_address' then nullif(btrim(v_address.permanent_address), '') is not null
+        when 'address.permanent_state' then nullif(btrim(v_address.permanent_state), '') is not null
+        when 'address.permanent_district' then nullif(btrim(v_address.permanent_district), '') is not null
+        when 'address.permanent_taluka' then nullif(btrim(v_address.permanent_taluka), '') is not null
+        when 'address.permanent_village' then nullif(btrim(v_address.permanent_village), '') is not null
+        when 'address.permanent_pincode' then v_address.permanent_pincode ~ '^[0-9]{6}$'
+        when 'address.same_as_permanent' then v_address.same_as_permanent is not null
+        when 'address.correspondence_address' then nullif(btrim(v_address.correspondence_address), '') is not null
+        when 'address.correspondence_state' then nullif(btrim(v_address.correspondence_state), '') is not null
+        when 'address.correspondence_district' then nullif(btrim(v_address.correspondence_district), '') is not null
+        when 'address.correspondence_taluka' then nullif(btrim(v_address.correspondence_taluka), '') is not null
+        when 'address.correspondence_village' then nullif(btrim(v_address.correspondence_village), '') is not null
+        when 'address.correspondence_pincode' then v_address.correspondence_pincode ~ '^[0-9]{6}$'
 
         -- Parents / guardian
-        when 'father_alive' then v_parents.father_alive is not null
-        when 'father_name' then nullif(btrim(v_parents.father_name), '') is not null
-        when 'father_occupation' then nullif(btrim(v_parents.father_occupation), '') is not null
-        when 'father_salaried' then v_parents.father_salaried is not null
-        when 'mother_alive' then v_parents.mother_alive is not null
-        when 'mother_name' then nullif(btrim(v_parents.mother_name), '') is not null
-        when 'mother_occupation' then nullif(btrim(v_parents.mother_occupation), '') is not null
-        when 'mother_salaried' then v_parents.mother_salaried is not null
-        when 'guardian_required' then v_parents.guardian_required is not null
-        when 'guardian_name' then nullif(btrim(v_parents.guardian_name), '') is not null
-        when 'guardian_relationship' then nullif(btrim(v_parents.guardian_relationship), '') is not null
-        when 'guardian_mobile' then nullif(btrim(v_parents.guardian_mobile), '') is not null
-        when 'guardian_occupation' then nullif(btrim(v_parents.guardian_occupation), '') is not null
+        when 'other.father_alive' then v_parents.father_alive is not null
+        when 'other.father_name' then nullif(btrim(v_parents.father_name), '') is not null
+        when 'other.father_occupation' then nullif(btrim(v_parents.father_occupation), '') is not null
+        when 'other.father_salaried' then v_parents.father_salaried is not null
+        when 'other.mother_alive' then v_parents.mother_alive is not null
+        when 'other.mother_name' then nullif(btrim(v_parents.mother_name), '') is not null
+        when 'other.mother_occupation' then nullif(btrim(v_parents.mother_occupation), '') is not null
+        when 'other.mother_salaried' then v_parents.mother_salaried is not null
+        when 'other.guardian_required' then v_parents.guardian_required is not null
+        when 'other.guardian_name' then nullif(btrim(v_parents.guardian_name), '') is not null
+        when 'other.guardian_relationship' then nullif(btrim(v_parents.guardian_relationship), '') is not null
+        when 'other.guardian_mobile' then nullif(btrim(v_parents.guardian_mobile), '') is not null
+        when 'other.guardian_occupation' then nullif(btrim(v_parents.guardian_occupation), '') is not null
 
         -- Current course
-        when 'academic_year' then nullif(btrim(v_course.academic_year), '') is not null
-        when 'course_level' then nullif(btrim(v_course.course_level), '') is not null
-        when 'course_name' then nullif(btrim(v_course.course_name), '') is not null
-        when 'degree' then nullif(btrim(v_course.degree), '') is not null
-        when 'branch' then nullif(btrim(v_course.branch), '') is not null
-        when 'year_of_study' then v_course.year_of_study is not null
-        when 'semester' then v_course.semester is not null
-        when 'institution_name' then nullif(btrim(v_course.institution_name), '') is not null
-        when 'board_university' then nullif(btrim(coalesce(v_course.board_university, v_course.university_name)), '') is not null
-        when 'admission_date' then v_course.admission_date is not null
-        when 'admission_type' then nullif(btrim(v_course.admission_type), '') is not null
-        when 'mode_of_study' then nullif(btrim(v_course.mode_of_study), '') is not null
-        when 'course_duration_months' then v_course.course_duration_months is not null
-        when 'is_professional' then v_course.is_professional is not null
-        when 'cap_admission' then v_course.cap_admission is not null
-        when 'cap_application_number' then nullif(btrim(v_course.cap_application_number), '') is not null
-        when 'seat_type' then nullif(btrim(v_course.seat_type), '') is not null
-        when 'institute_state' then nullif(btrim(v_course.institute_state), '') is not null
-        when 'institute_district' then nullif(btrim(v_course.institute_district), '') is not null
-        when 'institute_taluka' then nullif(btrim(v_course.institute_taluka), '') is not null
+        when 'current_course.academic_year' then nullif(btrim(v_course.academic_year), '') is not null
+        when 'current_course.course_level' then nullif(btrim(v_course.course_level), '') is not null
+        when 'current_course.course_name' then nullif(btrim(v_course.course_name), '') is not null
+        when 'current_course.degree' then nullif(btrim(v_course.degree), '') is not null
+        when 'current_course.branch' then nullif(btrim(v_course.branch), '') is not null
+        when 'current_course.year_of_study' then v_course.year_of_study is not null
+        when 'current_course.semester' then v_course.semester is not null
+        when 'current_course.institution_name' then nullif(btrim(v_course.institution_name), '') is not null
+        when 'current_course.board_university' then nullif(btrim(coalesce(v_course.board_university, v_course.university_name)), '') is not null
+        when 'current_course.admission_date' then v_course.admission_date is not null
+        when 'current_course.admission_type' then nullif(btrim(v_course.admission_type), '') is not null
+        when 'current_course.mode_of_study' then nullif(btrim(v_course.mode_of_study), '') is not null
+        when 'current_course.course_duration_months' then v_course.course_duration_months is not null
+        when 'current_course.is_professional' then v_course.is_professional is not null
+        when 'current_course.cap_admission' then v_course.cap_admission is not null
+        when 'current_course.cap_application_number' then nullif(btrim(v_course.cap_application_number), '') is not null
+        when 'current_course.seat_type' then nullif(btrim(v_course.seat_type), '') is not null
+        when 'current_course.institute_state' then nullif(btrim(v_course.institute_state), '') is not null
+        when 'current_course.institute_district' then nullif(btrim(v_course.institute_district), '') is not null
+        when 'current_course.institute_taluka' then nullif(btrim(v_course.institute_taluka), '') is not null
 
         -- Past qualifications
-        when 'has_qualification' then v_qualification_count > 0
-        when 'qualification_core' then v_qualification_count > 0 and v_incomplete_qualifications = 0
+        when 'past_qualification.has_qualification' then v_qualification_count > 0
+        when 'past_qualification.qualification_core' then v_qualification_count > 0 and v_incomplete_qualifications = 0
 
         -- Hostel
-        when 'beneficiary_category' then nullif(btrim(v_hostel.beneficiary_category), '') is not null
-        when 'state' then nullif(btrim(v_hostel.state), '') is not null
-        when 'district' then nullif(btrim(v_hostel.district), '') is not null
-        when 'taluka' then nullif(btrim(v_hostel.taluka), '') is not null
-        when 'hostel_type' then nullif(btrim(v_hostel.hostel_type), '') is not null
-        when 'hostel_name' then nullif(btrim(v_hostel.hostel_name), '') is not null
-        when 'is_aided' then v_hostel.is_aided is not null
-        when 'hostel_address' then nullif(btrim(v_hostel.hostel_address), '') is not null
-        when 'admission_date' then v_hostel.admission_date is not null
-        when 'mess_available' then v_hostel.mess_available is not null
-        when 'rent_per_month' then v_hostel.rent_per_month is not null
-        when 'certificate_document' then v_hostel.certificate_document_id is not null
+        when 'hostel.beneficiary_category' then nullif(btrim(v_hostel.beneficiary_category), '') is not null
+        when 'hostel.state' then nullif(btrim(v_hostel.state), '') is not null
+        when 'hostel.district' then nullif(btrim(v_hostel.district), '') is not null
+        when 'hostel.taluka' then nullif(btrim(v_hostel.taluka), '') is not null
+        when 'hostel.hostel_type' then nullif(btrim(v_hostel.hostel_type), '') is not null
+        when 'hostel.hostel_name' then nullif(btrim(v_hostel.hostel_name), '') is not null
+        when 'hostel.is_aided' then v_hostel.is_aided is not null
+        when 'hostel.hostel_address' then nullif(btrim(v_hostel.hostel_address), '') is not null
+        when 'hostel.admission_date' then v_hostel.admission_date is not null
+        when 'hostel.mess_available' then v_hostel.mess_available is not null
+        when 'hostel.rent_per_month' then v_hostel.rent_per_month is not null
+        when 'hostel.certificate_document' then v_hostel.certificate_document_id is not null
 
         else false
       end case;

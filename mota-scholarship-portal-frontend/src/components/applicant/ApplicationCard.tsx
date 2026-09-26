@@ -37,9 +37,11 @@ export function ApplicationCard({ application }: ApplicationCardProps) {
       </div>
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
         <span className="text-xs text-slate-500">Reference: {application.referenceNumber}</span>
-        <Button size="sm" to={applicantApplicationPath(application.id)} variant="outline">
-          View application
-        </Button>
+        {application.id ? (
+          <Button size="sm" to={applicantApplicationPath(application.id)} variant="outline">
+            View application
+          </Button>
+        ) : null}
       </div>
     </Card>
   );

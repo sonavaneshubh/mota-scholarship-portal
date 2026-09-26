@@ -21,6 +21,7 @@
  */
 
 import { supabase } from '../lib/supabase';
+import { messageFromError } from '../lib/dbErrorMessage';
 import type { ApplicantDocumentRecord } from '../types/profile';
 
 const BUCKET = 'applicant-documents';
@@ -44,9 +45,12 @@ function client() {
   return supabase;
 }
 
-function messageFromError(error: { message: string } | null, fallback: string): string {
-  return error?.message?.trim() ? error.message : fallback;
-}
+/**
+ * Applicant-facing database errors are filtered in one place, not per call site.
+ * The two services that write applicant data used to carry identical private
+ * copies of this helper, so the filter had to be corrected in both and a third
+ * copy would have reintroduced the raw-message behaviour.
+ */
 
 function extensionOf(file: File): string {
   const fromName = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();

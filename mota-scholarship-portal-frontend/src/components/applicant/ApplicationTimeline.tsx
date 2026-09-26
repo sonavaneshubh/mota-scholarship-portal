@@ -196,7 +196,9 @@ function DashboardTimeline({ application }: { application: ApplicantApplication 
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
           <p className="text-xs text-slate-500">Reference: {application.referenceNumber}</p>
-          <Button size="sm" to={applicantStatusPath(application.id)} variant="outline">Open full status</Button>
+          {application.id ? (
+            <Button size="sm" to={applicantStatusPath(application.id)} variant="outline">Open full status</Button>
+          ) : null}
         </div>
       </div>
     </Card>

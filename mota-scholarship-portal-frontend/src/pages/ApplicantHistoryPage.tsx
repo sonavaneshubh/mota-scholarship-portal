@@ -250,14 +250,16 @@ export function ApplicantHistoryPage() {
                             : '—'}
                         </td>
                         <td className="min-w-0 px-3 py-4">
-                          <Button
-                            className="max-w-full rounded text-left"
-                            size="sm"
-                            to={applicantApplicationPath(application.id)}
-                            variant="outline"
-                          >
-                            View details
-                          </Button>
+                          {application.id ? (
+                            <Button
+                              className="max-w-full rounded text-left"
+                              size="sm"
+                              to={applicantApplicationPath(application.id)}
+                              variant="outline"
+                            >
+                              View details
+                            </Button>
+                          ) : null}
                         </td>
                       </tr>
                     ))}
@@ -313,14 +315,16 @@ export function ApplicantHistoryPage() {
                 <p className="mt-3 break-words text-sm leading-relaxed text-slate-600">
                   {application.nextStep}
                 </p>
-                <Button
-                  className="mt-4 w-full rounded"
-                  size="md"
-                  to={applicantApplicationPath(application.id)}
-                  variant="outline"
-                >
-                  View details
-                </Button>
+                {application.id ? (
+                  <Button
+                    className="mt-4 w-full rounded"
+                    size="md"
+                    to={applicantApplicationPath(application.id)}
+                    variant="outline"
+                  >
+                    View details
+                  </Button>
+                ) : null}
               </Card>
             ))}
           </section>

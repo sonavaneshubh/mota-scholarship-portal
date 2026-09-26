@@ -77,6 +77,74 @@ export type SchemeWithRelations = Scheme & {
   scheme_categories?: Pick<SchemeCategory, 'id' | 'name'> | null;
 };
 
+/**
+ * Lifecycle of an `applications` row. The vocabulary is the one the table's
+ * check constraint enforces and the one applicantRecords.ts maps to labels; it
+ * is deliberately snake_case because it mirrors the column, not the UI label.
+ */
+export type ApplicationStatus =
+  | 'draft'
+  | 'submitted'
+  | 'under_verification'
+  | 'deficiency_raised'
+  | 'resubmission_required'
+  | 'under_scrutiny'
+  | 'selected'
+  | 'not_selected'
+  | 'rejected'
+  | 'withdrawn';
+
+/**
+ * A row of `public.applications`, as inserted by an "Apply Now" click.
+ *
+ * The column set mirrors the live table exactly. It was read back from the
+ * deployed PostgREST schema rather than assumed, which is how we know the
+ * human-readable reference is `application_number` and that there is no
+ * `application_id` column on this table.
+ *
+ * `application_number` is the reference the applicant is shown and quotes
+ * (APP-2026-A1B2C3D4). It is minted by the set_application_reference() trigger in
+ * the database — not in UI state. `id` is the surrogate primary key; both are real
+ * and stable.
+ *
+ * The form is routed by `id`, not by `application_number`. See
+ * lib/applicationHandle: emitting a reference we did not generate was what made
+ * Apply Now land on "Application not found", and the reference stays a display
+ * value. The reference is still accepted inbound, so a shared pretty URL works.
+ */
+export interface Application {
+  id: string;
+  /**
+   * Nullable on purpose. It is minted by the set_application_reference() trigger
+   * in 20260927000002_create_applications.sql, so it is null on any project where
+   * that migration has not been deployed. Typing it as a plain `string` invited
+   * code that assumed it was always there and quietly built a link to
+   * /applicant/applications/null.
+   */
+  application_number: string | null;
+  applicant_id: string;
+  scheme_id: string;
+  status: ApplicationStatus;
+  submitted_at: string | null;
+  created_at: string;
+  updated_at: string;
+
+  /* --- added by 20260927000003_application_form_data.sql ------------------- *
+   * The form's own storage. Deliberately the *only* application-scoped record
+   * of applicant-entered data: everything the profile already holds is read from
+   * the profile tables instead of being snapshotted here, so editing My Profile
+   * updates every application at once rather than leaving stale copies behind.
+   *
+   * Optional because these four columns do not exist until that migration has
+   * been applied. readStoredAnswers() in applicationFormService treats a missing
+   * key as "no answers saved yet" rather than failing the load, so the form works
+   * on an un-migrated project instead of erroring. */
+  scheme_answers?: Record<string, unknown> | null;
+  declaration_accepted?: boolean | null;
+  declaration_accepted_at?: string | null;
+  draft_saved_at?: string | null;
+}
+
 export interface SchemeEligibility {
   id: string;
   scheme_id: string;
