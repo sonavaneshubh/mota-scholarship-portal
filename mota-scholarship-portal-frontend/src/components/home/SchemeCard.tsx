@@ -1,5 +1,3 @@
-import { Link } from 'react-router-dom';
-import { ROUTES } from '../../lib/constants';
 import type { ApplicantScheme } from '../../lib/supabase';
 
 const badgeToneClass: Record<ApplicantScheme['badgeTone'], string> = {
@@ -62,12 +60,20 @@ export function SchemeCard({ scheme }: SchemeCardProps) {
       </div>
 
       <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
-        <Link
-          className={`text-xs font-semibold ${scheme.guidelinesAvailable ? 'text-gov-blue hover:underline' : 'text-slate-400'}`}
-          to={ROUTES.guidelinesNotices}
-        >
-          {scheme.guidelinesAvailable ? 'Guidelines' : 'Guidelines unavailable'}
-        </Link>
+          {scheme.guidelineUrl ? (
+            <a
+              className="text-xs font-semibold text-gov-blue hover:underline"
+              download
+              href={scheme.guidelineUrl}
+              rel="noopener noreferrer"
+              target="_blank"
+              title={`Download guidelines (PDF) - ${scheme.name}`}
+            >
+              Download Guidelines (PDF)
+            </a>
+          ) : (
+            <span className="text-xs font-semibold text-slate-400">Guidelines unavailable</span>
+          )}
         {scheme.applyHref ? (
           <a
             className="px-3 py-1 bg-gov-blue hover:bg-gov-blue-dark text-white text-xs font-semibold rounded transition"
