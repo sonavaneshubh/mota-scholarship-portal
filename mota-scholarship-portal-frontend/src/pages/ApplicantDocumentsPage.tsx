@@ -20,7 +20,7 @@ function getActionLabel(status: string) {
 
 export function ApplicantDocumentsPage() {
   return (
-    <div className="space-y-6 py-1 sm:py-2">
+    <div className="space-y-6 py-2 sm:py-4">
       <ApplicantPageHeader
         action={<Button size="md" to={ROUTES.applicant.applications} variant="outline">Back to applications</Button>}
         description="Review the sample documents attached to your applicant profile. Upload and verification actions are not connected."
@@ -35,7 +35,7 @@ export function ApplicantDocumentsPage() {
       <DocumentVerificationPanel documentCount={APPLICANT_DOCUMENTS.length} needsCorrection={APPLICANT_DOCUMENTS.some((document) => document.status === 'needs-correction')} />
 
       <Card className="min-w-0 overflow-hidden">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-4 sm:px-5">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-200 p-4 sm:px-5">
           <div>
             <p className="text-xs font-bold uppercase tracking-wider text-gov-saffron-dark">Document checklist</p>
             <h2 className="mt-1 text-lg font-bold text-gov-blue-dark">Your sample documents</h2>
@@ -44,32 +44,32 @@ export function ApplicantDocumentsPage() {
           <span className="text-xs font-semibold text-slate-500">Required for application review</span>
         </div>
 
-        <div className="hidden overflow-x-auto md:block">
-          <table className="w-full min-w-[900px] border-collapse text-left text-sm">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-max border-collapse text-left text-sm">
             <caption className="sr-only">Applicant document checklist</caption>
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
               <tr>
-                <th className="px-5 py-3 font-bold" scope="col">Document</th>
+                <th className="px-4 py-3 font-bold" scope="col">Document</th>
                 <th className="px-4 py-3 font-bold" scope="col">Type</th>
                 <th className="px-4 py-3 font-bold" scope="col">Status</th>
                 <th className="px-4 py-3 font-bold" scope="col">Uploaded</th>
                 <th className="px-4 py-3 font-bold" scope="col">Updated</th>
-                <th className="px-5 py-3 text-right font-bold" scope="col">Action</th>
+                <th className="px-4 py-3 text-right font-bold" scope="col">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {APPLICANT_DOCUMENTS.map((document) => (
                 <tr className="align-middle" key={document.id}>
-                  <td className="px-5 py-4">
+                  <td className="px-4 py-3">
                     <p className="font-semibold text-slate-900">{document.name}</p>
                     <p className="mt-1 max-w-sm text-xs leading-relaxed text-slate-500">{document.description}</p>
                     <p className="mt-1 text-[11px] text-slate-600">{document.fileSize}</p>
                   </td>
-                  <td className="px-4 py-4 text-slate-700">{document.type}</td>
-                  <td className="px-4 py-4"><DocumentStatusBadge status={document.status} label={document.statusLabel} /></td>
-                  <td className="whitespace-nowrap px-4 py-4 text-slate-600">{document.uploadedAt}</td>
-                  <td className="whitespace-nowrap px-4 py-4 text-slate-600">{document.updatedAt}</td>
-                  <td className="px-5 py-4 text-right">
+                  <td className="px-4 py-3 text-slate-700">{document.type}</td>
+                  <td className="px-4 py-3"><DocumentStatusBadge status={document.status} label={document.statusLabel} /></td>
+                  <td className="whitespace-nowrap px-4 py-3 text-slate-600">{document.uploadedAt}</td>
+                  <td className="whitespace-nowrap px-4 py-3 text-slate-600">{document.updatedAt}</td>
+                  <td className="px-4 py-3 text-right">
                     <Button aria-describedby="document-demo-notice" disabled size="sm" type="button" variant="outline">{getActionLabel(document.status)}</Button>
                   </td>
                 </tr>

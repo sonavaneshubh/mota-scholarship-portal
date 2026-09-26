@@ -11,30 +11,30 @@ interface ApplicationTableProps {
 export function ApplicationTable({ applications, caption }: ApplicationTableProps) {
   return (
     <div className="min-w-0">
-      <div className="hidden overflow-x-auto md:block">
-        <table className="w-full min-w-[900px] border-collapse text-left text-sm">
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-max border-collapse text-left text-sm">
           <caption className="sr-only">{caption}</caption>
           <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
             <tr>
-              <th className="px-5 py-3 font-bold" scope="col">Application ID</th>
+              <th className="px-4 py-3 font-bold" scope="col">Application ID</th>
               <th className="px-4 py-3 font-bold" scope="col">Scheme</th>
               <th className="px-4 py-3 font-bold" scope="col">Submitted</th>
               <th className="px-4 py-3 font-bold" scope="col">Last update</th>
               <th className="px-4 py-3 font-bold" scope="col">Status</th>
               <th className="px-4 py-3 font-bold" scope="col">Documents</th>
-              <th className="px-5 py-3 text-right font-bold" scope="col">Action</th>
+              <th className="px-4 py-3 text-right font-bold" scope="col">Action</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {applications.map((application) => (
               <tr className="align-middle" key={application.id}>
-                <td className="whitespace-nowrap px-5 py-4 font-semibold text-slate-800">{application.id}</td>
-                <td className="max-w-xs px-4 py-4 font-semibold text-slate-900">{application.schemeName}</td>
-                <td className="whitespace-nowrap px-4 py-4 text-slate-600">{application.submittedAt}</td>
-                <td className="whitespace-nowrap px-4 py-4 text-slate-600">{application.updatedAt}</td>
-                <td className="px-4 py-4"><ApplicationStatusBadge status={application.status} label={application.statusLabel} /></td>
-                <td className="whitespace-nowrap px-4 py-4 text-slate-600">{application.documentsComplete}/{application.documentsTotal}</td>
-                <td className="px-5 py-4 text-right">
+                <td className="whitespace-nowrap px-4 py-3 font-semibold text-slate-800">{application.id}</td>
+                <td className="max-w-xs px-4 py-3 font-semibold text-slate-900 truncate">{application.schemeName}</td>
+                <td className="whitespace-nowrap px-4 py-3 text-slate-600">{application.submittedAt}</td>
+                <td className="whitespace-nowrap px-4 py-3 text-slate-600">{application.updatedAt}</td>
+                <td className="px-4 py-3"><ApplicationStatusBadge status={application.status} label={application.statusLabel} /></td>
+                <td className="whitespace-nowrap px-4 py-3 text-slate-600">{application.documentsComplete}/{application.documentsTotal}</td>
+                <td className="px-4 py-3 text-right">
                   <Button size="sm" to={applicantApplicationPath(application.id)} variant="outline">View details</Button>
                 </td>
               </tr>

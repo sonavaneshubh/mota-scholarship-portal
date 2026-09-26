@@ -4,12 +4,12 @@ import { ROUTES } from '../../lib/constants';
 
 export function AboutMinistry() {
   return (
-    <div className="lg:col-span-8 bg-white border border-slate-200 rounded-lg p-6 shadow-sm">
+    <div className="bg-white border border-slate-200 rounded-lg p-4 sm:p-6 shadow-sm lg:col-span-7">
       <div className="border-b border-slate-200 pb-3 mb-4">
         <span className="text-xs font-bold text-gov-saffron uppercase tracking-wider">
-          About the Portal &amp; its Purpose
+          About the Portal & its Purpose
         </span>
-        <h2 className="text-xl font-bold text-gov-blue-dark">
+        <h2 className="mt-2 text-xl sm:text-2xl font-bold text-gov-blue-dark">
           About the Ministry of Tribal Affairs (MoTA)
         </h2>
       </div>
@@ -24,7 +24,7 @@ export function AboutMinistry() {
 
       <div className="bg-blue-50/70 border-l-4 border-gov-blue p-4 rounded-r mb-4">
         <h3 className="text-sm font-bold text-gov-blue-dark mb-1">
-          About the Scholarship &amp; Fellowship Management Portal
+          About the Scholarship & Fellowship Management Portal
         </h3>
         <p className="text-xs text-slate-700 leading-relaxed">
           This proposed platform aims to provide a unified digital workflow for scheme discovery,
@@ -40,9 +40,9 @@ export function AboutMinistry() {
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-center">
         {MINISTRY_STATS.map((stat) => (
-          <div key={stat.id} className="bg-slate-50 border border-slate-200 rounded p-2.5">
-            <div className={`text-sm md:text-lg font-black ${stat.valueClass}`}>{stat.value}</div>
-            <div className="text-[11px] text-slate-600 font-medium">{stat.label}</div>
+          <div key={stat.id} className="bg-slate-50 border border-slate-200 rounded p-3 sm:p-2.5">
+            <div className={`text-base sm:text-lg font-black ${stat.valueClass}`}>{stat.value}</div>
+            <div className="text-[11px] sm:text-xs text-slate-600 font-medium">{stat.label}</div>
           </div>
         ))}
       </div>

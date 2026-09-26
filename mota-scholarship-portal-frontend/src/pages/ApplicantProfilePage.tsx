@@ -28,25 +28,30 @@ export function ApplicantProfilePage() {
   ];
 
   return (
-    <div className="space-y-6 py-1 sm:py-2">
+    <div className="space-y-6 py-2 sm:py-4">
       <ApplicantPageHeader
         action={<Button size="md" to={ROUTES.applicant.dashboard} variant="outline">Back to dashboard</Button>}
         description="Review the profile associated with your Supabase account. Editing and verification are not connected in this phase."
         eyebrow="Applicant workspace"
         title="My profile"
       />
-      <div className="grid gap-6 lg:grid-cols-3">
-        <Card className="p-5 lg:col-span-2">
-          <div className="flex items-center gap-4 border-b border-slate-100 pb-5">
-            <span className="flex h-16 w-16 items-center justify-center rounded-full bg-amber-100 text-xl font-bold text-gov-saffron-dark">{profile.avatarInitials}</span>
-            <div>
-              <h2 className="text-xl font-bold text-gov-blue-dark">{profile.name}</h2>
+      <div className="grid gap-6 sm:grid-cols-1 lg:grid-cols-3">
+        <Card className="p-5 sm:p-5 lg:col-span-2">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 border-b border-slate-100 pb-5">
+            <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-amber-100 text-xl font-bold text-gov-saffron-dark">{profile.avatarInitials}</span>
+            <div className="min-w-0">
+              <h2 className="text-xl font-bold text-gov-blue-dark truncate">{profile.name}</h2>
               <p className="mt-1 text-sm text-slate-500">Applicant ID: {profile.id}</p>
               <div className="mt-2"><Badge tone="blue">Supabase profile</Badge></div>
             </div>
           </div>
-          <dl className="mt-5 grid gap-x-6 gap-y-5 sm:grid-cols-2">
-            {details.map(([label, value]) => <div key={label}><dt className="text-xs font-semibold text-slate-500">{label}</dt><dd className="mt-1 text-sm font-medium text-slate-800">{value}</dd></div>)}
+          <dl className="mt-5 grid gap-x-6 gap-y-4 sm:grid-cols-2">
+            {details.map(([label, value]) => (
+              <div key={label}>
+                <dt className="text-xs font-semibold text-slate-500">{label}</dt>
+                <dd className="mt-1 text-sm font-medium text-slate-800 truncate">{value}</dd>
+              </div>
+            ))}
           </dl>
           <div className="mt-6 rounded border border-amber-200 bg-amber-50 p-4 text-xs leading-relaxed text-amber-950">
             Profile editing and identity verification are not connected. Do not enter real personal or financial information in this demo.
@@ -69,8 +74,8 @@ export function ApplicantProfilePage() {
           <ul className="mt-4 space-y-3" aria-label="Profile section completion">
             {sections.map((section) => (
               <li className="flex items-center justify-between gap-3 text-xs" key={section.id}>
-                <span className="text-slate-600">{section.label}</span>
-                <span className={section.complete ? 'font-semibold text-emerald-700' : 'font-semibold text-amber-700'}>
+                <span className="text-slate-600 truncate">{section.label}</span>
+                <span className={section.complete ? 'font-semibold text-emerald-700 shrink-0' : 'font-semibold text-amber-700 shrink-0'}>
                   {section.complete ? 'Complete' : `${section.completed}/${section.total}`}
                 </span>
               </li>

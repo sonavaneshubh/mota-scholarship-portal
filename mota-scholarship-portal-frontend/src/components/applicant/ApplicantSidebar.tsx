@@ -1,19 +1,16 @@
 import type { ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { ROUTES } from '../../lib/constants';
-import { calculateApplicantProfileCompletion } from '../../lib/applicantProfile';
-import type { ApplicantProfile } from '../../types';
 
 interface ApplicantSidebarProps {
-  profile: ApplicantProfile;
   applicationCount: number;
   documentAttentionCount: number;
   unreadNotificationCount: number;
-  categoryVerified: boolean;
   onLogout: () => void;
   onNavigate?: () => void;
   onClose?: () => void;
-  idPrefix: string;
+  onToggleCollapse?: () => void;
+  collapsed?: boolean;
 }
 
 const navIcons: Record<string, ReactNode> = {
@@ -93,6 +90,26 @@ function NavIcon({ name }: { name: string }) {
   );
 }
 
+function HamburgerIcon({ className = '' }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M4 6h16M4 12h16M4 18h16" />
+    </svg>
+  );
+}
+
+function ChevronIcon({ direction }: { direction: 'left' | 'right' }) {
+  return (
+    <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true">
+      {direction === 'left' ? (
+        <path d="M15 18l-6-6 6-6" />
+      ) : (
+        <path d="M9 18l6-6-6-6" />
+      )}
+    </svg>
+  );
+}
+
 const navigationItems = [
   { id: 'dashboard', icon: 'dashboard', label: 'Dashboard', to: ROUTES.applicant.dashboard },
   { id: 'profile', icon: 'profile', label: 'My Profile', to: ROUTES.applicant.profile },
@@ -112,25 +129,17 @@ const navigationItems = [
   { id: 'faq', icon: 'faq', label: 'Help / FAQ', to: `${ROUTES.applicant.guidelines}#faq` },
 ] as const;
 
-const guidelineLinks = [
-  { id: 'instructions', label: 'Instruction set for the online application process', to: ROUTES.applicant.guidelines },
-  { id: 'popups', label: 'Pop-up blocker guidance', to: `${ROUTES.applicant.guidelines}#faq` },
-  { id: 'password', label: 'Password and sign-in help', to: `${ROUTES.applicant.guidelines}#faq` },
-] as const;
-
 export function ApplicantSidebar({
-  profile,
   applicationCount,
   documentAttentionCount,
   unreadNotificationCount,
-  categoryVerified,
   onLogout,
   onNavigate,
   onClose,
-  idPrefix,
+  onToggleCollapse,
+  collapsed = false,
 }: ApplicantSidebarProps) {
   const location = useLocation();
-  const completion = calculateApplicantProfileCompletion(profile);
   const counts = {
     applications: applicationCount,
     documents: documentAttentionCount,
@@ -154,67 +163,43 @@ export function ApplicantSidebar({
     return true;
   }
 
+  const sidebarWidth = collapsed ? 'w-16' : 'w-64';
+
   return (
-    <div className="flex min-h-full flex-col bg-white">
+    <div className={`flex h-full flex-col bg-white border-r border-slate-200 transition-all duration-300 ${sidebarWidth}`}>
       {onClose ? (
         <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 lg:hidden">
-          <p className="text-sm font-bold text-gov-blue-dark">Applicant menu</p>
+          <p className="text-sm font-bold text-[#0B2A4A]">Applicant menu</p>
           <button
             aria-label="Close applicant menu"
-            className="flex h-11 w-11 items-center justify-center rounded text-slate-600 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-gov-blue"
+            className="flex h-11 w-11 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-400"
             type="button"
             onClick={onClose}
           >
-            <svg aria-hidden="true" className="h-5 w-5" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="2" viewBox="0 0 24 24">
-              <path d="m6 6 12 12M18 6 6 18" />
-            </svg>
+            <HamburgerIcon className="h-5 w-5" />
           </button>
         </div>
       ) : null}
 
-      <div className="border-b border-slate-200 bg-portal-navy p-3 text-white">
-        <div className="flex items-start gap-2.5">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-portal-amber text-2xs font-bold text-portal-navy-deep">
-            {profile.avatarInitials}
-          </span>
-          <div className="min-w-0">
-            <p className="truncate text-2xs font-semibold text-white">{profile.name}</p>
-            <p className="mt-0.5 truncate text-2xs text-slate-400">{profile.course}</p>
-            <p className="mt-0.5 truncate text-2xs text-slate-500">ID: {profile.id}</p>
-          </div>
-        </div>
-        <div className="mt-2.5 flex flex-wrap gap-1">
-          <span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-1.5 py-0.5 text-2xs font-medium text-slate-200">
-            <span className="h-1.5 w-1.5 rounded-full bg-portal-amber" aria-hidden="true" />
-            {profile.category}
-          </span>
-          <span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-1.5 py-0.5 text-2xs font-medium text-slate-200">
-            <span className={`h-1.5 w-1.5 rounded-full ${categoryVerified ? 'bg-emerald-400' : 'bg-amber-400'}`} aria-hidden="true" />
-            {categoryVerified ? 'Category verified' : 'Category pending'}
-          </span>
-        </div>
-        <div className="mt-2.5">
-          <div className="flex items-center justify-between text-2xs font-medium text-slate-400">
-            <span>Profile completeness</span>
-            <span className="font-bold text-emerald-400">{completion}%</span>
-          </div>
-          <div
-            aria-label={`Core profile fields ${completion} percent complete`}
-            aria-valuemax={100}
-            aria-valuemin={0}
-            aria-valuenow={completion}
-            className="mt-1 h-1.5 overflow-hidden rounded-full bg-white/15"
-            id={`${idPrefix}-profile-progress`}
-            role="progressbar"
+      <div className="flex items-center justify-between px-3 py-3 border-b border-slate-200">
+        {!collapsed && (
+          <p className="text-xs font-bold uppercase tracking-wider text-slate-500">WORKSPACE</p>
+        )}
+        {onToggleCollapse && (
+          <button
+            onClick={onToggleCollapse}
+            className="flex-shrink-0 flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors focus:outline-none focus:ring-2 focus:ring-amber-400"
+            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-expanded={!collapsed}
+            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
-            <div className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-600" style={{ width: `${completion}%` }} />
-          </div>
-        </div>
+            {collapsed ? <ChevronIcon direction="right" /> : <HamburgerIcon className="h-5 w-5" />}
+          </button>
+        )}
       </div>
 
-      <nav aria-label="Applicant portal sections" className="flex-1 px-2 py-2">
-        <p className="px-2 pb-1 text-2xs font-bold uppercase tracking-wider text-slate-400">Workspace</p>
-        <ul className="divide-y divide-slate-100">
+      <nav aria-label="Applicant portal sections" className="flex-1 overflow-y-auto p-2">
+        <ul className="space-y-1">
           {navigationItems.map((item) => {
             const current = isCurrent(item);
             const countKey = 'count' in item ? item.count : null;
@@ -224,30 +209,22 @@ export function ApplicantSidebar({
               <li key={item.id}>
                 <Link
                   aria-current={current ? 'page' : undefined}
-                  className={`flex min-h-10 items-center justify-between gap-2 px-2 py-1.5 text-2xs font-medium transition focus:outline-none focus:ring-2 focus:ring-inset focus:ring-portal-amber ${
+                  aria-label={collapsed ? item.label : undefined}
+                  className={`flex min-h-11 items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                     current
-                      ? '-ml-2 border-l-4 border-portal-navy bg-blue-50/60 pl-1.5 font-semibold text-portal-navy'
-                      : 'text-slate-700 hover:bg-slate-50 hover:text-portal-navy'
-                  }`}
+                      ? 'bg-amber-500/10 text-[#0B2A4A] border border-amber-500/20'
+                      : 'text-slate-700 hover:bg-slate-100 hover:text-[#0B2A4A]'
+                  } ${collapsed ? 'justify-center' : ''}`}
                   to={item.to}
                   onClick={onNavigate}
                 >
-                  <span className="flex min-w-0 items-center gap-1.5">
-                    <span className={current ? 'text-portal-amber' : 'text-slate-400'}><NavIcon name={item.icon} /></span>
-                    <span className="min-w-0 truncate">{item.label}</span>
-                  </span>
-                  {typeof count === 'number' && count > 0 ? (
-                    <span
-                      className={`inline-flex min-w-5 shrink-0 items-center justify-center rounded-full px-1.5 text-[10px] font-bold ${
-                        current ? 'bg-portal-navy text-white' : 'bg-blue-100 text-portal-navy'
-                      }`}
-                    >
+                  <span className={`shrink-0 ${current ? 'text-amber-500' : 'text-slate-400'}`}><NavIcon name={item.icon} /></span>
+                  {!collapsed && <span className="min-w-0 truncate">{item.label}</span>}
+                  {!collapsed && typeof count === 'number' && count > 0 && (
+                    <span className="ml-auto inline-flex min-w-5 items-center justify-center rounded-full px-2 text-[10px] font-bold text-white bg-amber-500">
                       {count}
-                      <span className="sr-only">
-                        {countKey === 'applications' ? ' applications' : countKey === 'documents' ? ' document updates' : ' unread notifications'}
-                      </span>
                     </span>
-                  ) : null}
+                  )}
                 </Link>
               </li>
             );
@@ -255,65 +232,35 @@ export function ApplicantSidebar({
         </ul>
       </nav>
 
-      <div className="border-t border-slate-200 p-2">
+      {!collapsed && (
+        <div className="border-t border-slate-200 p-4">
         <Link
-          className="mb-2 flex items-center justify-between rounded-lg border border-amber-300 bg-amber-50/80 px-2.5 py-2 transition hover:border-amber-400 focus:outline-none focus:ring-2 focus:ring-portal-amber"
+          className="mb-3 flex items-center justify-between rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5 transition-colors hover:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-400"
           to={`${ROUTES.applicant.guidelines}#faq`}
           onClick={onNavigate}
         >
-          <span className="flex items-center gap-1.5">
-            <span aria-hidden="true" className="inline-block h-2 w-2 rounded-full bg-portal-amber" />
-            <span className="text-2xs font-bold text-portal-navy">Click here for Help</span>
+          <span className="flex items-center gap-2 text-sm font-medium text-[#0B2A4A]">
+            <span className="inline-block h-2 w-2 rounded-full bg-amber-500" />
+            Click here for Help
           </span>
-          <svg aria-hidden="true" className="h-3.5 w-3.5 text-amber-600" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24">
+          <svg aria-hidden="true" className="h-4 w-4 text-amber-600" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24">
             <path d="m9 18 6-6-6-6" />
           </svg>
         </Link>
 
         <Link
-          className="mb-2 flex w-full items-center justify-center gap-1.5 rounded bg-portal-navy py-1.5 text-2xs font-medium text-white shadow-sm transition hover:bg-portal-navy-dark focus:outline-none focus:ring-2 focus:ring-portal-amber"
+          className="mb-3 flex w-full items-center justify-center gap-2 rounded-lg bg-[#0B2A4A] px-3 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-[#0B2A4A]/90"
           to={ROUTES.applicant.grievance}
           onClick={onNavigate}
         >
-          <svg aria-hidden="true" className="h-3.5 w-3.5 text-portal-amber" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" viewBox="0 0 24 24">
+          <svg aria-hidden="true" className="h-4 w-4 text-amber-400" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" viewBox="0 0 24 24">
             <path d="M21 12a8 8 0 0 1-8 8H7l-4 3V12a8 8 0 0 1 8-8h2a8 8 0 0 1 8 8Z" />
           </svg>
           Grievance / Suggestions
         </Link>
 
-        <div className="border-t border-slate-200 pt-2">
-          <p className="flex items-center gap-1.5 px-1 py-1 text-2xs font-bold text-portal-navy">
-            <svg aria-hidden="true" className="h-3.5 w-3.5 text-portal-amber" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" viewBox="0 0 24 24">
-              <path d="M4 6h16v12H4z" />
-              <path d="m8 11 2.5 2.5L16 9" />
-            </svg>
-            Guidelines
-          </p>
-          <ul className="space-y-1 px-1 py-1">
-            {guidelineLinks.map((item) => (
-              <li key={item.id}>
-                <Link
-                  className="flex items-start gap-1.5 text-2xs font-medium text-portal-navy transition hover:text-portal-amber focus:outline-none focus:ring-2 focus:ring-portal-amber"
-                  to={item.to}
-                  onClick={onNavigate}
-                >
-                  <svg aria-hidden="true" className="mt-0.5 h-3 w-3 shrink-0 text-red-500" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M5 2h6l4 4v12a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1Zm6 0v4h4M7 12h6M7 15h4" />
-                  </svg>
-                  <span className="min-w-0">{item.label}</span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        <div className="mt-2 rounded border border-blue-200 bg-blue-50 p-2 text-2xs leading-relaxed text-slate-700">
-          <p className="font-bold text-portal-navy">AI assistance notice</p>
-          <p className="mt-0.5">AI assists document verification. Final verification and decisions are performed by authorized officials.</p>
-        </div>
-
         <button
-          className="mt-2 flex min-h-10 w-full items-center gap-1.5 rounded px-2 text-2xs font-semibold text-red-700 transition hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-300"
+          className="w-full flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-semibold text-red-700 transition-colors hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-300"
           type="button"
           onClick={onLogout}
         >
@@ -324,6 +271,44 @@ export function ApplicantSidebar({
           Logout
         </button>
       </div>
+    )}
+
+    {collapsed && (
+      <div className="border-t border-slate-200 p-2 space-y-1">
+        <Link
+          aria-label="Help"
+          className="flex h-11 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 hover:text-[#0B2A4A] transition-colors"
+          to={`${ROUTES.applicant.guidelines}#faq`}
+          onClick={onNavigate}
+        >
+          <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+            <path d="M9 12l2 2 4-4" />
+          </svg>
+        </Link>
+        <Link
+          aria-label="Grievance / Suggestions"
+          className="flex h-11 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 hover:text-[#0B2A4A] transition-colors"
+          to={ROUTES.applicant.grievance}
+          onClick={onNavigate}
+        >
+          <svg className="h-5 w-5 text-amber-500" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" viewBox="0 0 24 24">
+            <path d="M21 12a8 8 0 0 1-8 8H7l-4 3V12a8 8 0 0 1 8-8h2a8 8 0 0 1 8 8Z" />
+          </svg>
+        </Link>
+        <button
+          aria-label="Logout"
+          className="flex h-11 w-full items-center justify-center rounded-lg text-red-600 hover:bg-red-50 transition-colors focus:outline-none focus:ring-2 focus:ring-red-300"
+          type="button"
+          onClick={onLogout}
+        >
+          <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.7" viewBox="0 0 24 24">
+            <path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3" />
+            <path d="M10 17l-5-5 5-5M5 12h11" />
+          </svg>
+        </button>
+      </div>
+    )}
     </div>
   );
 }

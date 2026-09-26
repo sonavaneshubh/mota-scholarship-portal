@@ -35,7 +35,7 @@ export function HeroBanner() {
 
   return (
     <section
-      className="relative bg-gradient-to-r from-gov-blue-dark via-gov-blue to-slate-900 text-white py-8 px-4 overflow-hidden border-b-4 border-amber-500"
+      className="relative bg-gradient-to-r from-gov-blue-dark via-gov-blue to-slate-900 text-white py-6 px-3 sm:px-4 lg:px-8 overflow-hidden border-b-4 border-amber-500"
       data-purpose="hero-banner"
     >
       <div
@@ -45,10 +45,10 @@ export function HeroBanner() {
       />
 
       <div
-        className={`max-w-7xl mx-auto relative z-10 grid grid-cols-1 lg:grid-cols-12 ${isRegistration ? 'gap-4 lg:items-start' : 'gap-8 lg:items-center'}`}
+        className={`max-w-7xl mx-auto relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 ${isRegistration ? 'lg:items-start' : 'lg:items-center'}`}
       >
-        <div className={`${isRegistration ? 'lg:col-span-6' : 'lg:col-span-8'} space-y-4`}>
-          <div className="inline-flex items-center gap-2 px-2.5 md:px-3 py-1 bg-white/10 backdrop-blur rounded-full text-[11px] md:text-xs text-amber-300 border border-amber-400/40">
+        <div className={`${isRegistration ? 'lg:col-span-6' : 'lg:col-span-7'} space-y-4`}>
+          <div className="inline-flex items-center gap-2 px-2.5 py-1 bg-white/10 backdrop-blur rounded-full text-[10px] sm:text-xs text-amber-300 border border-amber-400/40">
             <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
               <path
                 clipRule="evenodd"
@@ -59,22 +59,22 @@ export function HeroBanner() {
             AI-Enabled • Human-Verified Workflow
           </div>
 
-          <h2 className="text-2xl md:text-4xl font-extrabold tracking-tight leading-tight">
-            Scholarship &amp; Fellowship Management Portal
+          <h2 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-extrabold tracking-tight leading-tight">
+            Scholarship & Fellowship Management Portal
           </h2>
 
-          <div className="text-lg md:text-xl font-medium text-amber-200">
-            A Unified Digital Platform for Tribal Students &amp; Researchers
+          <div className="text-base sm:text-lg md:text-xl font-medium text-amber-200">
+            A Unified Digital Platform for Tribal Students & Researchers
           </div>
 
-          <p className="text-slate-200 text-sm md:text-base leading-relaxed max-w-2xl">
+          <p className="text-slate-200 text-sm sm:text-base leading-relaxed max-w-2xl">
             A unified digital platform for discovering schemes, checking eligibility, submitting
             applications, managing documents, and tracking application verification and decisions.
           </p>
 
           <div className="pt-2">
-            <Button variant="accent" size="lg" to={ROUTES.scholarshipsFellowships}>
-              Explore Scholarships &amp; Fellowships
+            <Button variant="accent" size="lg" to={ROUTES.scholarshipsFellowships} className="w-full sm:w-auto">
+              Explore Scholarships & Fellowships
               <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M14 5l7 7m0 0l-7 7m7-7H3" strokeLinecap="round" strokeLinejoin="round" />
               </svg>

@@ -7,11 +7,9 @@ import {
   APPLICANT_NOTIFICATIONS,
 } from '../../data/applicantData';
 import { ROUTES, SECTION_IDS } from '../../lib/constants';
-import { AnnouncementTicker } from '../layout/AnnouncementTicker';
 import { Footer } from '../layout/Footer';
 import { Masthead } from '../layout/Masthead';
-import { TopAccessibilityBar } from '../layout/TopAccessibilityBar';
-import { ApplicantHeader } from './ApplicantHeader';
+import { CompactNavbar } from './CompactNavbar';
 import { ApplicantSidebar } from './ApplicantSidebar';
 
 export function ApplicantLayout() {
@@ -19,6 +17,7 @@ export function ApplicantLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const backgroundRef = useRef<HTMLDivElement>(null);
   const mobileSidebarRef = useRef<HTMLElement>(null);
 
@@ -145,9 +144,6 @@ export function ApplicantLayout() {
   const documentAttentionCount = APPLICANT_DOCUMENTS.filter((document) =>
     ['needs-correction', 'rejected'].includes(document.status),
   ).length;
-  const categoryVerified = APPLICANT_DOCUMENTS.some(
-    (document) => document.type === 'Category' && document.status === 'verified',
-  );
 
   async function handleLogout() {
     await signOut();
@@ -155,78 +151,67 @@ export function ApplicantLayout() {
   }
 
   return (
-    <div className="min-h-screen bg-gov-slate-bg">
-      <div ref={backgroundRef} className="flex min-h-screen flex-col">
-        <TopAccessibilityBar />
-        <Masthead />
-        <ApplicantHeader
-          profile={user}
-          sidebarOpen={sidebarOpen}
-          unreadCount={unreadNotificationCount}
-          onLogout={handleLogout}
-          onToggleSidebar={() => setSidebarOpen((current) => !current)}
-        />
-        <AnnouncementTicker />
+    <div className="min-h-screen bg-slate-50 flex flex-col">
+      <Masthead />
+      <CompactNavbar
+        profile={user}
+        sidebarOpen={sidebarOpen}
+        unreadCount={unreadNotificationCount}
+        onLogout={handleLogout}
+        onToggleSidebar={() => setSidebarOpen((current) => !current)}
+      />
 
-        <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-center text-xs font-medium text-amber-950">
-          Demo applicant workspace. Records are sample data; uploads, submissions, AI checks, and grievance delivery are not connected to a backend.
-        </div>
+      <div className="flex flex-1 overflow-hidden">
+        <aside
+          className="hidden lg:block w-64 flex-shrink-0 bg-white border-r border-slate-200 transition-all duration-300"
+          style={{ width: sidebarCollapsed ? '4rem' : '16rem' }}
+        >
+          <ApplicantSidebar
+            applicationCount={APPLICANT_APPLICATIONS.length}
+            documentAttentionCount={documentAttentionCount}
+            unreadNotificationCount={unreadNotificationCount}
+            onLogout={handleLogout}
+            collapsed={sidebarCollapsed}
+            onToggleCollapse={() => setSidebarCollapsed((prev) => !prev)}
+          />
+        </aside>
 
-        <main className="min-w-0 flex-grow" id={SECTION_IDS.MAIN_CONTENT.replace('#', '')}>
-          <div className="mx-auto grid min-w-0 max-w-[90rem] gap-4 px-4 py-4 sm:px-6 lg:grid-cols-[15rem_minmax(0,1fr)] lg:px-6">
-            <aside className="hidden min-w-0 lg:block">
-              <div className="sticky top-20 max-h-[calc(100vh-6rem)] overflow-y-auto rounded border border-slate-200 bg-white shadow-sm">
-                <ApplicantSidebar
-                  applicationCount={APPLICANT_APPLICATIONS.length}
-                  categoryVerified={categoryVerified}
-                  documentAttentionCount={documentAttentionCount}
-                  idPrefix="desktop-applicant-sidebar"
-                  profile={user}
-                  unreadNotificationCount={unreadNotificationCount}
-                  onLogout={handleLogout}
-                />
-              </div>
-            </aside>
-
-            <div className="min-w-0" key={location.pathname}>
-              <Outlet />
-            </div>
+        <main className="flex-1 min-w-0 overflow-y-auto" id={SECTION_IDS.MAIN_CONTENT.replace('#', '')}>
+          <div className="p-3 sm:p-4 lg:p-6">
+            <Outlet />
           </div>
         </main>
-
-        <Footer />
-        {sidebarOpen ? (
-          <div className="fixed inset-0 z-50 lg:hidden">
-            <button
-              aria-label="Close applicant navigation overlay"
-              className="absolute inset-0 h-full w-full bg-slate-950/60"
-              type="button"
-              onClick={closeSidebar}
-            />
-            <aside
-              aria-label="Applicant mobile navigation"
-              aria-modal="true"
-              className="relative h-full w-[min(20rem,90vw)] overflow-y-auto border-r border-slate-300 bg-white shadow-2xl"
-              id="applicant-mobile-sidebar"
-              ref={mobileSidebarRef}
-              role="dialog"
-              tabIndex={-1}
-            >
-              <ApplicantSidebar
-                applicationCount={APPLICANT_APPLICATIONS.length}
-                categoryVerified={categoryVerified}
-                documentAttentionCount={documentAttentionCount}
-                idPrefix="mobile-applicant-sidebar"
-                profile={user}
-                unreadNotificationCount={unreadNotificationCount}
-                onClose={closeSidebar}
-                onLogout={handleLogout}
-                onNavigate={closeSidebar}
-              />
-            </aside>
-          </div>
-        ) : null}
       </div>
+
+      <Footer />
+      {sidebarOpen ? (
+        <div className="fixed inset-0 z-50 lg:hidden animate-fade-in">
+          <button
+            aria-label="Close applicant navigation overlay"
+            className="absolute inset-0 h-full w-full bg-slate-950/60"
+            type="button"
+            onClick={closeSidebar}
+          />
+          <aside
+            aria-label="Applicant mobile navigation"
+            aria-modal="true"
+            className="relative h-full w-[min(20rem,90vw)] overflow-y-auto border-r border-slate-300 bg-white shadow-2xl animate-slide-in"
+            id="applicant-mobile-sidebar"
+            ref={mobileSidebarRef}
+            role="dialog"
+            tabIndex={-1}
+          >
+            <ApplicantSidebar
+              applicationCount={APPLICANT_APPLICATIONS.length}
+              documentAttentionCount={documentAttentionCount}
+              unreadNotificationCount={unreadNotificationCount}
+              onClose={closeSidebar}
+              onLogout={handleLogout}
+              onNavigate={closeSidebar}
+            />
+          </aside>
+        </div>
+      ) : null}
     </div>
   );
 }
