@@ -3,7 +3,6 @@ import type { FormEvent, RefObject } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useApplicantAuth } from '../../context/useApplicantAuth';
 import { useAdminAuth } from '../../context/useAdminAuth';
-import { ADMIN_DEMO_IDENTIFIER, ADMIN_DEMO_PASSWORD } from '../../services/adminAuth';
 import { ROUTES } from '../../lib/constants';
 import type { HomeAuthMode, HomeAuthNavigationState } from '../../types';
 import { Button } from '../ui/Button';
@@ -470,26 +469,6 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
 
       navigate(ROUTES.applicant.dashboard);
     } finally {
-      setIsSubmitting(false);
-    }
-  }
-
-  async function handleDemoAdminLogin() {
-    setIsSubmitting(true);
-    setIsAuthenticating(true);
-    setStatus('Signing in as Demo Admin…');
-
-    try {
-      const result = await signInAdmin(ADMIN_DEMO_IDENTIFIER, ADMIN_DEMO_PASSWORD, true);
-
-      if (!result.ok) {
-        setStatus(result.message ?? 'The admin ID or password is incorrect.');
-        return;
-      }
-
-      navigate(ROUTES.admin.dashboard);
-    } finally {
-      setIsAuthenticating(false);
       setIsSubmitting(false);
     }
   }
@@ -972,17 +951,9 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
           </Button>
 
           {isAdmin ? (
-            <div className="pt-2 border-t border-slate-200">
-              <Button
-                className="w-full justify-center rounded bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold border border-amber-600 shadow-xs"
-                disabled={isSubmitting || isAuthenticating}
-                size="md"
-                type="button"
-                onClick={handleDemoAdminLogin}
-              >
-                {isSubmitting || isAuthenticating ? 'Accessing Demo Admin…' : 'Login as Demo Admin (View All Data)'}
-              </Button>
-            </div>
+            <p className="pt-2 border-t border-slate-200 text-xs text-slate-500">
+              Administrator accounts sign in on the admin portal.
+            </p>
           ) : null}
 
           <div className="flex flex-wrap items-center justify-between gap-1 text-[11px]">
