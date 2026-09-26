@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { APPLICANT_APPLICATIONS } from '../data/applicantData';
+import { SCHEMES } from '../data/mockData';
+import { PORTAL_SCHEMES } from '../data/portalSchemes';
 import { fetchSchemeDetail } from '../services/schemes';
 import { evaluateEligibility, buildApplicantProfile } from '../services/eligibility';
 import type { EligibilityResult } from '../lib/supabase';
@@ -23,6 +25,95 @@ type SchemeDetailResponse = {
 
 export function ApplicantSchemeDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const { user } = useApplicantAuth();
+
+  const [loading, setLoading] = useState(true);
+  const [schemeData, setSchemeData] = useState<SchemeDetailResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [eligibilityEval, setEligibilityEval] = useState<{
+    result: EligibilityResult;
+    reasons: string[];
+    matched: string[];
+    missing: string[];
+  } | null>(null);
+
+  useEffect(() => {
+    async function loadScheme() {
+      if (!id) return;
+      
+      setLoading(true);
+      setError(null);
+      
+      try {
+        const data = await fetchSchemeDetail(id);
+        if (!data) {
+          setError('Scheme not found or not available');
+          return;
+        }
+        
+        setSchemeData(data);
+        
+        // Evaluate eligibility if user is logged in
+        if (user && data.eligibility) {
+          const applicantProfile = buildApplicantProfile({
+            category: user.category,
+            annual_income: null,
+            course: user.course,
+            gender: null,
+            date_of_birth: null,
+            state: user.state,
+            district: user.district,
+            previous_percentage: null,
+            admission_mode: null,
+            institution_type: null,
+            is_hosteller: null,
+          });
+          
+          const evaluation = evaluateEligibility(data.eligibility, applicantProfile);
+          setEligibilityEval(evaluation);
+        }
+      } catch (err) {
+        console.error('Failed to load scheme:', err);
+        setError('Failed to load scheme details');
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadScheme();
+  }, [id, user]);
+
+  if (loading) {
+    return (
+      <div className="space-y-4 py-1 sm:py-2">
+        <ApplicantPageHeader
+          action={<Button size="md" to={ROUTES.applicant.dashboard} variant="outline">Back to Home</Button>}
+          description={`${portalScheme.department} · ${portalScheme.type}`}
+          eyebrow="Suggested eligible scheme"
+          title={portalScheme.name}
+        />
+        <div className="grid gap-4 lg:grid-cols-3">
+          <Card className="scroll-mt-24 p-5 lg:col-span-2" id="guidelines">
+            <h2 className="text-base font-bold text-gov-blue-dark">Scheme guidelines (GR)</h2>
+            <p className="mt-2 text-sm leading-relaxed text-slate-600">
+              Official government resolutions for this scheme are not connected in this prototype. Confirm the
+              notification and criteria on the Maharashtra scholarship portal before applying.
+            </p>
+          </Card>
+          <Card accentClass="border-l-4 border-gov-saffron" className="h-fit scroll-mt-24 p-5" id="application-action">
+            <p className="text-xs font-bold uppercase tracking-wider text-gov-saffron-dark">Application action</p>
+            <h2 className="mt-1 text-base font-bold text-gov-blue-dark">Ready to apply?</h2>
+            <p className="mt-2 text-sm leading-relaxed text-slate-600">
+              The submission flow is represented in the applicant workspace for this demo, but no application can be
+              submitted yet.
+            </p>
+            <Button className="mt-4 w-full" disabled size="md" type="button" variant="primary">
+              Apply unavailable in demo
+            </Button>
+            <Button className="mt-2 w-full" size="md" to={ROUTES.applicant.applications} variant="outline">
+              View my applications
+            </Button>
+          </Card>
   const { user } = useApplicantAuth();
 
   const [loading, setLoading] = useState(true);
