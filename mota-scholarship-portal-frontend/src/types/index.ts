@@ -179,7 +179,12 @@ export interface ApplicantProfile {
   course: string;
   institution: string;
   avatarInitials: string;
-  profileCompletion?: number;
+  /**
+   * Intentionally no completion percentage. Completeness is owned by the
+   * database — see ProfileCompleteness in types/profile and
+   * fetchCompleteness() — because a value derived from auth metadata would not
+   * agree with what an administrator sees.
+   */
 }
 
 export interface ApplicantApplication {

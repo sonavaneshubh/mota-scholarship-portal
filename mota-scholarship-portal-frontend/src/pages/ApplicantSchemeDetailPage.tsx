@@ -25,10 +25,65 @@ type SchemeDetailResponse = {
 
 export function ApplicantSchemeDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const scheme = SCHEMES.find((item) => item.id === id);
-  const portalScheme = PORTAL_SCHEMES.find((item) => item.id === id);
+  const { user } = useApplicantAuth();
 
-  if (!scheme && portalScheme) {
+  const [loading, setLoading] = useState(true);
+  const [schemeData, setSchemeData] = useState<SchemeDetailResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [eligibilityEval, setEligibilityEval] = useState<{
+    result: EligibilityResult;
+    reasons: string[];
+    matched: string[];
+    missing: string[];
+  } | null>(null);
+
+  useEffect(() => {
+    async function loadScheme() {
+      if (!id) return;
+      
+      setLoading(true);
+      setError(null);
+      
+      try {
+        const data = await fetchSchemeDetail(id);
+        if (!data) {
+          setError('Scheme not found or not available');
+          return;
+        }
+        
+        setSchemeData(data);
+        
+        // Evaluate eligibility if user is logged in
+        if (user && data.eligibility) {
+          const applicantProfile = buildApplicantProfile({
+            category: user.category,
+            annual_income: null,
+            course: user.course,
+            gender: null,
+            date_of_birth: null,
+            state: user.state,
+            district: user.district,
+            previous_percentage: null,
+            admission_mode: null,
+            institution_type: null,
+            is_hosteller: null,
+          });
+          
+          const evaluation = evaluateEligibility(data.eligibility, applicantProfile);
+          setEligibilityEval(evaluation);
+        }
+      } catch (err) {
+        console.error('Failed to load scheme:', err);
+        setError('Failed to load scheme details');
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadScheme();
+  }, [id, user]);
+
+  if (loading) {
     return (
       <div className="space-y-4 py-1 sm:py-2">
         <ApplicantPageHeader
