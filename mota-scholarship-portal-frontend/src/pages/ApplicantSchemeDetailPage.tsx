@@ -1,11 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { APPLICANT_APPLICATIONS } from '../data/applicantData';
-import { SCHEMES } from '../data/mockData';
-import { PORTAL_SCHEMES } from '../data/portalSchemes';
 import { fetchSchemeDetail } from '../services/schemes';
 import { evaluateEligibility, buildApplicantProfile } from '../services/eligibility';
-import type { EligibilityResult } from '../lib/supabase';
 import { useApplicantAuth } from '../context/useApplicantAuth';
 import { ApplicantPageHeader } from '../components/applicant/ApplicantPageHeader';
 import { ApplicationStatusBadge } from '../components/applicant/StatusBadge';
@@ -14,113 +11,15 @@ import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { ROUTES } from '../lib/constants';
 
-type SchemeDetailResponse = {
-  scheme: any;
-  eligibility: any;
-  benefits: any[];
-  documents: any[];
-  sources: any[];
-  versions: any[];
-};
-
 export function ApplicantSchemeDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { user } = useApplicantAuth();
 
   const [loading, setLoading] = useState(true);
-  const [schemeData, setSchemeData] = useState<SchemeDetailResponse | null>(null);
+  const [schemeData, setSchemeData] = useState<any | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [eligibilityEval, setEligibilityEval] = useState<{
-    result: EligibilityResult;
-    reasons: string[];
-    matched: string[];
-    missing: string[];
-  } | null>(null);
-
-  useEffect(() => {
-    async function loadScheme() {
-      if (!id) return;
-      
-      setLoading(true);
-      setError(null);
-      
-      try {
-        const data = await fetchSchemeDetail(id);
-        if (!data) {
-          setError('Scheme not found or not available');
-          return;
-        }
-        
-        setSchemeData(data);
-        
-        // Evaluate eligibility if user is logged in
-        if (user && data.eligibility) {
-          const applicantProfile = buildApplicantProfile({
-            category: user.category,
-            annual_income: null,
-            course: user.course,
-            gender: null,
-            date_of_birth: null,
-            state: user.state,
-            district: user.district,
-            previous_percentage: null,
-            admission_mode: null,
-            institution_type: null,
-            is_hosteller: null,
-          });
-          
-          const evaluation = evaluateEligibility(data.eligibility, applicantProfile);
-          setEligibilityEval(evaluation);
-        }
-      } catch (err) {
-        console.error('Failed to load scheme:', err);
-        setError('Failed to load scheme details');
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    loadScheme();
-  }, [id, user]);
-
-  if (loading) {
-    return (
-      <div className="space-y-4 py-1 sm:py-2">
-        <ApplicantPageHeader
-          action={<Button size="md" to={ROUTES.applicant.dashboard} variant="outline">Back to Home</Button>}
-          description={`${portalScheme.department} · ${portalScheme.type}`}
-          eyebrow="Suggested eligible scheme"
-          title={portalScheme.name}
-        />
-        <div className="grid gap-4 lg:grid-cols-3">
-          <Card className="scroll-mt-24 p-5 lg:col-span-2" id="guidelines">
-            <h2 className="text-base font-bold text-gov-blue-dark">Scheme guidelines (GR)</h2>
-            <p className="mt-2 text-sm leading-relaxed text-slate-600">
-              Official government resolutions for this scheme are not connected in this prototype. Confirm the
-              notification and criteria on the Maharashtra scholarship portal before applying.
-            </p>
-          </Card>
-          <Card accentClass="border-l-4 border-gov-saffron" className="h-fit scroll-mt-24 p-5" id="application-action">
-            <p className="text-xs font-bold uppercase tracking-wider text-gov-saffron-dark">Application action</p>
-            <h2 className="mt-1 text-base font-bold text-gov-blue-dark">Ready to apply?</h2>
-            <p className="mt-2 text-sm leading-relaxed text-slate-600">
-              The submission flow is represented in the applicant workspace for this demo, but no application can be
-              submitted yet.
-            </p>
-            <Button className="mt-4 w-full" disabled size="md" type="button" variant="primary">
-              Apply unavailable in demo
-            </Button>
-            <Button className="mt-2 w-full" size="md" to={ROUTES.applicant.applications} variant="outline">
-              View my applications
-            </Button>
-          </Card>
-  const { user } = useApplicantAuth();
-
-  const [loading, setLoading] = useState(true);
-  const [schemeData, setSchemeData] = useState<SchemeDetailResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [eligibilityEval, setEligibilityEval] = useState<{
-    result: EligibilityResult;
+    result: 'ELIGIBLE' | 'NOT_ELIGIBLE' | 'NEEDS_REVIEW';
     reasons: string[];
     matched: string[];
     missing: string[];
@@ -198,7 +97,7 @@ export function ApplicantSchemeDetailPage() {
     );
   }
 
-  const { scheme, benefits, documents, sources } = schemeData;
+  const { scheme, benefits } = schemeData;
   const existingApplication = APPLICANT_APPLICATIONS.find((app) => app.schemeId === scheme.id);
 
   const getEligibilityStatus = (): { label: string; tone: 'blue' | 'amber' | 'green' | 'red' | 'purple' } => {
@@ -291,7 +190,6 @@ export function ApplicantSchemeDetailPage() {
                   </div>
                 </div>
               )}
- 
               <dl className="grid gap-4 border-y border-slate-100 py-4 sm:grid-cols-2">
                 <div>
                   <dt className="text-xs text-slate-500">Category</dt>
@@ -373,98 +271,6 @@ export function ApplicantSchemeDetailPage() {
                   </Card>
                 ))}
               </div>
-            </div>
-          )}
-
-          {/* Documents Section */}
-          {documents && documents.length > 0 && (
-            <div className="mb-6">
-              <h2 className="text-lg font-bold text-gov-blue-dark mb-4">Documents Required</h2>
-              <div className="space-y-2">
-                {documents.map((doc: { id: string; document_name: string; description: string | null; is_mandatory: boolean }) => (
-                  <div key={doc.id} className="flex items-center justify-between p-3 rounded border border-slate-200 bg-white">
-                    <div className="flex items-center gap-3">
-                      <span className={doc.is_mandatory ? 'text-red-500' : 'text-slate-400'}>
-                        {doc.is_mandatory ? '●' : '○'}
-                      </span>
-                      <div>
-                        <p className="text-sm font-medium text-slate-900">{doc.document_name}</p>
-                        {doc.description && <p className="text-xs text-slate-500">{doc.description}</p>}
-                      </div>
-                    </div>
-                    <Badge tone={doc.is_mandatory ? 'red' : 'purple'}>{doc.is_mandatory ? 'Mandatory' : 'Optional'}</Badge>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Sources Section */}
-          {sources && sources.length > 0 && (
-            <div className="rounded-lg border border-slate-200 bg-blue-50 p-4">
-              <h3 className="text-sm font-bold text-gov-blue-dark mb-2">Official Sources</h3>
-              <ul className="space-y-2 text-sm text-slate-700">
-                {sources.map((source: { id: string; source_url: string; source_title: string | null; gr_url: string | null; verification_status: string }) => (
-                  <li key={source.id} className="flex items-center gap-2">
-                    <a 
-                      href={source.source_url} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="text-gov-blue hover:underline flex-1 truncate"
-                    >
-                      {source.source_title || 'Official Scheme Page'}
-                    </a>
-                    {source.gr_url && (
-                      <a 
-                        href={source.gr_url} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="text-xs text-gov-blue hover:underline bg-white px-2 py-0.5 rounded border"
-                      >
-                        View GR
-                      </a>
-                    )}
-                    <Badge tone={source.verification_status === 'verified' ? 'green' : source.verification_status === 'rejected' ? 'red' : 'amber'}>{source.verification_status}</Badge>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {/* Application Dates */}
-          {(scheme.application_start_date || scheme.application_end_date) && (
-            <div className="rounded-lg border border-slate-200 bg-white p-4">
-              <h3 className="text-sm font-bold text-gov-blue-dark mb-3">Application Window</h3>
-              <dl className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <dt className="text-xs text-slate-500">Start Date</dt>
-                  <dd className="mt-1 text-sm font-semibold text-slate-800">
-                    {scheme.application_start_date ? new Date(scheme.application_start_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Not announced'}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-xs text-slate-500">End Date</dt>
-                  <dd className="mt-1 text-sm font-semibold text-slate-800">
-                    {scheme.application_end_date ? new Date(scheme.application_end_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Not announced'}
-                  </dd>
-                </div>
-              </dl>
-            </div>
-          )}
-
-          {/* Application URL */}
-          {scheme.official_application_url && (
-            <div className="rounded-lg border border-slate-200 bg-white p-4">
-              <p className="text-sm text-slate-600 mb-3">Apply through the official portal:</p>
-              <a
-                href={scheme.official_application_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 text-sm font-semibold text-gov-blue hover:underline"
-              >
-                {scheme.official_application_url}
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
-              </a>
             </div>
           )}
         </Card>
