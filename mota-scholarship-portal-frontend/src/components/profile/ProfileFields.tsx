@@ -395,6 +395,7 @@ interface MaskedSecretFieldProps {
   required: boolean;
   inputMode?: 'numeric' | 'tel';
   maxLength?: number;
+  placeholder?: string;
 }
 
 /**

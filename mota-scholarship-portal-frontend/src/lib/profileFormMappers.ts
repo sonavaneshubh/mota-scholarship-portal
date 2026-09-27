@@ -11,6 +11,7 @@ import type {
   AddressFormValues,
   ApplicantDocumentRecord,
   ApplicantProfileRecord,
+  BankDetailsRecord,
   CasteDetailsRecord,
   CurrentCourseFormValues,
   CurrentCoursesRecord,
@@ -25,10 +26,10 @@ import type {
   ProfileFormValues,
   QualificationFormValues,
 } from '../types/profile';
-import type { CertificateSlot } from '../components/profile/sections/PersonalSection';
 
 export function emptyProfileForm(): ProfileFormValues {
   return {
+    // Core identity
     full_name: '',
     email: '',
     mobile_number: '',
@@ -39,6 +40,8 @@ export function emptyProfileForm(): ProfileFormValues {
     applicant_full_name_as_per_marksheet: '',
     parent_guardian_mobile: '',
     aadhaar: '',
+    aadhaar_last4: '',
+    // Domicile
     is_maharashtra_domicile: null,
     has_domicile_certificate: null,
     domicile_certificate_source: '',
@@ -46,6 +49,7 @@ export function emptyProfileForm(): ProfileFormValues {
     domicile_certificate_number: '',
     domicile_issuing_authority: '',
     domicile_date_of_issue: '',
+    // Income
     annual_income: '',
     has_income_certificate: null,
     income_certificate_source: '',
@@ -53,13 +57,17 @@ export function emptyProfileForm(): ProfileFormValues {
     income_certificate_date: '',
     income_issuing_authority: '',
     income_barcode: '',
+    // Employment
     is_salaried: null,
     job_type: '',
+    // Disability
     is_disabled: null,
     disability_type: '',
     has_disability_certificate: null,
     disability_certificate_number: '',
+    // Siblings
     siblings_count: '',
+    // Caste
     category: '',
     caste: '',
     sub_caste: '',
@@ -69,9 +77,11 @@ export function emptyProfileForm(): ProfileFormValues {
     caste_certificate_holder_name: '',
     caste_issuing_authority: '',
     caste_date_of_issue: '',
+    // Bank
     bank_name: '',
     account_holder_name: '',
     account_number: '',
+    account_number_last4: '',
     ifsc_code: '',
     branch_name: '',
     account_type: '',
@@ -173,7 +183,7 @@ export function profileToForm(
   const income: IncomeDetailsRecord | null = data.income;
   const eligibility: PersonalEligibilityRecord | null = data.eligibility;
   const caste: CasteDetailsRecord | null = data.caste;
-  const bank = data.bank;
+  const bank: BankDetailsRecord | null = data.bank;
 
   return {
     ...base,
@@ -188,6 +198,7 @@ export function profileToForm(
     marital_status: s(profile?.marital_status),
     applicant_full_name_as_per_marksheet: s(profile?.applicant_full_name_as_per_marksheet),
     parent_guardian_mobile: s(profile?.parent_guardian_mobile),
+    aadhaar_last4: s(profile?.aadhaar_last4),
     is_maharashtra_domicile: b(domicile?.is_maharashtra_domicile),
     has_domicile_certificate: b(domicile?.has_domicile_certificate),
     domicile_certificate_source: s(domicile?.certificate_source),
@@ -220,6 +231,7 @@ export function profileToForm(
     caste_date_of_issue: s(caste?.date_of_issue),
     bank_name: s(bank?.bank_name),
     account_holder_name: s(bank?.account_holder_name),
+    account_number_last4: s(bank?.account_number_last4),
     ifsc_code: s(bank?.ifsc_code),
     branch_name: s(bank?.branch_name),
     account_type: s(bank?.account_type),
@@ -288,8 +300,6 @@ export function courseToForm(data: ProfileData): CurrentCourseFormValues {
     year_of_study: n(row.year_of_study),
     semester: n(row.semester),
     institution_name: s(row.institution_name),
-    // board_university is the canonical new column; university_name is the
-    // legacy one, so it is the fallback rather than the primary.
     board_university: s(row.board_university) || s(row.university_name),
     admission_date: s(row.admission_date),
     admission_type: s(row.admission_type),
@@ -363,6 +373,8 @@ export const CERTIFICATE_CODES = {
   disability: 'disability_certificate',
   hostel: 'hostel_certificate',
 } as const;
+
+export type CertificateSlot = 'domicile' | 'income' | 'caste' | 'disability';
 
 /**
  * Attach an already-uploaded certificate to the slot it belongs to.

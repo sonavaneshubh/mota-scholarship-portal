@@ -224,6 +224,7 @@ export interface ApplicantDocumentRecord {
 /* -------------------------------------------------------------------------- */
 
 export interface ProfileFormValues {
+  // Core identity
   full_name: string;
   email: string;
   mobile_number: string;
@@ -238,6 +239,10 @@ export interface ProfileFormValues {
    * database, because the server only ever returns a mask. See profileService.
    */
   aadhaar: string;
+  /** Read-only masked Aadhaar (XXXX XXXX 1234) from the database. */
+  aadhaar_last4: string;
+
+  // Domicile
   is_maharashtra_domicile: boolean | null;
   has_domicile_certificate: boolean | null;
   domicile_certificate_source: string;
@@ -245,6 +250,8 @@ export interface ProfileFormValues {
   domicile_certificate_number: string;
   domicile_issuing_authority: string;
   domicile_date_of_issue: string;
+
+  // Income
   annual_income: string;
   has_income_certificate: boolean | null;
   income_certificate_source: string;
@@ -252,13 +259,21 @@ export interface ProfileFormValues {
   income_certificate_date: string;
   income_issuing_authority: string;
   income_barcode: string;
+
+  // Employment
   is_salaried: boolean | null;
   job_type: string;
+
+  // Disability
   is_disabled: boolean | null;
   disability_type: string;
   has_disability_certificate: boolean | null;
   disability_certificate_number: string;
+
+  // Siblings
   siblings_count: string;
+
+  // Caste
   category: string;
   caste: string;
   sub_caste: string;
@@ -268,10 +283,14 @@ export interface ProfileFormValues {
   caste_certificate_holder_name: string;
   caste_issuing_authority: string;
   caste_date_of_issue: string;
+
+  // Bank
   bank_name: string;
   account_holder_name: string;
   /** Write-only, same lifecycle as `aadhaar`. */
   account_number: string;
+  /** Read-only masked account number (•••• 1234) from the database. */
+  account_number_last4: string;
   ifsc_code: string;
   branch_name: string;
   account_type: string;

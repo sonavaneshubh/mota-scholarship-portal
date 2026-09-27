@@ -1,5 +1,13 @@
 import type { FooterLinkColumn, LanguageOption, NavigationItem } from '../types';
 
+/**
+ * Shown wherever a real value is missing from the database. Using one shared
+ * string keeps the wording consistent and makes an absent value visibly
+ * absent, instead of rendering a confident-looking blank or a fabricated
+ * default such as "As per scheme guidelines".
+ */
+export const INFO_NOT_AVAILABLE = 'Information not available';
+
 export const SITE = {
   nameEn: 'Ministry of Tribal Affairs',
   nameHi: 'जनजातीय कार्य मंत्रालय',

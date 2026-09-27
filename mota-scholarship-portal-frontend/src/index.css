@@ -345,3 +345,105 @@
     font-size: 15px;
   }
 }
+
+/* --------------------------------------------------------------------------
+   Print
+
+   An applicant prints the review or the submission confirmation to keep for
+   their own records, so the printed page has to survive being monochrome and
+   un-clickable. Three things follow from that:
+
+     - Site chrome is removed. The masthead, navigation bar, sidebar and footer
+       are all ways of moving around the site; none of them is content, and a
+       printed copy of an application should not carry the department's web
+       furniture.
+     - The scroll container is released. The application shell scrolls `<main>`
+       rather than the page, which on paper would silently clip everything past
+       the first screenful.
+     - Cards are unboxed and long sections are allowed to break, so a multi-page
+       form is not truncated to one page by an oversized container.
+
+   Scoped to `@media print` and driven by the `no-print` / `print-keep` class
+   pair, so an ordinary screen view is completely unaffected.
+   -------------------------------------------------------------------------- */
+
+@media print {
+  /* Shell chrome. These are the only <header>/<footer>/<aside> elements in the
+     applicant layout — Masthead and CompactNavbar both render a <header>, and
+     the sidebar is the <aside> — so the selectors do not need to reach into
+     shared components to add opt-out classes. */
+  header,
+  footer,
+  aside {
+    display: none !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .print-only {
+    display: revert !important;
+  }
+
+  @page {
+    size: A4;
+    margin: 14mm 12mm;
+  }
+
+  html,
+  body {
+    background: #ffffff !important;
+    font-size: 11pt;
+  }
+
+  /* The shell is a full-height flex column with a scrolling <main>. On paper
+     both have to give up their viewport-based sizing, or the content is clipped
+     at one screenful and the rest silently never prints. */
+  #root > div {
+    min-height: 0 !important;
+    height: auto !important;
+    display: block !important;
+    background: #ffffff !important;
+    overflow: visible !important;
+  }
+
+  #root main {
+    overflow: visible !important;
+    height: auto !important;
+    padding: 0 !important;
+  }
+
+  /* Printers routinely drop background graphics, so nothing may rely on a
+     background colour to be legible or to carry meaning. */
+  * {
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  /* Cards are visual grouping for a screen. On paper they become large empty
+     boxes around text, so the border and padding go and the text is reflowed. */
+  .print-flat {
+    border: 0 !important;
+    background: transparent !important;
+    padding: 0 !important;
+  }
+
+  /* Keep a section heading with the content it introduces, and stop a two-line
+     section from being split across a page boundary. */
+  .print-keep {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .print-break-before {
+    break-before: page;
+    page-break-before: always;
+  }
+
+  /* A printed URL is noise, and appending hrefs to every link would print the
+     router path for text that is already on the page. */
+  a[href]::after {
+    content: "";
+  }
+}

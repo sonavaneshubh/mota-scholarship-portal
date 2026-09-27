@@ -184,7 +184,10 @@ export function ApplicantLayout() {
 
       <Footer />
       {sidebarOpen ? (
-        <div className="fixed inset-0 z-50 lg:hidden animate-fade-in">
+        /* no-print: the backdrop and the fixed overlay are viewport furniture.
+           Without this the overlay's own <aside> is caught by the print rule
+           that hides <aside>, but the full-bleed backdrop behind it is not. */
+        <div className="no-print fixed inset-0 z-50 lg:hidden animate-fade-in">
           <button
             aria-label="Close applicant navigation overlay"
             className="absolute inset-0 h-full w-full bg-slate-950/60"

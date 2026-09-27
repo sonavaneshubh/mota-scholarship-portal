@@ -22,10 +22,17 @@
  *    questionnaire wearing a scholarship's name.
  *
  * Nothing here is hardcoded per scholarship. The triggers are the generic
- * columns the schema already has: `max_income` means this scheme has an income
- * cap, `cap_requirement` means it cares how you got in, `hosteller_amount` means
- * it pays differently for hostellers. Add a scheme and it gets the right subset
- * of questions with no change to this file.
+ * columns the deployed scheme_eligibility / scheme_benefits tables actually
+ * have: `maximum_family_income` means this scheme has an income cap,
+ * `required_hosteller` means it is restricted to hostelers, and `amount` on a
+ * benefit row means it pays out money. Add a scheme and it gets the right
+ * subset of questions with no change to this file.
+ *
+ * Rules whose old trigger column has no counterpart in the deployed schema
+ * (institution restriction, CAP/admission requirement, disability provision)
+ * are switched off rather than pointed at a different column. Asking an
+ * applicant for a fact because of an unrelated rule would be worse than not
+ * asking.
  *
  * Two controls exist for facts that must never be typed into an application:
  * 'profile-notice' and the read-only branch. Category, bank account and
@@ -37,6 +44,7 @@
 
 import type { ApplicantDocumentRecord, ProfileData } from '../types/profile';
 import type { SchemeDetailResponse } from './supabase';
+import { describeList, describeRules } from '../services/eligibility';
 
 export type QuestionControl = 'text' | 'number' | 'textarea' | 'yesno' | 'select' | 'profile-notice';
 
@@ -117,23 +125,39 @@ function latestPercentage(ctx: RuleContext): string | null {
   return null;
 }
 
-/** True when the scheme pays out money, and therefore needs somewhere to pay it. */
+/**
+ * True when the scheme pays out money, and therefore needs somewhere to pay it.
+ *
+ * The figure is not always in `amount`: a tiered benefit carries it in
+ * `hosteller_amount` and `day_scholar_amount`, and a benefit whose amount is
+ * fixed by the institute or paid on actuals carries it only in `coverage`.
+ * Testing `amount` alone therefore reported these schemes as unpaid, which
+ * silently dropped the bank account and hosteller questions.
+ */
 function schemePaysMoney(detail: SchemeDetailResponse): boolean {
   return detail.benefits.some(
     (benefit) =>
       benefit.amount != null ||
       benefit.hosteller_amount != null ||
       benefit.day_scholar_amount != null ||
-      Boolean(benefit.coverage && benefit.coverage.trim() !== ''),
+      Boolean(benefit.coverage?.trim()),
   );
 }
 
+/**
+ * True when the scheme distinguishes hostellers from day scholars in what it
+ * pays. There is no hosteller boolean on `scheme_eligibility`, so the split
+ * amount columns are the reliable signal, with the scheme text as a fallback.
+ */
 function schemeMentionsHostel(detail: SchemeDetailResponse): boolean {
-  if (detail.benefits.some((benefit) => benefit.hosteller_amount != null)) return true;
-  const haystack = [detail.scheme.scheme_type, detail.scheme.name, detail.scheme.overview]
-    .filter(Boolean)
-    .join(' ')
-    .toLowerCase();
+  if (
+    detail.benefits.some(
+      (benefit) => benefit.hosteller_amount != null || benefit.day_scholar_amount != null,
+    )
+  ) {
+    return true;
+  }
+  const haystack = [detail.scheme.name, detail.scheme.description].filter(Boolean).join(' ').toLowerCase();
   return haystack.includes('hostel');
 }
 
@@ -146,11 +170,11 @@ const SCHEME_QUESTION_RULES: QuestionRule[] = [
     key: 'category',
     label: 'Category',
     control: 'profile-notice',
-    applies: (ctx) => Boolean(ctx.detail.eligibility?.category_requirement),
+    applies: (ctx) => Boolean(describeList(ctx.detail.eligibility?.category_requirement)),
     read: (ctx) => trimmed(ctx.profile.caste?.category),
     required: (ctx) => !trimmed(ctx.profile.caste?.category),
     because: (ctx) =>
-      `This scheme is restricted by category: ${ctx.detail.eligibility?.category_requirement}`,
+      `This scheme is restricted by category: ${describeList(ctx.detail.eligibility?.category_requirement)}`,
   },
   {
     key: 'annual_income',
@@ -201,7 +225,7 @@ const SCHEME_QUESTION_RULES: QuestionRule[] = [
     key: 'current_course',
     label: 'Current course',
     control: 'text',
-    applies: (ctx) => Boolean(ctx.detail.eligibility?.course_requirement),
+    applies: (ctx) => Boolean(describeList(ctx.detail.eligibility?.course_requirement)),
     read: (ctx) => {
       const named = trimmed(ctx.profile.course?.course_name);
       if (named) return named;
@@ -214,16 +238,18 @@ const SCHEME_QUESTION_RULES: QuestionRule[] = [
       return parts.length > 0 ? parts.join(' — ') : null;
     },
     required: (ctx) => !trimmed(ctx.profile.course?.course_name) && !trimmed(ctx.profile.course?.degree),
-    because: (ctx) => `This scheme is open to specific courses: ${ctx.detail.eligibility?.course_requirement}`,
+    because: (ctx) => `This scheme is open to specific courses: ${describeList(ctx.detail.eligibility?.course_requirement)}`,
   },
   {
     key: 'institution',
     label: 'Institution you are studying at',
     control: 'text',
-    applies: (ctx) => Boolean(ctx.detail.eligibility?.institution_requirement),
+    // The deployed scheme_eligibility table has no institution-restriction
+    // column, so there is nothing in the data that justifies asking this.
+    applies: () => false,
     read: (ctx) => trimmed(ctx.profile.course?.institution_name),
     required: (ctx) => !trimmed(ctx.profile.course?.institution_name),
-    because: (ctx) => `This scheme restricts institutions: ${ctx.detail.eligibility?.institution_requirement}`,
+    because: () => 'This scheme has an institution requirement.',
   },
   {
     key: 'admission_mode',
@@ -235,17 +261,14 @@ const SCHEME_QUESTION_RULES: QuestionRule[] = [
       { value: 'management', label: 'Management quota' },
       { value: 'other', label: 'Other' },
     ],
-    applies: (ctx) =>
-      Boolean(ctx.detail.eligibility?.cap_requirement) || Boolean(ctx.detail.eligibility?.admission_requirement),
+    // No admission-mode or CAP column exists in the deployed eligibility table.
+    applies: () => false,
     read: (ctx) => {
       if (ctx.profile.course?.cap_admission === true) return 'cap';
       return trimmed(ctx.profile.course?.admission_type);
     },
     required: (ctx) => ctx.profile.course?.cap_admission == null && !trimmed(ctx.profile.course?.admission_type),
-    because: (ctx) =>
-      ctx.detail.eligibility?.cap_requirement ??
-      ctx.detail.eligibility?.admission_requirement ??
-      'This scheme has an admission requirement.',
+    because: () => 'This scheme has an admission requirement.',
   },
   {
     key: 'last_percentage',
@@ -265,7 +288,10 @@ const SCHEME_QUESTION_RULES: QuestionRule[] = [
     label: 'Disability details',
     control: 'textarea',
     help: 'Describe your disability and the UDID number, if you have one.',
-    applies: (ctx) => Boolean(ctx.detail.eligibility?.disability_requirement),
+    // Asked only when the scheme records a disability provision, which is what
+    // disability_requirement holds. For the fellowship that is the Divyangjan
+    // category needing a certificate at 40% or more.
+    applies: (ctx) => Boolean(describeList(ctx.detail.eligibility?.disability_requirement)),
     read: (ctx) => {
       const stated = yesNo(ctx.profile.eligibility?.is_disabled);
       if (stated === 'No') return 'Not applicable';
@@ -273,7 +299,7 @@ const SCHEME_QUESTION_RULES: QuestionRule[] = [
       return null;
     },
     required: (ctx) => ctx.profile.eligibility?.is_disabled == null,
-    because: (ctx) => `This scheme has a provision for persons with disabilities: ${ctx.detail.eligibility?.disability_requirement}`,
+    because: () => 'This scheme has a provision for persons with disabilities.',
   },
   {
     key: 'parent_guardian',
@@ -313,10 +339,18 @@ const SCHEME_QUESTION_RULES: QuestionRule[] = [
     label: 'Other conditions for this scheme',
     control: 'textarea',
     help: 'Type I agree, then add anything the applicant should confirm.',
-    applies: (ctx) => Boolean(trimmed(ctx.detail.eligibility?.other_conditions)),
+    applies: (ctx) => Boolean(describeRules(ctx.detail.eligibility?.other_conditions)),
     read: () => null,
-    required: () => true,
-    because: (ctx) => `This scheme carries an extra condition you must accept: ${ctx.detail.eligibility?.other_conditions}`,
+    // Deliberately not a submit blocker. The stored conditions are a paragraph
+    // of guideline text, so demanding an answer here would stop an applicant
+    // from submitting until they typed prose about it, which is not a useful
+    // gate. The conditions themselves are still shown above the control via
+    // `because`, so the applicant sees what they are agreeing to. If an
+    // explicit acknowledgement is wanted, this needs a checkbox control
+    // rather than a free-text box.
+    required: () => false,
+    because: (ctx) =>
+      `This scheme carries an extra condition you must accept: ${describeRules(ctx.detail.eligibility?.other_conditions)}`,
   },
 ];
 

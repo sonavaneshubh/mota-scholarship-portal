@@ -1,44 +1,46 @@
 /**
- * Section 1 — Personal Information.
+ * Section 1 — Personal Information (complete).
  *
- * Spans seven tables (the applicant anchor row plus domicile, income,
- * employment/disability, caste and bank details) because that is how the data is
- * normalised, but it is presented to the applicant as one coherent form with one
- * Save button. The two sensitive values — Aadhaar and account number — are
- * routed to their SECURITY DEFINER writers and are never part of a column
- * payload.
+ * All personal information fields from the profile form:
+ * - Full Name
+ * - Email
+ * - Mobile Number
+ * - Date of Birth
+ * - Gender
+ * - Religion
+ * - Marital Status
+ * - Name as per marksheet
+ * - Parent/guardian mobile
+ * - Aadhaar number (write-only)
+ * - Maharashtra domicile
+ * - Domicile certificate
+ * - Family annual income
+ * - Income certificate
+ * - Salaried status
+ * - Disability status
+ * - Siblings count
+ * - Caste category
+ * - Caste
+ * - Caste certificate
+ * - Bank details
  */
 
 import {
   FORM_GRID_CLASS,
   Fieldset,
-  MaskedSecretField,
   SelectField,
   TextField,
   YesNoField,
+  MaskedSecretField,
 } from '../ProfileFields';
-import { DocumentUploadField } from '../DocumentUploadField';
-import {
-  ACCOUNT_TYPE_OPTIONS,
-  CERTIFICATE_SOURCE_OPTIONS,
-  GENDER_OPTIONS,
-  MARITAL_STATUS_OPTIONS,
-} from '../../../lib/profileValidation';
-import type { ApplicantDocumentRecord, ProfileFormValues, ProfileMasterData } from '../../../types/profile';
-
-export type CertificateSlot = 'domicile' | 'income' | 'caste' | 'disability';
+import { GENDER_OPTIONS, MARITAL_STATUS_OPTIONS, CERTIFICATE_SOURCE_OPTIONS, ACCOUNT_TYPE_OPTIONS } from '../../../lib/profileValidation';
+import type { ProfileFormValues, ProfileMasterData } from '../../../types/profile';
 
 export interface PersonalSectionProps {
   values: ProfileFormValues;
   onChange: (patch: Partial<ProfileFormValues>) => void;
   errors: Record<string, string>;
   master: ProfileMasterData;
-  certificates: Record<CertificateSlot, ApplicantDocumentRecord | null>;
-  onCertificateChange: (slot: CertificateSlot, document: ApplicantDocumentRecord | null) => void;
-  onUploadBusyChange: (busy: boolean) => void;
-  applicantId: string;
-  aadhaarMask: string | null;
-  accountMask: string | null;
 }
 
 export function PersonalSection({
@@ -46,20 +48,16 @@ export function PersonalSection({
   onChange,
   errors,
   master,
-  certificates,
-  onCertificateChange,
-  onUploadBusyChange,
-  applicantId,
-  aadhaarMask,
-  accountMask,
 }: PersonalSectionProps) {
   const genderOptions = GENDER_OPTIONS.map((option) => ({ value: option, label: option }));
-  const maritalOptions = MARITAL_STATUS_OPTIONS.map((option) => ({ value: option, label: option }));
-  const sourceOptions = CERTIFICATE_SOURCE_OPTIONS.map((option) => ({ value: option, label: option }));
+  const maritalStatusOptions = MARITAL_STATUS_OPTIONS.map((option) => ({ value: option, label: option }));
+  const certificateSourceOptions = CERTIFICATE_SOURCE_OPTIONS.map((option) => ({ value: option, label: option }));
+  const accountTypeOptions = ACCOUNT_TYPE_OPTIONS.map((option) => ({ value: option, label: option }));
+  const casteCategoryOptions = master.casteCategories.map((category) => ({ value: category, label: category }));
 
   return (
     <div className="space-y-6">
-      <Fieldset legend="Identity and contact">
+      <Fieldset legend="Personal Information">
         <div className={FORM_GRID_CLASS}>
           <TextField
             autoComplete="name"
@@ -68,25 +66,6 @@ export function PersonalSection({
             onChange={(value) => onChange({ full_name: value })}
             required
             value={values.full_name}
-          />
-          <TextField
-            autoComplete="name"
-            error={errors.applicant_full_name_as_per_marksheet}
-            hint="Exactly as printed on your marksheet. This is the name certificates are verified against."
-            label="Name as per marksheet"
-            onChange={(value) => onChange({ applicant_full_name_as_per_marksheet: value })}
-            required
-            value={values.applicant_full_name_as_per_marksheet}
-          />
-          <TextField
-            error={errors.mobile_number}
-            inputMode="tel"
-            label="Mobile number"
-            maxLength={10}
-            onChange={(value) => onChange({ mobile_number: value.replace(/\D/g, '').slice(0, 10) })}
-            placeholder="10-digit mobile number"
-            required
-            value={values.mobile_number}
           />
           <TextField
             autoComplete="email"
@@ -98,13 +77,14 @@ export function PersonalSection({
             value={values.email}
           />
           <TextField
-            error={errors.parent_guardian_mobile}
+            error={errors.mobile_number}
             inputMode="tel"
-            label="Parent / guardian mobile"
+            label="Mobile number"
             maxLength={10}
-            onChange={(value) => onChange({ parent_guardian_mobile: value.replace(/\D/g, '').slice(0, 10) })}
+            onChange={(value) => onChange({ mobile_number: value.replace(/\D/g, '').slice(0, 10) })}
+            placeholder="10-digit mobile number"
             required
-            value={values.parent_guardian_mobile}
+            value={values.mobile_number}
           />
           <TextField
             error={errors.date_of_birth}
@@ -123,11 +103,11 @@ export function PersonalSection({
             value={values.gender}
           />
           <SelectField
-            allowCustom
             error={errors.religion}
             label="Religion"
             onChange={(value) => onChange({ religion: value })}
-            options={master.religions.map((row) => ({ value: row.name, label: row.name }))}
+            options={master.religions.map((r) => ({ value: r.name, label: r.name }))}
+            placeholder="Select religion"
             required
             value={values.religion}
           />
@@ -135,27 +115,42 @@ export function PersonalSection({
             error={errors.marital_status}
             label="Marital status"
             onChange={(value) => onChange({ marital_status: value })}
-            options={maritalOptions}
+            options={maritalStatusOptions}
             required
             value={values.marital_status}
+          />
+          <TextField
+            error={errors.applicant_full_name_as_per_marksheet}
+            label="Name as per marksheet"
+            onChange={(value) => onChange({ applicant_full_name_as_per_marksheet: value })}
+            required
+            value={values.applicant_full_name_as_per_marksheet}
+          />
+          <TextField
+            error={errors.parent_guardian_mobile}
+            inputMode="tel"
+            label="Parent/guardian mobile"
+            maxLength={10}
+            onChange={(value) => onChange({ parent_guardian_mobile: value.replace(/\D/g, '').slice(0, 10) })}
+            placeholder="10-digit mobile number"
+            required
+            value={values.parent_guardian_mobile}
           />
         </div>
       </Fieldset>
 
-      <Fieldset
-        description="Your Aadhaar is sent once to an encrypted writer, then discarded. Only a masked value and the last four digits are kept, so it cannot be read back or leaked from a backup. Until the writer is enabled, only the mask and last four are kept on this device, and the number will need to be entered again later."
-        legend="Aadhaar identification"
-      >
+      <Fieldset legend="Aadhaar (write-only — never displayed in full)">
         <div className={FORM_GRID_CLASS}>
           <MaskedSecretField
             error={errors.aadhaar}
-            hint="Enter the applicant's Aadhaar number. The format is checked at verification."
-            inputMode="numeric"
+            hint="12 digits. Stored as masked value (XXXX XXXX 1234) and fingerprint only."
             label="Aadhaar number"
-            maxLength={14}
-            onChange={(value) => onChange({ aadhaar: value })}
-            required
-            storedMask={aadhaarMask}
+            onChange={(value) => onChange({ aadhaar: value.replace(/\D/g, '').slice(0, 12) })}
+            placeholder="Enter to save securely"
+            required={!values.aadhaar_last4}
+            storedMask={values.aadhaar_last4 ? `XXXX XXXX ${values.aadhaar_last4}` : null}
+            maxLength={12}
+            inputMode="numeric"
             value={values.aadhaar}
           />
         </div>
@@ -165,46 +160,44 @@ export function PersonalSection({
         <div className={FORM_GRID_CLASS}>
           <YesNoField
             error={errors.is_maharashtra_domicile}
-            hint="Domicile is what makes you eligible for Maharashtra state scholarship schemes."
-            label="Are you a domiciled resident of Maharashtra?"
-            onChange={(value) => onChange({ is_maharashtra_domicile: value })}
+            label="Do you have Maharashtra domicile?"
+            onChange={(value) => onChange({ is_maharashtra_domicile: value, has_domicile_certificate: null })}
             required
             value={values.is_maharashtra_domicile}
           />
-        </div>
-
-        {values.is_maharashtra_domicile ? (
-          <div className="space-y-3">
-            <div className={FORM_GRID_CLASS}>
+          {values.is_maharashtra_domicile ? (
+            <>
               <YesNoField
                 error={errors.has_domicile_certificate}
-                label="Do you hold a domicile certificate?"
+                label="Do you have a domicile certificate?"
                 onChange={(value) => onChange({ has_domicile_certificate: value })}
                 required
                 value={values.has_domicile_certificate}
               />
-              {values.has_domicile_certificate ? (
+              {values.has_domicile_certificate && (
                 <>
                   <SelectField
                     allowCustom
-                    label="Certificate obtained through"
+                    error={errors.domicile_certificate_source}
+                    label="Certificate source"
                     onChange={(value) => onChange({ domicile_certificate_source: value })}
-                    options={sourceOptions}
+                    options={certificateSourceOptions}
+                    required
                     value={values.domicile_certificate_source}
                   />
                   <TextField
-                    error={errors.domicile_certificate_number}
-                    label="Domicile certificate number"
-                    onChange={(value) => onChange({ domicile_certificate_number: value })}
-                    required
-                    value={values.domicile_certificate_number}
-                  />
-                  <TextField
                     error={errors.domicile_certificate_holder_name}
-                    label="Name on the certificate"
+                    label="Certificate holder name"
                     onChange={(value) => onChange({ domicile_certificate_holder_name: value })}
                     required
                     value={values.domicile_certificate_holder_name}
+                  />
+                  <TextField
+                    error={errors.domicile_certificate_number}
+                    label="Certificate number"
+                    onChange={(value) => onChange({ domicile_certificate_number: value })}
+                    required
+                    value={values.domicile_certificate_number}
                   />
                   <TextField
                     error={errors.domicile_issuing_authority}
@@ -222,61 +215,55 @@ export function PersonalSection({
                     value={values.domicile_date_of_issue}
                   />
                 </>
-              ) : null}
-            </div>
-
-            {values.has_domicile_certificate ? (
-              <DocumentUploadField
-                applicantId={applicantId}
-                document={certificates.domicile}
-                documentCode="domicile_certificate"
-                error={errors.domicile_document}
-                label="Domicile certificate"
-                onBusyChange={onUploadBusyChange}
-                onChange={(document) => onCertificateChange('domicile', document)}
-              />
-            ) : null}
-          </div>
-        ) : null}
+              )}
+            </>
+          ) : null}
+        </div>
       </Fieldset>
 
-      <Fieldset legend="Family income">
+      <Fieldset legend="Family Income">
         <div className={FORM_GRID_CLASS}>
           <TextField
             error={errors.annual_income}
-            hint="Total annual income of the family, in rupees."
-            inputMode="decimal"
-            label="Family annual income"
-            onChange={(value) => onChange({ annual_income: value.replace(/[^\d.]/g, '') })}
-            placeholder="e.g. 250000"
+            hint="Annual family income in rupees."
+            inputMode="numeric"
+            label="Family annual income (₹)"
+            onChange={(value) => onChange({ annual_income: value.replace(/[^\d]/g, '') })}
             required
             value={values.annual_income}
           />
           <YesNoField
             error={errors.has_income_certificate}
-            label="Do you hold an income certificate?"
+            label="Do you have an income certificate?"
             onChange={(value) => onChange({ has_income_certificate: value })}
             required
             value={values.has_income_certificate}
           />
-        </div>
-
-        {values.has_income_certificate ? (
-          <div className="space-y-3">
-            <div className={FORM_GRID_CLASS}>
+          {values.has_income_certificate && (
+            <>
               <SelectField
                 allowCustom
-                label="Certificate obtained through"
+                error={errors.income_certificate_source}
+                label="Certificate source"
                 onChange={(value) => onChange({ income_certificate_source: value })}
-                options={sourceOptions}
+                options={certificateSourceOptions}
+                required
                 value={values.income_certificate_source}
               />
               <TextField
                 error={errors.income_certificate_number}
-                label="Income certificate number"
+                label="Certificate number"
                 onChange={(value) => onChange({ income_certificate_number: value })}
                 required
                 value={values.income_certificate_number}
+              />
+              <TextField
+                error={errors.income_certificate_date}
+                label="Certificate date"
+                onChange={(value) => onChange({ income_certificate_date: value })}
+                required
+                type="date"
+                value={values.income_certificate_date}
               />
               <TextField
                 error={errors.income_issuing_authority}
@@ -286,104 +273,80 @@ export function PersonalSection({
                 value={values.income_issuing_authority}
               />
               <TextField
-                error={errors.income_certificate_date}
-                label="Date of issue"
-                onChange={(value) => onChange({ income_certificate_date: value })}
-                required
-                type="date"
-                value={values.income_certificate_date}
-              />
-              <TextField
-                hint="Printed on the Aaple Sarkar income certificate, if present."
-                label="Certificate barcode / reference"
+                error={errors.income_barcode}
+                label="Barcode (if any)"
                 onChange={(value) => onChange({ income_barcode: value })}
                 value={values.income_barcode}
               />
-            </div>
-            <DocumentUploadField
-              applicantId={applicantId}
-              document={certificates.income}
-              documentCode="income_certificate"
-              error={errors.income_document}
-              label="Income certificate"
-              onBusyChange={onUploadBusyChange}
-              onChange={(document) => onCertificateChange('income', document)}
-            />
-          </div>
-        ) : null}
+            </>
+          )}
+        </div>
       </Fieldset>
 
-      <Fieldset legend="Employment and disability">
+      <Fieldset legend="Employment">
         <div className={FORM_GRID_CLASS}>
           <YesNoField
             error={errors.is_salaried}
-            label="Are you currently salaried?"
-            onChange={(value) => onChange({ is_salaried: value })}
+            label="Are you salaried?"
+            onChange={(value) => onChange({ is_salaried: value, job_type: '' })}
             required
             value={values.is_salaried}
           />
-          {values.is_salaried ? (
+          {values.is_salaried && (
             <TextField
               error={errors.job_type}
               label="Job type"
               onChange={(value) => onChange({ job_type: value })}
-              placeholder="e.g. Full-time, Part-time, Self-employed"
               required
               value={values.job_type}
             />
-          ) : null}
+          )}
+        </div>
+      </Fieldset>
 
+      <Fieldset legend="Disability">
+        <div className={FORM_GRID_CLASS}>
           <YesNoField
             error={errors.is_disabled}
-            label="Do you have a disability under the Rights of Persons with Disabilities Act?"
-            onChange={(value) => onChange({ is_disabled: value })}
+            label="Do you have a disability?"
+            onChange={(value) => onChange({ is_disabled: value, disability_type: '', has_disability_certificate: null })}
             required
             value={values.is_disabled}
           />
-          {values.is_disabled ? (
-            <SelectField
-              allowCustom
-              error={errors.disability_type}
-              label="Disability type"
-              onChange={(value) => onChange({ disability_type: value })}
-              options={master.disabilityTypes.map((row) => ({ value: row, label: row }))}
-              required
-              value={values.disability_type}
-            />
-          ) : null}
-          {values.is_disabled ? (
-            <YesNoField
-              error={errors.has_disability_certificate}
-              label="Do you hold a disability certificate?"
-              onChange={(value) => onChange({ has_disability_certificate: value })}
-              required
-              value={values.has_disability_certificate}
-            />
-          ) : null}
-          {values.is_disabled && values.has_disability_certificate ? (
-            <TextField
-              error={errors.disability_certificate_number}
-              label="Disability certificate number"
-              onChange={(value) => onChange({ disability_certificate_number: value })}
-              required
-              value={values.disability_certificate_number}
-            />
-          ) : null}
-          {values.is_disabled && values.has_disability_certificate ? (
-            <DocumentUploadField
-              applicantId={applicantId}
-              document={certificates.disability}
-              documentCode="disability_certificate"
-              error={errors.disability_document}
-              label="Disability certificate"
-              onBusyChange={onUploadBusyChange}
-              onChange={(document) => onCertificateChange('disability', document)}
-            />
-          ) : null}
+          {values.is_disabled && (
+            <>
+              <TextField
+                error={errors.disability_type}
+                label="Disability type"
+                onChange={(value) => onChange({ disability_type: value })}
+                required
+                value={values.disability_type}
+              />
+              <YesNoField
+                error={errors.has_disability_certificate}
+                label="Do you have a disability certificate?"
+                onChange={(value) => onChange({ has_disability_certificate: value })}
+                required
+                value={values.has_disability_certificate}
+              />
+              {values.has_disability_certificate && (
+                <TextField
+                  error={errors.disability_certificate_number}
+                  label="Certificate number"
+                  onChange={(value) => onChange({ disability_certificate_number: value })}
+                  required
+                  value={values.disability_certificate_number}
+                />
+              )}
+            </>
+          )}
+        </div>
+      </Fieldset>
 
+      <Fieldset legend="Siblings">
+        <div className={FORM_GRID_CLASS}>
           <TextField
             error={errors.siblings_count}
-            hint="Include yourself. Enter 0 if you are the only child."
             inputMode="numeric"
             label="Number of siblings"
             maxLength={2}
@@ -394,66 +357,62 @@ export function PersonalSection({
         </div>
       </Fieldset>
 
-      <Fieldset legend="Caste category">
+      <Fieldset legend="Caste / Category">
         <div className={FORM_GRID_CLASS}>
           <SelectField
             allowCustom
             error={errors.category}
             label="Category"
             onChange={(value) => onChange({ category: value })}
-            options={master.casteCategories.map((category) => ({ value: category, label: category }))}
+            options={casteCategoryOptions}
             placeholder="Select category"
             required
             value={values.category}
           />
-          <SelectField
-            allowCustom
+          <TextField
             error={errors.caste}
-            hint="No caste list is pre-loaded, because the list is notified by the government. Type your community name."
-            label="Caste / community"
+            label="Caste"
             onChange={(value) => onChange({ caste: value })}
-            options={[]}
-            placeholder="Type or select"
             required
             value={values.caste}
           />
           <TextField
-            label="Sub-caste / jati (optional)"
+            error={errors.sub_caste}
+            label="Sub-caste"
             onChange={(value) => onChange({ sub_caste: value })}
             value={values.sub_caste}
           />
           <YesNoField
             error={errors.has_caste_certificate}
-            label="Do you hold a caste certificate?"
+            label="Do you have a caste certificate?"
             onChange={(value) => onChange({ has_caste_certificate: value })}
             required
             value={values.has_caste_certificate}
           />
-        </div>
-
-        {values.has_caste_certificate ? (
-          <div className="space-y-3">
-            <div className={FORM_GRID_CLASS}>
+          {values.has_caste_certificate && (
+            <>
               <SelectField
                 allowCustom
-                label="Certificate obtained through"
+                error={errors.caste_certificate_source}
+                label="Certificate source"
                 onChange={(value) => onChange({ caste_certificate_source: value })}
-                options={sourceOptions}
+                options={certificateSourceOptions}
+                required
                 value={values.caste_certificate_source}
               />
               <TextField
-                error={errors.caste_certificate_number}
-                label="Caste certificate number"
-                onChange={(value) => onChange({ caste_certificate_number: value })}
-                required
-                value={values.caste_certificate_number}
-              />
-              <TextField
                 error={errors.caste_certificate_holder_name}
-                label="Name on the certificate"
+                label="Certificate holder name"
                 onChange={(value) => onChange({ caste_certificate_holder_name: value })}
                 required
                 value={values.caste_certificate_holder_name}
+              />
+              <TextField
+                error={errors.caste_certificate_number}
+                label="Certificate number"
+                onChange={(value) => onChange({ caste_certificate_number: value })}
+                required
+                value={values.caste_certificate_number}
               />
               <TextField
                 error={errors.caste_issuing_authority}
@@ -470,24 +429,12 @@ export function PersonalSection({
                 type="date"
                 value={values.caste_date_of_issue}
               />
-            </div>
-            <DocumentUploadField
-              applicantId={applicantId}
-              document={certificates.caste}
-              documentCode="caste_certificate"
-              error={errors.caste_document}
-              label="Caste certificate"
-              onBusyChange={onUploadBusyChange}
-              onChange={(document) => onCertificateChange('caste', document)}
-            />
-          </div>
-        ) : null}
+            </>
+          )}
+        </div>
       </Fieldset>
 
-      <Fieldset
-        description="The account number is sent once to an encrypted writer and is never stored in plain text. Only its last four digits are kept for your reference."
-        legend="Bank account for scholarship disbursement"
-      >
+      <Fieldset legend="Bank Account">
         <div className={FORM_GRID_CLASS}>
           <TextField
             error={errors.bank_name}
@@ -505,21 +452,21 @@ export function PersonalSection({
           />
           <MaskedSecretField
             error={errors.account_number}
-            hint="6 to 20 digits. Leave blank to keep the saved number."
-            inputMode="numeric"
-            label="Account number"
+            hint="6–20 digits. Stored encrypted; only last 4 digits shown."
+            label="Bank account number"
+            onChange={(value) => onChange({ account_number: value.replace(/\D/g, '') })}
+            placeholder="Enter to save securely"
+            required={!values.account_number_last4}
+            storedMask={values.account_number_last4 ? `•••• ${values.account_number_last4}` : null}
             maxLength={20}
-            onChange={(value) => onChange({ account_number: value.replace(/\D/g, '').slice(0, 20) })}
-            required
-            storedMask={accountMask}
+            inputMode="numeric"
             value={values.account_number}
           />
           <TextField
             error={errors.ifsc_code}
-            hint="11 characters, for example HDFC0001234."
             label="IFSC code"
+            onChange={(value) => onChange({ ifsc_code: value.toUpperCase() })}
             maxLength={11}
-            onChange={(value) => onChange({ ifsc_code: value.toUpperCase().replace(/\s/g, '').slice(0, 11) })}
             required
             value={values.ifsc_code}
           />
@@ -534,14 +481,13 @@ export function PersonalSection({
             error={errors.account_type}
             label="Account type"
             onChange={(value) => onChange({ account_type: value })}
-            options={ACCOUNT_TYPE_OPTIONS.map((option) => ({ value: option, label: option }))}
+            options={accountTypeOptions}
             required
             value={values.account_type}
           />
           <YesNoField
             error={errors.aadhaar_linked}
-            hint="Aaple Sarkar requires the applicant's own Aadhaar-seeded account for direct benefit transfer."
-            label="Is this account linked to your Aadhaar?"
+            label="Is Aadhaar linked?"
             onChange={(value) => onChange({ aadhaar_linked: value })}
             required
             value={values.aadhaar_linked}

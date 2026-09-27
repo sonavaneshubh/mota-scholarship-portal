@@ -39,6 +39,24 @@ export interface SchemeCategory {
   updated_at: string;
 }
 
+/**
+ * Mirrors the deployed `public.schemes` table.
+ *
+ * This deliberately lists only columns that exist in the database, verified
+ * against PostgREST. Earlier revisions of this file also described scheme_type,
+ * overview, application_mode, official_scheme_url, official_application_url,
+ * gr_url, renewal_available and source_* — none of which are in the deployed
+ * table, so every read of them returned undefined and the UI rendered
+ * confident-looking blanks. Add a column here only after it exists in the
+ * database.
+ *
+ * scheme_type and overview are the exception, and they are back. Migration
+ * 20260927000000 added both to the deployed table and
+ * 20260927000008_scheme_detail_content.sql re-asserts them idempotently, so
+ * they are now genuinely readable. They are still nullable: a scheme row that
+ * has not been through the new seed has no value, and the detail view says so
+ * rather than substituting a default that nobody verified.
+ */
 export interface Scheme {
   id: string;
   scheme_code: string;
@@ -49,23 +67,18 @@ export interface Scheme {
   scheme_type: string | null;
   description: string | null;
   overview: string | null;
-  application_mode: string | null;
-  official_scheme_url: string | null;
-  official_application_url: string | null;
-  gr_url: string | null;
   academic_year: string;
   application_start_date: string | null;
   application_end_date: string | null;
-  renewal_available: boolean | null;
-  status: 'draft' | 'review' | 'published' | 'inactive';
+  status: 'draft' | 'review' | 'published' | 'inactive' | 'archived';
   verification_status: 'pending_review' | 'verified' | 'rejected';
-  source_url: string;
-  source_type: string | null;
-  source_last_verified_at: string | null;
+  is_active: boolean;
+  created_by: string | null;
   verified_by: string | null;
+  verified_at: string | null;
   created_at: string;
   updated_at: string;
-  
+
   // Joined fields
   departments?: Department;
   scheme_categories?: SchemeCategory;
@@ -146,32 +159,49 @@ export interface Application {
   draft_saved_at?: string | null;
 }
 
+/**
+ * Mirrors the deployed `public.scheme_eligibility` table. There is no
+ * `academic_year` column here — filtering a query by it returns PostgreSQL
+ * 42703 "column does not exist", which is what silently emptied the
+ * eligibility section of the scheme detail page.
+ */
 export interface SchemeEligibility {
   id: string;
   scheme_id: string;
   academic_year: string;
-  category_requirement: string | null;
-  religion_requirement: string | null;
-  gender_requirement: string | null;
-  disability_requirement: string | null;
   min_age: number | null;
   max_age: number | null;
+  // Free-text requirement columns. PostgREST returns these as strings, and
+  // older rows can hold a JSON array, so the UI normalises both shapes through
+  // describeList() rather than calling string methods on them.
+  category_requirement: string[] | string | null;
+  religion_requirement: string[] | string | null;
+  gender_requirement: string[] | string | null;
+  disability_requirement: string[] | string | null;
+  qualification_requirement: string[] | string | null;
+  course_requirement: string[] | string | null;
+  residency_requirement: string[] | string | null;
+  institution_requirement: string[] | string | null;
+  attendance_requirement: string[] | string | null;
+  admission_requirement: string[] | string | null;
+  cap_requirement: string[] | string | null;
+  gap_requirement: string[] | string | null;
   min_percentage: number | null;
   max_income: number | null;
+  // 'per annum' or similar. Null when the column is not meaningful, such as on
+  // a scheme with no income criterion at all.
   income_period: string | null;
-  residency_requirement: string | null;
-  qualification_requirement: string | null;
-  course_requirement: string | null;
-  institution_requirement: string | null;
-  attendance_requirement: string | null;
-  admission_requirement: string | null;
-  cap_requirement: string | null;
-  gap_requirement: string | null;
-  other_conditions: string | null;
+  other_conditions: Record<string, unknown> | string | null;
   created_at: string;
   updated_at: string;
 }
 
+/**
+ * Mirrors the deployed `public.scheme_benefits` table. Amounts are null in the
+ * data, and there are no amount_currency/amount_period/coverage/hosteller or
+ * day-scholar columns, so the UI must not imply a per-year or per-hosteller
+ * figure it cannot source.
+ */
 export interface SchemeBenefit {
   id: string;
   scheme_id: string;
@@ -179,27 +209,81 @@ export interface SchemeBenefit {
   benefit_type: string;
   description: string | null;
   amount: number | null;
-  amount_currency: string;
+  frequency: string | null;
+  conditions: string | null;
+  // Added by 20260927000008_scheme_detail_content.sql.
+  //
+  // A single scalar `amount` cannot express a stipend that differs by
+  // residence, so the hosteller and day-scholar rates get their own columns
+  // instead of being flattened into prose. `benefit_group` labels a tier within
+  // one benefit_type (I, II, III, IV for the stipend groups); it is null for
+  // benefits that are not tiered, which is why these stay nullable rather than
+  // defaulting to an empty string that would look like a real group.
+  benefit_group: string | null;
   amount_period: string | null;
   coverage: string | null;
   hosteller_amount: number | null;
   day_scholar_amount: number | null;
-  conditions: string | null;
+  created_at: string;
+}
+
+/**
+ * Mirrors the deployed `public.scheme_process_steps` table, added by
+ * 20260927000008_scheme_detail_content.sql. One ordered step an applicant
+ * passes through, from submission through to payment.
+ *
+ * `is_verified` is false until a department officer has checked the step
+ * against the scheme's own guideline, so the detail view can mark the pipeline
+ * as provisional rather than presenting it as settled.
+ */
+export interface SchemeProcessStep {
+  id: string;
+  scheme_id: string;
+  step_number: number;
+  title: string;
+  description: string | null;
+  actor: string | null;
+  is_verified: boolean;
   created_at: string;
   updated_at: string;
 }
 
-export interface SchemeDocument {
+/**
+ * Mirrors the deployed `public.scheme_criteria` table, added by
+ * 20260927000008_scheme_detail_content.sql.
+ *
+ * Separate from SchemeEligibility on purpose: that table holds the
+ * machine-checkable values used to pre-evaluate an applicant (income ceiling,
+ * minimum percentage, eligible categories), whereas this holds the ordered
+ * conditions a person reads. They answer different questions and one cannot be
+ * reliably derived from the other.
+ */
+export interface SchemeCriterion {
   id: string;
   scheme_id: string;
-  document_name: string;
-  description: string | null;
+  criterion_order: number;
+  label: string;
+  detail: string | null;
   is_mandatory: boolean;
-  applicant_type: string | null;
-  academic_year: string | null;
   source_text: string | null;
   created_at: string;
   updated_at: string;
+}
+
+/**
+ * Mirrors the deployed `public.scheme_documents` table. There is no
+ * `updated_at`, `applicant_type` or `source_text` column.
+ */
+export interface SchemeDocument {
+  id: string;
+  scheme_id: string;
+  document_type: string | null;
+  document_name: string;
+  description: string | null;
+  is_mandatory: boolean | null;
+  accepted_formats: string | null;
+  max_file_size_mb: number | null;
+  created_at: string;
 }
 
 export interface SchemeSource {
@@ -242,6 +326,10 @@ export interface SchemeDetailResponse {
   documents: SchemeDocument[];
   sources: SchemeSource[];
   versions: SchemeVersion[];
+  /** Ordered pipeline from submission to payment. Empty when none is recorded. */
+  processSteps: SchemeProcessStep[];
+  /** Ordered eligibility conditions. Empty when none is recorded. */
+  criteria: SchemeCriterion[];
 }
 
 export interface SchemeFilters {
@@ -279,6 +367,18 @@ export interface ApplicantScheme {
   applyHref: string;
 }
 
+/**
+ * Columns the guideline/overview fallback reads, but which the deployed
+ * public.schemes table does not have. Kept off `Scheme` on purpose so nothing
+ * depends on a column that is not in the database; reading them optionally means
+ * a migration that adds them is picked up without another code change.
+ */
+type SchemeOptionalColumns = {
+  gr_url?: string | null;
+  overview?: string | null;
+  official_application_url?: string | null;
+};
+
 // Helper to convert DB scheme to frontend format
 export function mapSchemeToFrontend(scheme: SchemeWithRelations): ApplicantScheme {
   const categoryMap: Record<string, { label: string; tone: ApplicantScheme['badgeTone'] }> = {
@@ -296,7 +396,12 @@ export function mapSchemeToFrontend(scheme: SchemeWithRelations): ApplicantSchem
 
   const catInfo = categoryMap[scheme.scheme_categories?.name || ''] || { label: 'Other', tone: 'slate' };
   const deptName = scheme.departments?.name || 'Unknown Department';
-  const guidelineUrl = resolveGuidelineUrl(scheme.gr_url, scheme.scheme_code);
+  // public.schemes has no gr_url column, so the database value is read
+  // optionally rather than declared on `Scheme`. resolveGuidelineUrl then falls
+  // back to the scheme-code table, and picks the column up automatically if a
+  // future migration adds it.
+  const optionalColumns = scheme as SchemeWithRelations & SchemeOptionalColumns;
+  const guidelineUrl = resolveGuidelineUrl(optionalColumns.gr_url, scheme.scheme_code);
   
   return {
     id: scheme.id,
@@ -311,7 +416,7 @@ export function mapSchemeToFrontend(scheme: SchemeWithRelations): ApplicantSchem
     department: deptName,
       guidelinesAvailable: guidelineUrl !== '',
       guidelineUrl,
-    description: scheme.description || scheme.overview || '',
+    description: scheme.description || optionalColumns.overview || '',
     stats: [
       { label: 'Academic Year', value: scheme.academic_year, emphasize: true },
       { label: 'Department', value: deptName },
@@ -319,7 +424,7 @@ export function mapSchemeToFrontend(scheme: SchemeWithRelations): ApplicantSchem
     ],
     // Empty string means "no official application URL is published". A placeholder
     // href would render a working-looking Apply button that leads nowhere.
-    applyHref: scheme.official_application_url ?? '',
+    applyHref: optionalColumns.official_application_url ?? '',
   };
 }
 

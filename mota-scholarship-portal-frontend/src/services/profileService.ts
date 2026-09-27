@@ -1,31 +1,24 @@
 /**
  * Applicant profile data access.
  *
- * This is the only module that speaks to the profile tables. Components never
- * see a Supabase client, a column name or a null-handling decision — they get
- * form-shaped values in and a typed result out.
+ * Handles all profile sections:
+ * 1. Personal Information
+ * 2. Address Information
+ * 3. Other Information (parents / guardian)
+ * 4. Current Course
+ * 5. Past Qualification
+ * 6. Hostel Details
  *
- * Security notes that are easy to get wrong and are therefore handled here:
- *
- *  - Ownership is never sent by the client. `applicant_id` is resolved from
- *    auth.uid() server-side, and the RLS policies reject a mismatch, so a
- *    tampered payload cannot write to somebody else's row.
- *  - The full Aadhaar and the full account number are sent exactly once, to the
- *    SECURITY DEFINER writers, and are cleared from component state as soon as
- *    the call resolves. They are never written to localStorage/sessionStorage,
- *    never placed in a URL, and never logged.
- *  - Reads of `bank_details` name their columns explicitly and never include
- *    `account_number` or `account_number_ciphertext`: the database grants
- *    privileges on that table per column, and the plaintext column is locked to
- *    NULL by a check constraint.
+ * The loadProfile function loads all data for the application form to use.
+ * The save functions handle each section separately.
  */
 
 import { supabase } from '../lib/supabase';
 import { messageFromError } from '../lib/dbErrorMessage';
 import { saveLocalAadhaar, saveLocalAccountNumber } from '../lib/localSecretStore';
 import type {
-  AddressFormValues,
   AddressDetailsRecord,
+  AddressFormValues,
   ApplicantDocumentRecord,
   ApplicantProfileRecord,
   ApplicantQualificationRecord,
@@ -62,6 +55,16 @@ export interface ServiceResult<T> {
 }
 
 const PROFILE_TABLE = 'applicant_profiles';
+const DOMICILE_TABLE = 'domicile_details';
+const INCOME_TABLE = 'income_details';
+const ELIGIBILITY_TABLE = 'personal_eligibility';
+const CASTE_TABLE = 'caste_details';
+const ADDRESS_TABLE = 'address_details';
+const PARENTS_TABLE = 'parent_guardian_details';
+const BANK_TABLE = 'bank_details';
+const COURSE_TABLE = 'current_courses';
+const QUAL_TABLE = 'applicant_qualifications';
+const HOSTEL_TABLE = 'hostel_details';
 
 function requireClient() {
   if (!supabase) {
@@ -71,13 +74,6 @@ function requireClient() {
   }
   return supabase;
 }
-
-/**
- * Applicant-facing database errors are filtered in one place, not per call site.
- * The two services that write applicant data used to carry identical private
- * copies of this helper, so the filter had to be corrected in both and a third
- * copy would have reintroduced the raw-message behaviour.
- */
 
 /** Empty string means "not answered"; store NULL so the completeness engine agrees. */
 function text(value: string | null | undefined): string | null {
@@ -104,17 +100,12 @@ function date(value: string | null | undefined): string | null {
   return trimmed === '' ? null : trimmed;
 }
 
+
+
 /* -------------------------------------------------------------------------- */
 /* Anchor row                                                                 */
 /* -------------------------------------------------------------------------- */
 
-/**
- * Returns the caller's applicant_profiles row, creating it on first use.
- *
- * Every section table hangs off this row, so it must exist before anything else
- * can be saved. Creation is safe to retry: the unique user_id makes the second
- * attempt a no-op that falls through to the select.
- */
 export async function ensureApplicantProfile(userId: string): Promise<ServiceResult<ApplicantProfileRecord>> {
   const client = requireClient();
 
@@ -139,7 +130,6 @@ export async function ensureApplicantProfile(userId: string): Promise<ServiceRes
     .maybeSingle();
 
   if (insertError) {
-    // A concurrent tab may have won the insert; re-read once before failing.
     const { data: retry } = await client
       .from(PROFILE_TABLE)
       .select('*')
@@ -166,12 +156,12 @@ export async function loadProfile(applicantId: string): Promise<ServiceResult<Pr
   const [profile, domicile, income, eligibility, caste, address, parents, bank, course, hostel, quals, docs] =
     await Promise.all([
       client.from(PROFILE_TABLE).select('*').eq('id', applicantId).maybeSingle(),
-      client.from('domicile_details').select('*').eq('applicant_id', applicantId).maybeSingle(),
-      client.from('income_details').select('*').eq('applicant_id', applicantId).maybeSingle(),
-      client.from('personal_eligibility').select('*').eq('applicant_id', applicantId).maybeSingle(),
-      client.from('caste_details').select('*').eq('applicant_id', applicantId).maybeSingle(),
-      client.from('address_details').select('*').eq('applicant_id', applicantId).maybeSingle(),
-      client.from('parent_guardian_details').select('*').eq('applicant_id', applicantId).maybeSingle(),
+      client.from(DOMICILE_TABLE).select('*').eq('applicant_id', applicantId).maybeSingle(),
+      client.from(INCOME_TABLE).select('*').eq('applicant_id', applicantId).maybeSingle(),
+      client.from(ELIGIBILITY_TABLE).select('*').eq('applicant_id', applicantId).maybeSingle(),
+      client.from(CASTE_TABLE).select('*').eq('applicant_id', applicantId).maybeSingle(),
+      client.from(ADDRESS_TABLE).select('*').eq('applicant_id', applicantId).maybeSingle(),
+      client.from(PARENTS_TABLE).select('*').eq('applicant_id', applicantId).maybeSingle(),
       // Columns are listed explicitly rather than using '*'. bank_details has
       // column-level grants (the RLS migration revokes the table-level grant and
       // re-grants per column, excluding account_number and
@@ -179,15 +169,15 @@ export async function loadProfile(applicantId: string): Promise<ServiceResult<Pr
       // Naming the safe columns also documents at the call site that the
       // ciphertext is never pulled into the browser.
       client
-        .from('bank_details')
+        .from(BANK_TABLE)
         .select(
           'id, applicant_id, bank_name, account_holder_name, ifsc_code, branch_name, account_type, aadhaar_linked, account_number_last4',
         )
         .eq('applicant_id', applicantId)
         .maybeSingle(),
-      client.from('current_courses').select('*').eq('applicant_id', applicantId).maybeSingle(),
-      client.from('hostel_details').select('*').eq('applicant_id', applicantId).maybeSingle(),
-      client.from('applicant_qualifications').select('*').eq('applicant_id', applicantId).order('passing_year', {
+      client.from(COURSE_TABLE).select('*').eq('applicant_id', applicantId).maybeSingle(),
+      client.from(HOSTEL_TABLE).select('*').eq('applicant_id', applicantId).maybeSingle(),
+      client.from(QUAL_TABLE).select('*').eq('applicant_id', applicantId).order('passing_year', {
         ascending: false,
       }),
       client.from('applicant_documents').select('*').eq('applicant_id', applicantId).order('uploaded_at', {
@@ -229,15 +219,6 @@ export async function loadProfile(applicantId: string): Promise<ServiceResult<Pr
   };
 }
 
-/**
- * Columns an applicant may read back from bank_details.
- *
- * bank_details grants privileges per column, excluding account_number and
- * account_number_ciphertext, so a bare '*' select is rejected by the database.
- */
-const BANK_SAFE_COLUMNS =
-  'id, applicant_id, bank_name, account_holder_name, ifsc_code, branch_name, account_type, aadhaar_linked, account_number_last4';
-
 /** upsert helper for the 1:1 section tables. */
 async function upsertOne<T>(
   table: string,
@@ -249,9 +230,6 @@ async function upsertOne<T>(
   const client = requireClient();
 
   if (rowId) {
-    // applicant_id is in the filter as well as being the RLS subject: the
-    // predicate is what proves the row being replaced is the caller's own, so a
-    // stale id in the browser cannot overwrite somebody else's section.
     const { data, error } = await client
       .from(table)
       .update(payload)
@@ -280,7 +258,6 @@ async function upsertOne<T>(
 export interface PersonalSaveInput {
   values: ProfileFormValues;
   ids: {
-    /** applicant_profiles.id — the anchor row, already created. */
     profile: string;
     domicile: string | null;
     income: string | null;
@@ -381,7 +358,7 @@ export async function savePersonalSection(
   );
   if (!profileResult.ok) return { ok: false, error: profileResult.error };
 
-  const domicile = await upsertOne<DomicileDetailsRecord>('domicile_details', applicantId, ids.domicile, {
+  const domicile = await upsertOne<DomicileDetailsRecord>(DOMICILE_TABLE, applicantId, ids.domicile, {
     is_maharashtra_domicile: values.is_maharashtra_domicile,
     has_domicile_certificate: values.has_domicile_certificate,
     certificate_source: text(values.domicile_certificate_source),
@@ -393,7 +370,7 @@ export async function savePersonalSection(
   });
   if (!domicile.ok) return { ok: false, error: domicile.error };
 
-  const income = await upsertOne<IncomeDetailsRecord>('income_details', applicantId, ids.income, {
+  const income = await upsertOne<IncomeDetailsRecord>(INCOME_TABLE, applicantId, ids.income, {
     annual_income: num(values.annual_income),
     has_income_certificate: values.has_income_certificate,
     certificate_source: text(values.income_certificate_source),
@@ -405,7 +382,7 @@ export async function savePersonalSection(
   });
   if (!income.ok) return { ok: false, error: income.error };
 
-  const eligibility = await upsertOne<PersonalEligibilityRecord>('personal_eligibility', applicantId, ids.eligibility, {
+  const eligibility = await upsertOne<PersonalEligibilityRecord>(ELIGIBILITY_TABLE, applicantId, ids.eligibility, {
     is_salaried: values.is_salaried,
     job_type: text(values.job_type),
     is_disabled: values.is_disabled,
@@ -417,7 +394,7 @@ export async function savePersonalSection(
   });
   if (!eligibility.ok) return { ok: false, error: eligibility.error };
 
-  const caste = await upsertOne<CasteDetailsRecord>('caste_details', applicantId, ids.caste, {
+  const caste = await upsertOne<CasteDetailsRecord>(CASTE_TABLE, applicantId, ids.caste, {
     category: text(values.category),
     caste: text(values.caste),
     sub_caste: text(values.sub_caste),
@@ -436,7 +413,7 @@ export async function savePersonalSection(
   // which encrypts it server-side. The safe column list is passed to upsertOne
   // because this table has no table-level SELECT grant.
   const bank = await upsertOne<BankDetailsRecord>(
-    'bank_details',
+    BANK_TABLE,
     applicantId,
     ids.bank,
     {
@@ -447,7 +424,7 @@ export async function savePersonalSection(
       account_type: text(values.account_type),
       aadhaar_linked: values.aadhaar_linked,
     },
-    BANK_SAFE_COLUMNS,
+    'id, applicant_id, bank_name, account_holder_name, ifsc_code, branch_name, account_type, aadhaar_linked, account_number_last4',
   );
   if (!bank.ok) return { ok: false, error: bank.error };
 
@@ -487,7 +464,7 @@ export async function saveAddressSection(
         correspondence_pincode: text(values.correspondence_pincode),
       };
 
-  return upsertOne<AddressDetailsRecord>('address_details', applicantId, rowId, {
+  return upsertOne<AddressDetailsRecord>(ADDRESS_TABLE, applicantId, rowId, {
     permanent_address: text(values.permanent_address),
     permanent_village: text(values.permanent_village),
     permanent_state: text(values.permanent_state),
@@ -508,7 +485,7 @@ export async function saveOtherInfoSection(
   rowId: string | null,
   values: OtherInfoFormValues,
 ): Promise<ServiceResult<ParentGuardianDetailsRecord>> {
-  return upsertOne<ParentGuardianDetailsRecord>('parent_guardian_details', applicantId, rowId, {
+  return upsertOne<ParentGuardianDetailsRecord>(PARENTS_TABLE, applicantId, rowId, {
     father_alive: values.father_alive,
     father_name: values.father_alive ? text(values.father_name) : null,
     father_occupation: values.father_alive ? text(values.father_occupation) : null,
@@ -534,7 +511,7 @@ export async function saveCurrentCourseSection(
   rowId: string | null,
   values: CurrentCourseFormValues,
 ): Promise<ServiceResult<CurrentCoursesRecord>> {
-  return upsertOne<CurrentCoursesRecord>('current_courses', applicantId, rowId, {
+  return upsertOne<CurrentCoursesRecord>(COURSE_TABLE, applicantId, rowId, {
     academic_year: text(values.academic_year),
     course_level: text(values.course_level),
     course_name: text(values.course_name),
@@ -586,13 +563,13 @@ export async function saveQualificationsSection(
   // applicant's own ids, and RLS independently rejects anything else.
   if (incomingIds.length > 0) {
     const { error } = await client
-      .from('applicant_qualifications')
+      .from(QUAL_TABLE)
       .delete()
       .eq('applicant_id', applicantId)
       .not('id', 'in', `(${incomingIds.join(',')})`);
     if (error) return { ok: false, error: messageFromError(error, 'Could not remove a qualification.') };
   } else {
-    const { error } = await client.from('applicant_qualifications').delete().eq('applicant_id', applicantId);
+    const { error } = await client.from(QUAL_TABLE).delete().eq('applicant_id', applicantId);
     if (error) return { ok: false, error: messageFromError(error, 'Could not remove a qualification.') };
   }
 
@@ -600,11 +577,11 @@ export async function saveQualificationsSection(
     const payload = qualificationPayload(row);
     const { error } = row.id
       ? await client
-          .from('applicant_qualifications')
+          .from(QUAL_TABLE)
           .update(payload)
           .eq('id', row.id)
           .eq('applicant_id', applicantId)
-      : await client.from('applicant_qualifications').insert({ ...payload, applicant_id: applicantId });
+      : await client.from(QUAL_TABLE).insert({ ...payload, applicant_id: applicantId });
 
     if (error) {
       return { ok: false, error: messageFromError(error, 'Could not save your qualifications.') };
@@ -612,7 +589,7 @@ export async function saveQualificationsSection(
   }
 
   const { data, error } = await client
-    .from('applicant_qualifications')
+    .from(QUAL_TABLE)
     .select('*')
     .eq('applicant_id', applicantId)
     .order('passing_year', { ascending: false });
@@ -633,7 +610,7 @@ export async function saveHostelSection(
 ): Promise<ServiceResult<HostelDetailsRecord>> {
   const isHosteller = values.beneficiary_category.trim().toLowerCase() === 'hosteller';
 
-  return upsertOne<HostelDetailsRecord>('hostel_details', applicantId, rowId, {
+  return upsertOne<HostelDetailsRecord>(HOSTEL_TABLE, applicantId, rowId, {
     beneficiary_category: text(values.beneficiary_category),
     // Hostel location only means anything for a hosteller. Storing it for a day
     // scholar would keep dead rows in the completeness calculation.
@@ -655,11 +632,6 @@ export async function saveHostelSection(
 /* Completeness                                                               */
 /* -------------------------------------------------------------------------- */
 
-/**
- * The server-computed completeness. The dashboard and the profile page both
- * render this rather than counting fields in the browser, so the number an
- * applicant sees always matches the number an administrator sees.
- */
 export async function fetchCompleteness(): Promise<ServiceResult<ProfileCompleteness>> {
   const client = requireClient();
 

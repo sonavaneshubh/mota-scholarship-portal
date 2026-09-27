@@ -17,6 +17,7 @@ import type { ApplicantDocumentRecord } from '../../types/profile';
 import type { DocumentRequirementView } from '../../lib/applicationFormView';
 import { daysUntil } from '../../lib/applicationFormView';
 import { createViewUrl, validateDocumentFile } from '../../services/documentService';
+import { describeList, describeRules } from '../../services/eligibility';
 
 /* -------------------------------------------------------------------------- */
 /* Section 3 — Important Scheme Details                                        */
@@ -52,22 +53,36 @@ export function SchemeDetailsSection({ scheme }: { scheme: SchemeDetailResponse 
   const remaining = daysUntil(row.application_end_date);
   const closed = remaining !== null && remaining < 0;
 
+  // Only the columns the deployed scheme_eligibility table actually has. The
+  // religion, gap lines this used to show had no such column, so they rendered
+  // blank; the older `eligible_*` and `minimum_*` names this list was written
+  // against never existed either, which is why the whole list stayed empty.
+  const otherRules = describeRules(eligibility?.other_conditions ?? null);
   const eligibilityLines = [
-    eligibility?.category_requirement && `Category: ${eligibility.category_requirement}`,
-    eligibility?.gender_requirement && `Gender: ${eligibility.gender_requirement}`,
-    eligibility?.religion_requirement && `Religion: ${eligibility.religion_requirement}`,
-    eligibility?.disability_requirement && `Disability: ${eligibility.disability_requirement}`,
-    eligibility?.qualification_requirement && `Qualification: ${eligibility.qualification_requirement}`,
-    eligibility?.course_requirement && `Course: ${eligibility.course_requirement}`,
-    eligibility?.institution_requirement && `Institution: ${eligibility.institution_requirement}`,
-    eligibility?.residency_requirement && `Residency: ${eligibility.residency_requirement}`,
+    describeList(eligibility?.category_requirement) &&
+      `Eligible categories: ${describeList(eligibility?.category_requirement)}`,
+    describeList(eligibility?.gender_requirement) &&
+      `Gender: ${describeList(eligibility?.gender_requirement)}`,
+    describeList(eligibility?.qualification_requirement) &&
+      `Qualifying examination: ${describeList(eligibility?.qualification_requirement)}`,
+    describeList(eligibility?.course_requirement) &&
+      `Course level: ${describeList(eligibility?.course_requirement)}`,
+    describeList(eligibility?.institution_requirement) &&
+      `Institution: ${describeList(eligibility?.institution_requirement)}`,
+    describeList(eligibility?.residency_requirement) &&
+      `State / domicile: ${describeList(eligibility?.residency_requirement)}`,
+    describeList(eligibility?.disability_requirement) &&
+      `Disability: ${describeList(eligibility?.disability_requirement)}`,
+    describeList(eligibility?.cap_requirement) &&
+      `Limits and caps: ${describeList(eligibility?.cap_requirement)}`,
     eligibility?.min_percentage != null && `Minimum marks: ${eligibility.min_percentage}%`,
-    eligibility?.max_income != null && `Maximum annual income: ${eligibility.max_income}`,
+    eligibility?.max_income != null &&
+      `Maximum annual family income: ₹${eligibility.max_income.toLocaleString('en-IN')}${
+        eligibility?.income_period ? ` ${eligibility.income_period}` : ''
+      }`,
     eligibility?.min_age != null && `Minimum age: ${eligibility.min_age}`,
     eligibility?.max_age != null && `Maximum age: ${eligibility.max_age}`,
-    eligibility?.cap_requirement && `Admission: ${eligibility.cap_requirement}`,
-    eligibility?.gap_requirement && `Gap: ${eligibility.gap_requirement}`,
-    eligibility?.other_conditions && `Other: ${eligibility.other_conditions}`,
+    otherRules && `Other: ${otherRules}`,
   ].filter((line): line is string => Boolean(line));
 
   return (
@@ -81,7 +96,6 @@ export function SchemeDetailsSection({ scheme }: { scheme: SchemeDetailResponse 
           { label: 'Academic year', value: row.academic_year },
           { label: 'Application opens', value: formatDeadline(row.application_start_date) },
           { label: 'Application deadline', value: formatDeadline(row.application_end_date) },
-          { label: 'Renewal available', value: row.renewal_available ? 'Yes' : 'No' },
         ]}
       />
 
@@ -96,11 +110,11 @@ export function SchemeDetailsSection({ scheme }: { scheme: SchemeDetailResponse 
         </p>
       ) : null}
 
-      {row.overview || row.description ? (
+      {row.description ? (
         <div>
           <h3 className="mb-1.5 text-[12px] font-bold uppercase tracking-wide text-gov-blue-dark">About this scheme</h3>
           <p className="whitespace-pre-line text-[13px] leading-relaxed text-slate-700">
-            {row.overview ?? row.description}
+            {row.description}
           </p>
         </div>
       ) : null}
@@ -118,21 +132,13 @@ export function SchemeDetailsSection({ scheme }: { scheme: SchemeDetailResponse 
                   <p className="mt-0.5 text-[12px] leading-snug text-slate-600">{benefit.description}</p>
                 ) : null}
                 <div className="mt-1.5 flex flex-wrap gap-1.5">
-                  {/* The importer records descriptions but no rupee amounts for
-                      most schemes, so an absent amount is stated as absent
-                      rather than rendered as ₹0. */}
+                  {/* Only `amount` and `frequency` exist on scheme_benefits. The
+                      hosteller/day-scholar/coverage badges this used to render
+                      had no column behind them, so they always showed nothing. */}
                   {benefit.amount != null ? (
-                    <Badge tone="emerald">
-                      {`₹${benefit.amount.toLocaleString('en-IN')}${benefit.amount_period ? ` / ${benefit.amount_period}` : ''}`}
-                    </Badge>
+                    <Badge tone="emerald">{`₹${benefit.amount.toLocaleString('en-IN')}`}</Badge>
                   ) : null}
-                  {benefit.hosteller_amount != null ? (
-                    <Badge tone="blue">{`Hosteller ₹${benefit.hosteller_amount.toLocaleString('en-IN')}`}</Badge>
-                  ) : null}
-                  {benefit.day_scholar_amount != null ? (
-                    <Badge tone="blue">{`Day scholar ₹${benefit.day_scholar_amount.toLocaleString('en-IN')}`}</Badge>
-                  ) : null}
-                  {benefit.coverage ? <Badge tone="slate">{benefit.coverage}</Badge> : null}
+                  {benefit.frequency ? <Badge tone="slate">{benefit.frequency}</Badge> : null}
                 </div>
                 {benefit.conditions ? (
                   <p className="mt-1.5 text-[11px] leading-snug text-slate-500">Condition: {benefit.conditions}</p>
@@ -156,13 +162,6 @@ export function SchemeDetailsSection({ scheme }: { scheme: SchemeDetailResponse 
             ))}
           </ul>
         </div>
-      ) : null}
-
-      {row.application_mode ? (
-        <p className="text-[12px] leading-snug text-slate-600">
-          <span className="font-semibold">How to apply: </span>
-          {row.application_mode}
-        </p>
       ) : null}
 
       {sources.length > 0 ? (

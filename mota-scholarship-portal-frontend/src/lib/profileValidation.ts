@@ -141,7 +141,7 @@ class FieldCollector {
 }
 
 /* -------------------------------------------------------------------------- */
-/* 1. Personal Information                                                     */
+/* 1. Personal Information                                                    */
 /* -------------------------------------------------------------------------- */
 
 export interface PersonalValidationContext {
@@ -162,6 +162,7 @@ export function validatePersonal(
 ): SectionValidation {
   const f = new FieldCollector();
 
+  // Core identity - always required
   f.required('full_name', 'Full name', values.full_name);
   f.required('mobile_number', 'Mobile number', values.mobile_number);
   f.pattern('mobile_number', 'Mobile number', values.mobile_number, MOBILE_PATTERN, 'Enter a 10-digit mobile number.');
@@ -172,33 +173,11 @@ export function validatePersonal(
   f.required('gender', 'Gender', values.gender);
   f.required('religion', 'Religion', values.religion);
   f.required('marital_status', 'Marital status', values.marital_status);
-  f.required(
-    'applicant_full_name_as_per_marksheet',
-    'Name as per marksheet',
-    values.applicant_full_name_as_per_marksheet,
-  );
+  f.required('applicant_full_name_as_per_marksheet', 'Name as per marksheet', values.applicant_full_name_as_per_marksheet);
   f.required('parent_guardian_mobile', 'Parent/guardian mobile', values.parent_guardian_mobile);
-  f.pattern(
-    'parent_guardian_mobile',
-    'Parent/guardian mobile',
-    values.parent_guardian_mobile,
-    MOBILE_PATTERN,
-    'Enter a 10-digit mobile number.',
-  );
+  f.pattern('parent_guardian_mobile', 'Parent/guardian mobile', values.parent_guardian_mobile, MOBILE_PATTERN, 'Enter a 10-digit mobile number.');
 
-  // Aadhaar. Write-only: once saved, the server returns only a mask, so the
-  // field is legitimately empty on a later visit and must not be re-required.
-  //
-  // The 12-digit and repeated-digit rules are deliberately NOT applied. The
-  // database writer that enforced them (set_applicant_aadhaar) is not deployed on
-  // this project, and a client-side rule that the server does not also enforce
-  // rejects input the system would otherwise accept. Aadhaar format checking
-  // belongs with the verification flow that will own aadhaar_verified_at, not with
-  // a field that only records a number of digits.
-  //
-  // What is still enforced: not empty when nothing is saved yet, and at least one
-  // digit once something is typed, so a field of letters or punctuation is not
-  // recorded as an Aadhaar number.
+  // Aadhaar
   if (!context.hasSavedAadhaar) {
     f.required('aadhaar', 'Aadhaar number', values.aadhaar);
   }
@@ -206,17 +185,13 @@ export function validatePersonal(
     f.errors.aadhaar = 'Aadhaar number must contain digits.';
   }
 
-  // Domicile
+  // Domicile - conditional on is_maharashtra_domicile
   f.requiredChoice('is_maharashtra_domicile', 'Maharashtra domicile status', values.is_maharashtra_domicile);
   if (values.is_maharashtra_domicile) {
     f.requiredChoice('has_domicile_certificate', 'Domicile certificate status', values.has_domicile_certificate);
     if (values.has_domicile_certificate) {
       f.required('domicile_certificate_number', 'Domicile certificate number', values.domicile_certificate_number);
-      f.required(
-        'domicile_certificate_holder_name',
-        'Domicile certificate holder name',
-        values.domicile_certificate_holder_name,
-      );
+      f.required('domicile_certificate_holder_name', 'Domicile certificate holder name', values.domicile_certificate_holder_name);
       f.required('domicile_issuing_authority', 'Domicile issuing authority', values.domicile_issuing_authority);
       f.required('domicile_date_of_issue', 'Domicile certificate date', values.domicile_date_of_issue);
       f.notFutureDate('domicile_date_of_issue', 'Domicile certificate date', values.domicile_date_of_issue);
@@ -236,9 +211,9 @@ export function validatePersonal(
     f.required('income_certificate_date', 'Income certificate date', values.income_certificate_date);
     f.notFutureDate('income_certificate_date', 'Income certificate date', values.income_certificate_date);
     f.required('income_issuing_authority', 'Income certificate issuing authority', values.income_issuing_authority);
-      if (!context.hasIncomeDocument) {
-        f.required('income_document', 'Income certificate upload', '');
-      }
+    if (!context.hasIncomeDocument) {
+      f.required('income_document', 'Income certificate upload', '');
+    }
   }
 
   // Employment
@@ -251,23 +226,16 @@ export function validatePersonal(
   f.requiredChoice('is_disabled', 'Disability status', values.is_disabled);
   if (values.is_disabled) {
     f.required('disability_type', 'Disability type', values.disability_type);
-    f.requiredChoice(
-      'has_disability_certificate',
-      'Disability certificate status',
-      values.has_disability_certificate,
-    );
+    f.requiredChoice('has_disability_certificate', 'Disability certificate status', values.has_disability_certificate);
     if (values.has_disability_certificate) {
-      f.required(
-        'disability_certificate_number',
-        'Disability certificate number',
-        values.disability_certificate_number,
-      );
+      f.required('disability_certificate_number', 'Disability certificate number', values.disability_certificate_number);
       if (!context.hasDisabilityDocument) {
         f.required('disability_document', 'Disability certificate upload', '');
       }
     }
   }
 
+  // Siblings
   f.required('siblings_count', 'Number of siblings', values.siblings_count);
   f.numberRange('siblings_count', 'Number of siblings', values.siblings_count, 0, 30);
 
@@ -281,9 +249,9 @@ export function validatePersonal(
     f.required('caste_issuing_authority', 'Caste issuing authority', values.caste_issuing_authority);
     f.required('caste_date_of_issue', 'Caste certificate date', values.caste_date_of_issue);
     f.notFutureDate('caste_date_of_issue', 'Caste certificate date', values.caste_date_of_issue);
-      if (!context.hasCasteDocument) {
-        f.required('caste_document', 'Caste certificate upload', '');
-      }
+    if (!context.hasCasteDocument) {
+      f.required('caste_document', 'Caste certificate upload', '');
+    }
   }
 
   // Bank
@@ -293,13 +261,7 @@ export function validatePersonal(
     f.required('account_number', 'Bank account number', values.account_number);
   }
   f.required('ifsc_code', 'IFSC code', values.ifsc_code);
-  f.pattern(
-    'ifsc_code',
-    'IFSC code',
-    values.ifsc_code.toUpperCase(),
-    IFSC_PATTERN,
-    'Enter a valid 11-character IFSC code.',
-  );
+  f.pattern('ifsc_code', 'IFSC code', values.ifsc_code.toUpperCase(), IFSC_PATTERN, 'Enter a valid 11-character IFSC code.');
   f.required('branch_name', 'Branch name', values.branch_name);
   f.required('account_type', 'Account type', values.account_type);
   f.requiredChoice('aadhaar_linked', 'Aadhaar-linked account status', values.aadhaar_linked);
@@ -333,13 +295,7 @@ export function validateAddress(values: AddressFormValues): SectionValidation {
     f.required('correspondence_district', 'Correspondence district', values.correspondence_district);
     f.required('correspondence_taluka', 'Correspondence taluka', values.correspondence_taluka);
     f.required('correspondence_pincode', 'Correspondence pincode', values.correspondence_pincode);
-    f.pattern(
-      'correspondence_pincode',
-      'Correspondence pincode',
-      values.correspondence_pincode,
-      PINCODE_PATTERN,
-      'Pincode must be 6 digits.',
-    );
+    f.pattern('correspondence_pincode', 'Correspondence pincode', values.correspondence_pincode, PINCODE_PATTERN, 'Pincode must be 6 digits.');
   }
 
   return {
@@ -376,13 +332,7 @@ export function validateOtherInfo(values: OtherInfoFormValues): SectionValidatio
     f.required('guardian_relationship', 'Relationship with guardian', values.guardian_relationship);
     f.required('guardian_occupation', "Guardian's occupation", values.guardian_occupation);
     f.required('guardian_mobile', "Guardian's mobile", values.guardian_mobile);
-    f.pattern(
-      'guardian_mobile',
-      "Guardian's mobile",
-      values.guardian_mobile,
-      MOBILE_PATTERN,
-      'Enter a 10-digit mobile number.',
-    );
+    f.pattern('guardian_mobile', "Guardian's mobile", values.guardian_mobile, MOBILE_PATTERN, 'Enter a 10-digit mobile number.');
   }
 
   return {
@@ -502,9 +452,6 @@ export function validateHostel(
     f.requiredChoice('mess_available', 'Mess availability', values.mess_available);
     f.required('rent_per_month', 'Rent per month', values.rent_per_month);
     f.numberRange('rent_per_month', 'Rent per month', values.rent_per_month, 0, 1_000_000);
-    // Mirrors the hostel.certificate_document rule. Enforced here as well as on
-    // the server so a hosteller is told to upload before pressing Save, rather
-    // than discovering it from the completeness panel afterwards.
     if (!context.hasCertificate) {
       f.required('certificate_document', 'Hosteller certificate upload', '');
     }
@@ -529,6 +476,7 @@ export const FIELD_LABELS: Record<string, string> = {
   applicant_full_name_as_per_marksheet: 'Name as per marksheet',
   parent_guardian_mobile: 'Parent/guardian mobile',
   aadhaar: 'Aadhaar number',
+  aadhaar_last4: 'Aadhaar number',
   is_maharashtra_domicile: 'Maharashtra domicile status',
   has_domicile_certificate: 'Domicile certificate status',
   domicile_certificate_number: 'Domicile certificate number',
@@ -561,6 +509,7 @@ export const FIELD_LABELS: Record<string, string> = {
   bank_name: 'Bank name',
   account_holder_name: 'Account holder name',
   account_number: 'Bank account number',
+  account_number_last4: 'Bank account number',
   ifsc_code: 'IFSC code',
   branch_name: 'Branch name',
   account_type: 'Account type',

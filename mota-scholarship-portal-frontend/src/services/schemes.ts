@@ -77,23 +77,28 @@ export async function fetchSchemeDetail(schemeId: string): Promise<SchemeDetailR
     return null;
   }
 
-  const [eligibility, benefits, documents, sources, versions] = await Promise.all([
+  // The child tables are related to a scheme, not to a year. None of them has an
+  // `academic_year` column, so filtering by it returned PostgreSQL 42703 and
+  // every related section on the detail page rendered empty. `maybeSingle` is
+  // used because a scheme with no eligibility row is a valid state, not an error.
+  const [eligibility, benefits, documents, sources, versions, processSteps, criteria] = await Promise.all([
     supabase
       .from('scheme_eligibility')
       .select('*')
       .eq('scheme_id', schemeId)
-      .eq('academic_year', scheme.academic_year)
-      .single(),
+      .maybeSingle(),
     supabase
       .from('scheme_benefits')
       .select('*')
       .eq('scheme_id', schemeId)
-      .eq('academic_year', scheme.academic_year),
+      // benefit_type alone leaves the tiers of one benefit in arbitrary order,
+      // so benefit_group breaks the tie and Group I precedes Group II.
+      .order('benefit_type')
+      .order('benefit_group'),
     supabase
       .from('scheme_documents')
       .select('*')
-      .eq('scheme_id', schemeId)
-      .eq('academic_year', scheme.academic_year),
+      .eq('scheme_id', schemeId),
     supabase
       .from('scheme_sources')
       .select('*')
@@ -104,7 +109,29 @@ export async function fetchSchemeDetail(schemeId: string): Promise<SchemeDetailR
       .eq('scheme_id', schemeId)
       .order('created_at', { ascending: false })
       .limit(5),
+    // Ordered by their own sequence rather than by insertion time, so a step
+    // that was edited later still reads in the right order.
+    supabase
+      .from('scheme_process_steps')
+      .select('*')
+      .eq('scheme_id', schemeId)
+      .order('step_number'),
+    supabase
+      .from('scheme_criteria')
+      .select('*')
+      .eq('scheme_id', schemeId)
+      .order('criterion_order'),
   ]);
+
+  // Log each related-table failure instead of silently returning empty lists,
+  // which is what made a wrong column name look like "this scheme has no data".
+  if (eligibility.error) console.error('Error fetching scheme eligibility:', eligibility.error);
+  if (benefits.error) console.error('Error fetching scheme benefits:', benefits.error);
+  if (documents.error) console.error('Error fetching scheme documents:', documents.error);
+  if (sources.error) console.error('Error fetching scheme sources:', sources.error);
+  if (versions.error) console.error('Error fetching scheme versions:', versions.error);
+  if (processSteps.error) console.error('Error fetching scheme process steps:', processSteps.error);
+  if (criteria.error) console.error('Error fetching scheme criteria:', criteria.error);
 
   return {
     scheme,
@@ -113,6 +140,8 @@ export async function fetchSchemeDetail(schemeId: string): Promise<SchemeDetailR
     documents: documents.data || [],
     sources: sources.data || [],
     versions: versions.data || [],
+    processSteps: processSteps.data || [],
+    criteria: criteria.data || [],
   };
 }
 
@@ -154,7 +183,7 @@ export async function fetchSchemeCategories() {
   return data || [];
 }
 
-export async function fetchSchemeEligibility(schemeId: string, academicYear: string) {
+export async function fetchSchemeEligibility(schemeId: string) {
   if (!supabase) {
     return null;
   }
@@ -163,17 +192,17 @@ export async function fetchSchemeEligibility(schemeId: string, academicYear: str
     .from('scheme_eligibility')
     .select('*')
     .eq('scheme_id', schemeId)
-    .eq('academic_year', academicYear)
-    .single();
+    .maybeSingle();
 
   if (error) {
+    console.error('Error fetching scheme eligibility:', error);
     return null;
   }
 
   return data;
 }
 
-export async function fetchSchemeBenefits(schemeId: string, academicYear: string) {
+export async function fetchSchemeBenefits(schemeId: string) {
   if (!supabase) {
     return [];
   }
@@ -181,17 +210,17 @@ export async function fetchSchemeBenefits(schemeId: string, academicYear: string
   const { data, error } = await supabase
     .from('scheme_benefits')
     .select('*')
-    .eq('scheme_id', schemeId)
-    .eq('academic_year', academicYear);
+    .eq('scheme_id', schemeId);
 
   if (error) {
+    console.error('Error fetching scheme benefits:', error);
     return [];
   }
 
   return data || [];
 }
 
-export async function fetchSchemeDocuments(schemeId: string, academicYear: string) {
+export async function fetchSchemeDocuments(schemeId: string) {
   if (!supabase) {
     return [];
   }
@@ -200,10 +229,10 @@ export async function fetchSchemeDocuments(schemeId: string, academicYear: strin
     .from('scheme_documents')
     .select('*')
     .eq('scheme_id', schemeId)
-    .eq('academic_year', academicYear)
     .order('is_mandatory', { ascending: false });
 
   if (error) {
+    console.error('Error fetching scheme documents:', error);
     return [];
   }
 

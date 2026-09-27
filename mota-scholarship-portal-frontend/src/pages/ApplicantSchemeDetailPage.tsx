@@ -3,16 +3,52 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useApplicantApplications } from '../hooks/useApplicantRecords';
 import { fetchSchemeDetail } from '../services/schemes';
 import type { EligibilityEvaluation, SchemeDetailResponse } from '../lib/supabase';
-import { evaluateEligibility, buildApplicantProfile } from '../services/eligibility';
+import {
+  buildApplicantProfile,
+  describeList,
+  describeRules,
+  evaluateEligibility,
+  formatInr,
+} from '../services/eligibility';
 import { createOrResumeApplication } from '../services/applicantRecords';
 import { applicationRouteHandle } from '../lib/applicationHandle';
 import { useApplicantAuth } from '../context/useApplicantAuth';
 import { ApplicantPageHeader } from '../components/applicant/ApplicantPageHeader';
 import { ApplicationStatusBadge } from '../components/applicant/StatusBadge';
+import { SchemeBenefitsTable } from '../components/applicant/SchemeBenefitsTable';
+import { SchemeCriteriaList } from '../components/applicant/SchemeCriteriaList';
+import { SchemeDocumentsChecklist } from '../components/applicant/SchemeDocumentsChecklist';
+import { SchemeProcessSteps } from '../components/applicant/SchemeProcessSteps';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
-import { applicantApplicationPath, ROUTES } from '../lib/constants';
+import { Tabs, type TabDefinition } from '../components/ui/Tabs';
+import { applicantApplicationPath, INFO_NOT_AVAILABLE, ROUTES } from '../lib/constants';
+
+/**
+ * Shown when a scheme has no eligibility row, so the section never silently
+ * disappears and the applicant can tell "no criteria recorded" apart from
+ * "criteria failed to load".
+ */
+const ELIGIBILITY_UNAVAILABLE = 'Detailed eligibility criteria will be updated.';
+
+/**
+ * Used where the guideline deliberately sets no limit, which is different from
+ * a value that failed to load. The National Fellowship scheme states there is
+ * no income criterion, so "no limit" is the accurate answer for it and
+ * "not available" would wrongly read as missing data.
+ */
+const NO_LIMIT = 'No limit specified';
+
+/** Scheme window dates. Kept local rather than imported from the records
+ * service, which formats for a different purpose. An unparseable or absent
+ * date becomes the shared placeholder instead of "Invalid Date". */
+function formatSchemeDate(value: string | null): string | null {
+  if (!value) return null;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+}
 
 export function ApplicantSchemeDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -26,23 +62,24 @@ export function ApplicantSchemeDetailPage() {
   const [eligibilityEval, setEligibilityEval] = useState<EligibilityEvaluation | null>(null);
   const [applying, setApplying] = useState(false);
   const [applyError, setApplyError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState('overview');
 
   useEffect(() => {
     async function loadScheme() {
       if (!id) return;
-      
+
       setLoading(true);
       setError(null);
-      
+
       try {
         const data = await fetchSchemeDetail(id);
         if (!data) {
           setError('Scheme not found or not available');
           return;
         }
-        
+
         setSchemeData(data);
-        
+
         // Evaluate eligibility if user is logged in
         if (user && data.eligibility) {
           const applicantProfile = buildApplicantProfile({
@@ -58,9 +95,8 @@ export function ApplicantSchemeDetailPage() {
             institution_type: null,
             is_hosteller: null,
           });
-          
-          const evaluation = evaluateEligibility(data.eligibility, applicantProfile);
-          setEligibilityEval(evaluation);
+
+          setEligibilityEval(evaluateEligibility(data.eligibility, applicantProfile));
         }
       } catch (err) {
         console.error('Failed to load scheme:', err);
@@ -77,10 +113,10 @@ export function ApplicantSchemeDetailPage() {
     return (
       <div className="space-y-6 py-2 sm:py-2">
         <div className="animate-pulse space-y-6">
-          <div className="h-8 bg-slate-100 rounded w-3/4" />
+          <div className="h-8 w-3/4 rounded bg-slate-100" />
           <div className="grid gap-6 lg:grid-cols-3">
-            <div className="lg:col-span-2 h-64 bg-slate-100 rounded" />
-            <div className="h-48 bg-slate-100 rounded" />
+            <div className="h-64 rounded bg-slate-100 lg:col-span-2" />
+            <div className="h-48 rounded bg-slate-100" />
           </div>
         </div>
       </div>
@@ -92,8 +128,12 @@ export function ApplicantSchemeDetailPage() {
       <div className="space-y-6 py-2 sm:py-2">
         <Card className="p-8 text-center">
           <h1 className="text-xl font-bold text-gov-blue-dark">Scheme not found</h1>
-          <p className="mt-2 text-sm text-slate-600">{error || 'This scheme is not available or has not been verified.'}</p>
-          <Button className="mt-5" size="md" to={ROUTES.applicant.schemes} variant="outline">Back to schemes</Button>
+          <p className="mt-2 text-sm text-slate-600">
+            {error || 'This scheme is not available or has not been verified.'}
+          </p>
+          <Button className="mt-5" size="md" to={ROUTES.applicant.schemes} variant="outline">
+            Back to schemes
+          </Button>
         </Card>
       </div>
     );
@@ -108,7 +148,7 @@ export function ApplicantSchemeDetailPage() {
    * Creates a real `applications` row, or resumes the one that already exists
    * for this applicant and scheme, then navigates to that row's form. On any
    * failure it stays on this page, shows a retryable message, and navigates
-   * nowhere — the applicant must never be dropped into a form for an application
+   * nowhere - the applicant must never be dropped into a form for an application
    * that does not exist.
    */
   async function handleApplyNow() {
@@ -138,12 +178,11 @@ export function ApplicantSchemeDetailPage() {
     // The uuid, via applicationRouteHandle(). The previous `application_number ||
     // id` is what produced "Application not found" on Apply: the || only guarded
     // null and '', so a reference in any unconfirmed format was preferred, and
-    // the form page then rejected it as neither a uuid nor an APP-… reference.
+    // the form page then rejected it as neither a uuid nor an APP- reference.
     // applicationRouteHandle returns null rather than a value that is known to
-    // fail, so a bad row is reported here — where the applicant can retry —
+    // fail, so a bad row is reported here - where the applicant can retry -
     // instead of on the next page as a missing application.
     const handle = applicationRouteHandle(outcome.application);
-
     if (!handle) {
       setApplying(false);
       console.error('Application row has no usable identifier', outcome.application);
@@ -158,11 +197,12 @@ export function ApplicantSchemeDetailPage() {
     navigate(applicantApplicationPath(handle));
   }
 
-  const getEligibilityStatus = (): { label: string; tone: 'blue' | 'amber' | 'green' | 'red' | 'purple' } => {
-    if (!eligibilityEval) {
-      return { label: 'Eligibility unknown', tone: 'purple' };
-    }
-    
+  function getEligibilityStatus(): {
+    label: string;
+    tone: 'blue' | 'amber' | 'green' | 'red' | 'purple';
+  } {
+    if (!eligibilityEval) return { label: 'Eligibility unknown', tone: 'purple' };
+
     switch (eligibilityEval.result) {
       case 'ELIGIBLE':
         return { label: 'Likely Eligible', tone: 'green' };
@@ -173,200 +213,289 @@ export function ApplicantSchemeDetailPage() {
       default:
         return { label: 'Unknown', tone: 'purple' };
     }
-  };
+  }
 
   const eligibilityStatus = getEligibilityStatus();
+  const otherRulesText = describeRules(schemeData.eligibility?.other_conditions ?? null);
+
+  const keyFacts = [
+    { label: 'Academic year', value: scheme.academic_year },
+    { label: 'Category', value: scheme.scheme_categories?.name ?? null },
+    { label: 'Department', value: scheme.departments?.name ?? null },
+    { label: 'Reference', value: scheme.scheme_code },
+    { label: 'Applications open', value: formatSchemeDate(scheme.application_start_date) },
+    { label: 'Applications close', value: formatSchemeDate(scheme.application_end_date) },
+  ];
+
+  const overviewContent = (
+    <div className="space-y-5">
+      {scheme.scheme_type ? (
+        <div>
+          <p className="text-[11px] font-bold uppercase tracking-wider text-gov-saffron-dark">Scheme type</p>
+          <p className="mt-1 text-sm font-semibold text-slate-800">{scheme.scheme_type}</p>
+        </div>
+      ) : null}
+
+      <div>
+        <h2 className="text-lg font-bold text-gov-blue-dark">Overview and objective</h2>
+        {scheme.overview ? (
+          <p className="mt-2 text-sm leading-relaxed text-slate-700">{scheme.overview}</p>
+        ) : scheme.description ? (
+          <p className="mt-2 text-sm leading-relaxed text-slate-700">{scheme.description}</p>
+        ) : (
+          <p className="mt-2 text-sm text-slate-600">
+            An overview has not been recorded for this scheme yet. Please refer to the official guideline.
+          </p>
+        )}
+      </div>
+
+      {/* Only shown when the two fields actually differ. For the schemes that
+          have no separate overview, this avoids printing the same paragraph
+          twice under two headings. */}
+      {scheme.overview && scheme.description ? (
+        <div>
+          <h2 className="text-lg font-bold text-gov-blue-dark">Description</h2>
+          <p className="mt-2 text-sm leading-relaxed text-slate-700">{scheme.description}</p>
+        </div>
+      ) : null}
+
+      <dl className="grid gap-x-6 gap-y-3 rounded border border-slate-200 bg-slate-50 px-4 py-4 sm:grid-cols-2 lg:grid-cols-3">
+        {keyFacts.map((fact) => (
+          <div className="min-w-0" key={fact.label}>
+            <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{fact.label}</dt>
+            <dd className="mt-0.5 break-words text-[13px] font-semibold text-slate-800">
+              {fact.value ?? INFO_NOT_AVAILABLE}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
+
+  const eligibilityContent = (
+    <div className="space-y-5">
+      {eligibilityEval ? (
+        <div className="space-y-3">
+          {eligibilityEval.matched.length > 0 ? (
+            <div className="rounded border border-emerald-200 bg-emerald-50 p-3">
+              <p className="mb-2 text-xs font-semibold text-emerald-700">Requirements met</p>
+              <ul className="space-y-1 text-xs text-emerald-800">
+                {eligibilityEval.matched.map((item, index) => (
+                  <li key={index}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          {eligibilityEval.missing.length > 0 ? (
+            <div className="rounded border border-amber-200 bg-amber-50 p-3">
+              <p className="mb-2 text-xs font-semibold text-amber-700">Still to confirm</p>
+              <ul className="space-y-1 text-xs text-amber-800">
+                {eligibilityEval.missing.map((item, index) => (
+                  <li key={index}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          <p className="rounded border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+            <span className="font-semibold">Note:</span> This is a preliminary assessment based on your
+            profile. Final eligibility is subject to document verification and authorised review.
+          </p>
+        </div>
+      ) : null}
+
+      {schemeData.criteria.length > 0 ? (
+        <div>
+          <h2 className="mb-2 text-lg font-bold text-gov-blue-dark">Eligibility criteria</h2>
+          <SchemeCriteriaList criteria={schemeData.criteria} />
+        </div>
+      ) : null}
+
+      {schemeData.eligibility ? (
+        <div>
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-lg font-bold text-gov-blue-dark">Checked against your profile</h2>
+            <Badge tone={eligibilityStatus.tone}>{eligibilityStatus.label}</Badge>
+          </div>
+
+          <dl className="grid gap-4 rounded border border-slate-200 px-4 py-4 sm:grid-cols-2">
+            <div className="sm:col-span-2">
+              <dt className="text-xs text-slate-500">Eligible categories</dt>
+              <dd className="mt-1 text-sm font-semibold text-slate-800">
+                {describeList(schemeData.eligibility.category_requirement) || INFO_NOT_AVAILABLE}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-slate-500">Family income limit</dt>
+              <dd className="mt-1 text-sm font-semibold text-slate-800">
+                {typeof schemeData.eligibility.max_income === 'number'
+                  ? `${formatInr(schemeData.eligibility.max_income)}${
+                      schemeData.eligibility.income_period
+                        ? ` ${schemeData.eligibility.income_period}`
+                        : ''
+                    }`
+                  : NO_LIMIT}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-slate-500">Age limit</dt>
+              <dd className="mt-1 text-sm font-semibold text-slate-800">
+                {typeof schemeData.eligibility.min_age === 'number' ||
+                typeof schemeData.eligibility.max_age === 'number'
+                  ? `${schemeData.eligibility.min_age ?? 'No min'} - ${
+                      schemeData.eligibility.max_age ?? 'No max'
+                    } years`
+                  : INFO_NOT_AVAILABLE}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-slate-500">Minimum percentage</dt>
+              <dd className="mt-1 text-sm font-semibold text-slate-800">
+                {typeof schemeData.eligibility.min_percentage === 'number'
+                  ? `${schemeData.eligibility.min_percentage}%`
+                  : NO_LIMIT}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-slate-500">Gender</dt>
+              <dd className="mt-1 text-sm font-semibold text-slate-800">
+                {describeList(schemeData.eligibility.gender_requirement) || 'All genders'}
+              </dd>
+            </div>
+            <div className="sm:col-span-2">
+              <dt className="text-xs text-slate-500">Qualifying examination</dt>
+              <dd className="mt-1 text-sm font-semibold text-slate-800">
+                {describeList(schemeData.eligibility.qualification_requirement) || INFO_NOT_AVAILABLE}
+              </dd>
+            </div>
+            <div className="sm:col-span-2">
+              <dt className="text-xs text-slate-500">Course level</dt>
+              <dd className="mt-1 text-sm font-semibold text-slate-800">
+                {describeList(schemeData.eligibility.course_requirement) || INFO_NOT_AVAILABLE}
+              </dd>
+            </div>
+            <div className="sm:col-span-2">
+              <dt className="text-xs text-slate-500">Institution</dt>
+              <dd className="mt-1 text-sm font-semibold text-slate-800">
+                {describeList(schemeData.eligibility.institution_requirement) || INFO_NOT_AVAILABLE}
+              </dd>
+            </div>
+            <div className="sm:col-span-2">
+              <dt className="text-xs text-slate-500">State / domicile</dt>
+              <dd className="mt-1 text-sm font-semibold text-slate-800">
+                {describeList(schemeData.eligibility.residency_requirement) || INFO_NOT_AVAILABLE}
+              </dd>
+            </div>
+            {describeList(schemeData.eligibility.disability_requirement) ? (
+              <div className="sm:col-span-2">
+                <dt className="text-xs text-slate-500">Disability</dt>
+                <dd className="mt-1 text-sm font-semibold text-slate-800">
+                  {describeList(schemeData.eligibility.disability_requirement)}
+                </dd>
+              </div>
+            ) : null}
+            {describeList(schemeData.eligibility.attendance_requirement) ? (
+              <div className="sm:col-span-2">
+                <dt className="text-xs text-slate-500">Attendance and conduct</dt>
+                <dd className="mt-1 text-sm font-semibold text-slate-800">
+                  {describeList(schemeData.eligibility.attendance_requirement)}
+                </dd>
+              </div>
+            ) : null}
+            {describeList(schemeData.eligibility.admission_requirement) ? (
+              <div className="sm:col-span-2">
+                <dt className="text-xs text-slate-500">Admission</dt>
+                <dd className="mt-1 text-sm font-semibold text-slate-800">
+                  {describeList(schemeData.eligibility.admission_requirement)}
+                </dd>
+              </div>
+            ) : null}
+            {describeList(schemeData.eligibility.cap_requirement) ? (
+              <div className="sm:col-span-2">
+                <dt className="text-xs text-slate-500">Limits and caps</dt>
+                <dd className="mt-1 text-sm font-semibold text-slate-800">
+                  {describeList(schemeData.eligibility.cap_requirement)}
+                </dd>
+              </div>
+            ) : null}
+          </dl>
+
+          {otherRulesText ? (
+            <div className="mt-4 rounded border border-amber-200 bg-amber-50 p-3 text-sm leading-relaxed text-amber-950">
+              <span className="font-bold">Additional conditions:</span>
+              <p className="mt-1">{otherRulesText}</p>
+            </div>
+          ) : null}
+        </div>
+      ) : (
+        <p className="text-sm text-slate-600">{ELIGIBILITY_UNAVAILABLE}</p>
+      )}
+    </div>
+  );
+
+  /**
+   * Tab order is the order a reader should work through: what the scheme is,
+   * whether they qualify, what they get, what they need to send, and what
+   * happens next.
+   */
+  const tabs: TabDefinition[] = [
+    { id: 'overview', label: 'Overview', content: overviewContent },
+    { id: 'eligibility', label: 'Eligibility', content: eligibilityContent },
+    {
+      id: 'benefits',
+      label: 'Financial benefits',
+      count: benefits.length,
+      content: <SchemeBenefitsTable benefits={benefits} />,
+    },
+    {
+      id: 'documents',
+      label: 'Required documents',
+      count: schemeData.documents.length,
+      content: <SchemeDocumentsChecklist documents={schemeData.documents} />,
+    },
+    {
+      id: 'process',
+      label: 'Application process',
+      count: schemeData.processSteps.length,
+      content: <SchemeProcessSteps steps={schemeData.processSteps} />,
+    },
+  ];
 
   return (
     <div className="space-y-6 py-2 sm:py-4">
       <ApplicantPageHeader
-        action={<Button size="md" to={ROUTES.applicant.schemes} variant="outline">Back to schemes</Button>}
-        description={scheme.description || scheme.overview || 'Official scheme information from verified sources.'}
+        action={
+          <Button size="md" to={ROUTES.applicant.schemes} variant="outline">
+            Back to schemes
+          </Button>
+        }
+        description={scheme.description || 'Official scheme information from verified sources.'}
         eyebrow={`${scheme.scheme_categories?.name || 'Scheme'} · ${scheme.academic_year}`}
         title={scheme.name}
       />
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <Card className="p-5 lg:col-span-2">
-          <div className="flex flex-wrap items-center gap-2 mb-4">
-            <Badge tone="blue">{scheme.status === 'published' && scheme.verification_status === 'verified' ? 'Verified' : 'Draft'}</Badge>
-            <span className="text-xs text-slate-500">Academic Year: {scheme.academic_year}</span>
-            <span className="text-xs text-slate-500">Reference: {scheme.scheme_code}</span>
+      <div className="grid gap-6">
+        {/* The apply action now sits at the upper left of this box. It used to
+            live in a separate "Application action" card in a sidebar column,
+            which has been removed. The id is kept on this card because
+            SchemeTable deep-links to #application-action, so dropping it would
+            silently break that scroll target. */}
+        <Card className="p-5" id="application-action">
+          <div className="flex flex-wrap items-center gap-3">
+            <Button disabled={applying} size="md" type="button" variant="primary" onClick={handleApplyNow}>
+              {applying
+                ? existingApplication
+                  ? 'Opening your application…'
+                  : 'Creating your application…'
+                : existingApplication
+                  ? 'Continue application'
+                  : 'Apply Now'}
+            </Button>
+            <Button size="md" to={ROUTES.applicant.applications} variant="ghost">
+              View my applications
+            </Button>
           </div>
-
-          {scheme.overview && (
-            <div className="mb-6">
-              <h2 className="text-lg font-bold text-gov-blue-dark mb-2">Scheme Overview</h2>
-              <p className="text-sm leading-relaxed text-slate-600">{scheme.overview}</p>
-            </div>
-          )}
-
-          {scheme.description && (
-            <div className="mb-6">
-              <h2 className="text-lg font-bold text-gov-blue-dark mb-2">Description</h2>
-              <p className="text-sm leading-relaxed text-slate-600">{scheme.description}</p>
-            </div>
-          )}
-
-          {/* Eligibility Section */}
-          {schemeData.eligibility && (
-            <div className="mb-6 rounded-lg border border-slate-200 bg-white p-4">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-bold text-gov-blue-dark">Eligibility Criteria</h2>
-                <Badge tone={eligibilityStatus.tone}>{eligibilityStatus.label}</Badge>
-              </div>
-              
-              {eligibilityEval && (
-                <div className="space-y-3">
-                  {eligibilityEval.matched.length > 0 && (
-                    <div className="rounded border border-emerald-200 bg-emerald-50 p-3">
-                      <p className="text-xs font-semibold text-emerald-700 mb-2">✓ Requirements Met</p>
-                      <ul className="space-y-1 text-xs text-emerald-800">
-                        {eligibilityEval.matched.map((m, i) => (
-                          <li key={i} className="flex items-center gap-1">{m}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  
-                  {eligibilityEval.missing.length > 0 && (
-                    <div className="rounded border border-amber-200 bg-amber-50 p-3">
-                      <p className="text-xs font-semibold text-amber-700 mb-2">⚠ Requirements to Verify</p>
-                      <ul className="space-y-1 text-xs text-amber-800">
-                        {eligibilityEval.missing.map((m, i) => (
-                          <li key={i} className="flex items-center gap-1">{m}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  
-                  <div className="mt-3 p-3 rounded border border-slate-200 bg-slate-50">
-                    <p className="text-xs text-slate-600">
-                      <span className="font-semibold">Note:</span> This is a preliminary assessment based on your profile. 
-                      Final eligibility is subject to document verification and authorized review.
-                    </p>
-                  </div>
-                </div>
-              )}
-              <dl className="grid gap-4 border-y border-slate-100 py-4 sm:grid-cols-2">
-                <div>
-                  <dt className="text-xs text-slate-500">Category</dt>
-                  <dd className="mt-1 text-sm font-semibold text-slate-800">{schemeData.eligibility.category_requirement || 'As per scheme guidelines'}</dd>
-                </div>
-                <div>
-                  <dt className="text-xs text-slate-500">Income Limit</dt>
-                  <dd className="mt-1 text-sm font-semibold text-slate-800">
-                    {schemeData.eligibility.max_income ? `₹${schemeData.eligibility.max_income.toLocaleString()} per annum` : 'Not specified'}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-xs text-slate-500">Age Limit</dt>
-                  <dd className="mt-1 text-sm font-semibold text-slate-800">
-                    {schemeData.eligibility.min_age || schemeData.eligibility.max_age 
-                      ? `${schemeData.eligibility.min_age || 'No min'} - ${schemeData.eligibility.max_age || 'No max'} years`
-                      : 'Not specified'}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-xs text-slate-500">Academic Requirement</dt>
-                  <dd className="mt-1 text-sm font-semibold text-slate-800">
-                    {schemeData.eligibility.min_percentage ? `Min ${schemeData.eligibility.min_percentage}%` : 
-                     schemeData.eligibility.qualification_requirement || 'As per scheme norms'}
-                  </dd>
-                </div>
-                <div className="sm:col-span-2">
-                  <dt className="text-xs text-slate-500">Course Requirement</dt>
-                  <dd className="mt-1 text-sm font-semibold text-slate-800">{schemeData.eligibility.course_requirement || 'As per scheme guidelines'}</dd>
-                </div>
-                <div className="sm:col-span-2">
-                  <dt className="text-xs text-slate-500">Institution</dt>
-                  <dd className="mt-1 text-sm font-semibold text-slate-800">{schemeData.eligibility.institution_requirement || 'Recognized institutions'}</dd>
-                </div>
-                <div className="sm:col-span-2">
-                  <dt className="text-xs text-slate-500">Residency</dt>
-                  <dd className="mt-1 text-sm font-semibold text-slate-800">{schemeData.eligibility.residency_requirement || 'As per state norms'}</dd>
-                </div>
-                <div className="sm:col-span-2">
-                  <dt className="text-xs text-slate-500">Admission Mode</dt>
-                  <dd className="mt-1 text-sm font-semibold text-slate-800">{schemeData.eligibility.admission_requirement || 'As per scheme guidelines'}</dd>
-                </div>
-              </dl>
-
-              {schemeData.eligibility.other_conditions && (
-                <div className="mt-4 rounded border border-amber-200 bg-amber-50 p-3 text-sm leading-relaxed text-amber-950">
-                  <span className="font-bold">Additional Conditions:</span>
-                  <p className="mt-1">{schemeData.eligibility.other_conditions}</p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Benefits Section */}
-          {benefits && benefits.length > 0 && (
-            <div className="mb-6">
-              <h2 className="text-lg font-bold text-gov-blue-dark mb-4">Benefits</h2>
-              <div className="space-y-3">
-                {benefits.map((benefit: { id: string; benefit_type: string; description: string | null; amount: number | null; amount_currency: string; amount_period: string | null; coverage: string | null; hosteller_amount: number | null; day_scholar_amount: number | null; conditions: string | null }) => (
-                  <Card key={benefit.id} className="p-4 bg-emerald-50 border-emerald-100">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-semibold text-emerald-800 capitalize">{benefit.benefit_type.replace('_', ' ')}</p>
-                        {benefit.description && <p className="mt-1 text-xs text-emerald-700">{benefit.description}</p>}
-                        {benefit.conditions && <p className="mt-1 text-xs text-emerald-600">{benefit.conditions}</p>}
-                      </div>
-                      <div className="text-right shrink-0">
-                        {benefit.amount ? (
-                          <p className="text-lg font-bold text-emerald-700">₹{benefit.amount.toLocaleString()}</p>
-                        ) : null}
-                        {benefit.hosteller_amount !== null && benefit.day_scholar_amount !== null ? (
-                          <div className="text-xs text-emerald-600 mt-1">
-                            Hosteller: ₹{benefit.hosteller_amount.toLocaleString()} / Day Scholar: ₹{benefit.day_scholar_amount.toLocaleString()}
-                          </div>
-                        ) : null}
-                        <p className="text-xs text-emerald-600">{benefit.amount_period || 'annual'}</p>
-                      </div>
-                    </div>
-                  </Card>
-                ))}
-              </div>
-            </div>
-          )}
-        </Card>
-
-        <Card
-          className="h-fit p-5"
-          accentClass="border-l-4 border-gov-saffron"
-          id="application-action"
-        >
-          <p className="text-xs font-bold uppercase tracking-wider text-gov-saffron-dark">Application action</p>
-          
-          {eligibilityEval && (
-            <div className="mt-4 p-3 rounded-lg bg-emerald-50 border border-emerald-200">
-              <p className="text-sm font-bold text-emerald-800">Eligibility Assessment</p>
-              <p className="mt-1 text-sm text-emerald-700">
-                {eligibilityEval.result === 'ELIGIBLE' ? 'You appear to meet the key requirements!' :
-                 eligibilityEval.result === 'NOT_ELIGIBLE' ? 'You may not meet critical requirements.' :
-                 'Some requirements need verification.'}
-              </p>
-            </div>
-          )}
-
-          <p className="mt-4 text-lg font-bold text-gov-blue-dark">Ready to apply?</p>
-          <p className="mt-2 text-sm leading-relaxed text-slate-600">
-            Applying creates an application in your account with its own reference number. You can save it as a
-            draft and come back to it, and reapplying will reopen the same application rather than starting a
-            new one.
-          </p>
-
-          {existingApplication ? (
-            <div className="mt-4 rounded border border-blue-200 bg-blue-50 p-3">
-              <p className="text-xs font-bold uppercase tracking-wide text-gov-blue">Existing application</p>
-              <div className="mt-2 flex items-center justify-between gap-3">
-                <span className="text-sm font-semibold text-slate-800">{existingApplication.referenceNumber}</span>
-                <ApplicationStatusBadge status={existingApplication.status} label={existingApplication.statusLabel} />
-              </div>
-            </div>
-          ) : null}
 
           {applyError ? (
             <div className="mt-4 rounded border border-red-200 bg-red-50 p-3" role="alert">
@@ -374,42 +503,41 @@ export function ApplicantSchemeDetailPage() {
             </div>
           ) : null}
 
-          <Button
-            className="mt-4 w-full"
-            disabled={applying}
-            size="md"
-            type="button"
-            variant="primary"
-            onClick={handleApplyNow}
-          >
-            {applying
-              ? existingApplication
-                ? 'Opening your application…'
-                : 'Creating your application…'
-              : existingApplication
-                ? 'Continue application'
-                : 'Apply Now'}
-          </Button>
+          {existingApplication ? (
+            <div className="mt-4 rounded border border-blue-200 bg-blue-50 p-3">
+              <p className="text-xs font-bold uppercase tracking-wide text-gov-blue">Existing application</p>
+              <div className="mt-2 flex items-center justify-between gap-3">
+                <span className="text-sm font-semibold text-slate-800">
+                  {existingApplication.referenceNumber}
+                </span>
+                <ApplicationStatusBadge
+                  status={existingApplication.status}
+                  label={existingApplication.statusLabel}
+                />
+              </div>
+            </div>
+          ) : null}
 
           {!user ? (
-            <p className="mt-2 text-center text-xs text-slate-500">Sign in to apply. Your application is saved to your account.</p>
+            <p className="mt-3 text-xs text-slate-500">
+              Sign in to apply. Your application is saved to your account.
+            </p>
           ) : null}
 
-          {scheme.official_application_url ? (
-            <a
-              className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-300"
-              href={scheme.official_application_url}
-              rel="noopener noreferrer"
-              target="_blank"
-            >
-              Official government portal
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
-            </a>
-          ) : null}
+          <div className="mt-5 flex flex-wrap items-center gap-2">
+            <Badge tone="blue">
+              {scheme.status === 'published' && scheme.verification_status === 'verified'
+                ? 'Verified'
+                : 'Draft'}
+            </Badge>
+            {scheme.scheme_type ? <Badge tone="purple">{scheme.scheme_type}</Badge> : null}
+            <span className="text-xs text-slate-500">Academic Year: {scheme.academic_year}</span>
+            <span className="text-xs text-slate-500">Reference: {scheme.scheme_code}</span>
+          </div>
+        </Card>
 
-          <Button className="mt-2 w-full" size="md" to={ROUTES.applicant.applications} variant="outline">
-            View my applications
-          </Button>
+        <Card className="p-5">
+          <Tabs activeId={activeTab} label="Scheme details" onChange={setActiveTab} tabs={tabs} />
         </Card>
       </div>
     </div>
