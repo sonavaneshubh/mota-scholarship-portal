@@ -1,0 +1,48 @@
+# supabase/config.toml
+
+[project]
+id = "mciwgsdthqjaadtzuthq"
+
+[api]
+port = 54321
+
+[db]
+port = 54322
+major_version = 15
+
+[studio]
+port = 54323
+
+[inbucket]
+port = 54324
+
+[auth]
+site_url = "http://localhost:3000"
+additional_redirect_urls = []
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+confirm_mail_subject = "Confirm your email"
+confirm_mail_body = "Click the link to confirm your email: {{ .ConfirmationURL }}"
+recovery_mail_subject = "Reset your password"
+recovery_mail_body = "Click the link to reset your password: {{ .ConfirmationURL }}"
+invite_mail_subject = "You have been invited"
+invite_mail_body = "Click the link to accept the invite: {{ .ConfirmationURL }}"
+mailer_autoconfirm = false
+max_frequency = "1m"
+otp_expiry = "1h"
+rate_limit = "10/m"
+enable_anonymous_sign_ins = false
+enable_phone_signup = false
+enable_email_signup = true
+password_min_length = 8
+
+[auth.external]
+providers = []
+
+[storage]
+file_size_limit = "50MiB"
+
+[functions]
+verify_jwt = true
