@@ -6,10 +6,11 @@
  * of the section is that an applicant can see what happens to their application
  * after they submit it, and how many hands it passes through before money moves.
  *
- * `is_verified` is surfaced honestly. The steps for the schemes other than
- * Post-Matric ST were seeded from the shared Ministry of Tribal Affairs / NITA
- * pipeline and have not yet been checked against each scheme's own guideline,
- * so the section says so rather than presenting them as settled fact.
+ * Every row was written from the scheme's own guideline rather than from a shared
+ * pipeline, and each one carries the document and page it came from in
+ * `source_ref`, which is shown beneath the step so the process is traceable.
+ * `sla_or_timeline` holds dates the guidelines describe as SUGGESTED, so it is
+ * labelled as such and never presented as a fixed deadline.
  */
 
 import type { SchemeProcessStep } from '../../lib/supabase';
@@ -27,16 +28,12 @@ export function SchemeProcessSteps({ steps }: SchemeProcessStepsProps) {
     );
   }
 
-  const unverified = steps.some((step) => !step.is_verified);
-
   return (
     <div className="space-y-4">
-      {unverified ? (
-        <p className="rounded border border-amber-300 bg-amber-50 px-3 py-2.5 text-xs leading-snug text-amber-900">
-          The steps below follow the standard Ministry of Tribal Affairs process and are awaiting confirmation
-          against this scheme&rsquo;s official guideline.
-        </p>
-      ) : null}
+      <p className="rounded border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs leading-snug text-slate-600">
+        Dates shown below are the ones the official guideline suggests. They vary by State and by year, and
+        the portal announcement for the current cycle is the authority for actual deadlines.
+      </p>
 
       <ol className="space-y-0">
         {steps.map((step, index) => {
@@ -49,7 +46,7 @@ export function SchemeProcessSteps({ steps }: SchemeProcessStepsProps) {
                   below it without needing a pseudo-element. */}
               <div className="flex flex-col items-center">
                 <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gov-blue-dark text-[11px] font-bold text-white">
-                  {step.step_number}
+                  {step.step_order}
                 </span>
                 {!isLast ? <span aria-hidden="true" className="w-px flex-1 bg-slate-300" /> : null}
               </div>
@@ -62,6 +59,16 @@ export function SchemeProcessSteps({ steps }: SchemeProcessStepsProps) {
                 {step.actor ? (
                   <p className="mt-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                     {step.actor}
+                  </p>
+                ) : null}
+                {step.sla_or_timeline ? (
+                  <p className="mt-1.5 text-[12px] leading-snug text-slate-700">
+                    <span className="font-semibold">Timeline:</span> {step.sla_or_timeline}
+                  </p>
+                ) : null}
+                {step.source_ref ? (
+                  <p className="mt-1.5 text-[11px] italic leading-snug text-slate-400">
+                    Source: {step.source_ref}
                   </p>
                 ) : null}
               </div>

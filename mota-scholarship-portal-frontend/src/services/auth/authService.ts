@@ -1,6 +1,7 @@
 import type { Session, User } from '@supabase/supabase-js';
 import { ROUTES } from '../../lib/constants';
-import { supabase, DEMO_MODE } from '../../lib/supabase';
+import { missingSupabaseEnvVars, supabase, DEMO_MODE, supabaseConfigNotice } from '../../lib/supabase';
+import { diagnostic, diagnosticError } from '../../lib/diagnostics';
 import type { AuthProfile, UserRole } from '../../types';
 
 export interface SignUpInput {
@@ -32,8 +33,19 @@ interface ProfileResult {
   error: string | null;
 }
 
-const notConfiguredMessage =
-  'Supabase authentication is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY to .env.local.';
+const notConfiguredMessage = supabaseConfigNotice;
+
+/**
+ * Developer-facing detail about a misconfigured build.
+ *
+ * The variable names are safe to log and are the difference between "the
+ * deployment forgot an environment variable" and "the deployment is pointing at
+ * a Supabase project whose auth settings reject this request". Never shown to an
+ * applicant.
+ */
+function describeMissingConfiguration(): Record<string, unknown> {
+  return { missingEnvVars: missingSupabaseEnvVars, demoMode: DEMO_MODE };
+}
 
 const DEMO_USERS = [
   {
@@ -122,11 +134,15 @@ function getErrorMessage(error: { message?: string; code?: string } | null | und
   }
 
   if (message.includes('invalid login credentials')) {
-    return 'The email or password is incorrect.';
+    return 'Invalid email or password.';
   }
 
   if (message.includes('email not confirmed')) {
     return 'Confirm your email before signing in.';
+  }
+
+  if (message.includes('email address') && message.includes('invalid')) {
+    return 'Enter a valid email address.';
   }
 
   if (message.includes('user already registered')) {
@@ -205,6 +221,14 @@ export async function getSession(): Promise<{ session: Session | null; error: st
   try {
     const { data, error } = await supabase.auth.getSession();
 
+    // Presence only. The access and refresh tokens in `data.session` are never
+    // passed to the logger, in any environment.
+    diagnostic('auth', 'session restore', {
+      restored: Boolean(data.session),
+      userId: data.session?.user?.id ?? null,
+      error: error?.message ?? null,
+    });
+
     return {
       session: data.session,
       error: error ? getErrorMessage(error, 'Unable to restore the authentication session.') : null,
@@ -258,6 +282,14 @@ export async function getProfile(userId: string): Promise<ProfileResult> {
       .eq('id', userId)
       .maybeSingle();
 
+    if (error) {
+      diagnosticError('auth', 'profiles read failed', {
+        userId,
+        code: error.code ?? null,
+        message: error.message,
+      });
+    }
+
     if (!error && data) {
       const profile = normalizeProfile(data);
 
@@ -286,8 +318,19 @@ export async function getProfile(userId: string): Promise<ProfileResult> {
           const profile = normalizeProfile(newProfileData);
 
           if (profile) {
+            diagnostic('auth', 'profiles row was missing and has been created for the signed-in user', {
+              userId,
+            });
             return { profile, error: null };
           }
+        }
+
+        if (insertError) {
+          diagnosticError('auth', 'could not create the missing profiles row', {
+            userId,
+            code: insertError.code ?? null,
+            message: insertError.message,
+          });
         }
       }
 
@@ -412,9 +455,15 @@ export async function signUp(input: SignUpInput): Promise<SignUpResult> {
 }
 
 export async function signIn(email: string, password: string): Promise<SignInResult> {
+  // The email is logged because it is the input the applicant typed, and it is
+  // the field that distinguishes "wrong password" from "this account does not
+  // exist". The password is never passed to the logger and never logged.
+  diagnostic('auth', 'sign-in requested', { email: email.trim(), demoMode: DEMO_MODE });
+
   if (DEMO_MODE) {
     const demoUser = DEMO_USERS.find((u: typeof DEMO_USERS[0]) => u.email === email.trim() && u.password === password);
     if (demoUser) {
+      diagnostic('auth', 'sign-in resolved against a demo account', { email: email.trim() });
       const { mockUser, mockSession, mockProfile } = createMockUser(demoUser);
       return {
         success: true,
@@ -425,10 +474,25 @@ export async function signIn(email: string, password: string): Promise<SignInRes
         role: 'applicant',
       };
     }
-    return failedSignIn('Invalid demo credentials. Use demo@applicant.test / demo123');
+
+    // No Supabase client exists, so this credential can never be checked against
+    // a real account. Reporting it as a wrong password is what made the deployed
+    // login look inert: the message named the demo accounts instead of the
+    // missing environment variable, and nothing on screen explained why a correct
+    // password was rejected. The reason is stated instead.
+    diagnosticError('auth', 'sign-in rejected: no Supabase client is configured', {
+      email: email.trim(),
+      ...describeMissingConfiguration(),
+    });
+
+    return failedSignIn(notConfiguredMessage);
   }
 
   if (!supabase) {
+    diagnosticError('auth', 'sign-in rejected: Supabase client missing', {
+      email: email.trim(),
+      ...describeMissingConfiguration(),
+    });
     return failedSignIn(notConfiguredMessage);
   }
 
@@ -436,22 +500,37 @@ export async function signIn(email: string, password: string): Promise<SignInRes
     const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
 
     if (error) {
+      diagnosticError('auth', 'sign-in rejected by Supabase', {
+        email: email.trim(),
+        code: error.code ?? null,
+        // The Supabase message is the diagnosis (invalid credentials, unconfirmed
+        // email, rate limit, disabled sign-ups). It contains no secrets and no
+        // token, and it is development-only, so it is logged verbatim.
+        message: error.message,
+      });
       return failedSignIn(getErrorMessage(error, 'Sign in could not be completed. Please try again.'));
     }
 
     if (!data.user || !data.session) {
+      diagnosticError('auth', 'sign-in returned no session', { email: email.trim() });
       return failedSignIn('Sign in did not return an authenticated session.');
     }
 
     const profileResult = await getProfile(data.user.id);
 
     if (profileResult.error || !profileResult.profile) {
+      diagnosticError('auth', 'sign-in succeeded but the profile could not be loaded', {
+        userId: data.user.id,
+        error: profileResult.error,
+      });
       return {
         ...failedSignIn(profileResult.error ?? 'Your profile could not be loaded. Ask an administrator to verify your account.'),
         user: data.user,
         session: data.session,
       };
     }
+
+    diagnostic('auth', 'sign-in succeeded', { userId: data.user.id, role: profileResult.profile.role });
 
     return {
       success: true,
@@ -462,6 +541,10 @@ export async function signIn(email: string, password: string): Promise<SignInRes
       role: profileResult.profile.role,
     };
   } catch (error) {
+    diagnosticError('auth', 'sign-in threw', {
+      email: email.trim(),
+      message: error instanceof Error ? error.message : String(error),
+    });
     return failedSignIn(getExceptionMessage(error, 'Sign in could not be completed. Please try again.'));
   }
 }

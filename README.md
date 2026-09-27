@@ -45,10 +45,61 @@ Existing public and applicant routes are preserved, including:
 1. Copy `mota-scholarship-portal-frontend/.env.example` to `.env.local`.
 2. Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` with the project's public browser values.
 3. Apply `supabase/migrations/20260925120000_create_profiles.sql` to the Supabase project.
-4. Configure `/applicant/login` and `/reset-password` as allowed redirect URLs, then enable the desired email-confirmation policy in Supabase Auth.
+4. Configure the Auth URL settings in the Supabase dashboard (below).
 5. Assign any administrator role through a protected database/admin process; registration metadata cannot grant `admin`.
 
 Never place a service-role key, database password, or JWT secret in frontend environment files or browser code.
+
+### Supabase dashboard — Authentication → URL Configuration
+
+These are dashboard settings, not repository files. Set them on the hosted
+project (Project Settings → Authentication → URL Configuration):
+
+| Setting | Value |
+| --- | --- |
+| Site URL | the production origin, e.g. `https://<project>.vercel.app` |
+| Redirect URLs | the production origin, `http://localhost:5173/**` for local development, and any preview origin the team uses |
+
+`supabase/config.toml` also carries `site_url = "http://localhost:3000"`, but
+that file configures the **local** Supabase stack started by the CLI. It does not
+change the hosted project, so the dashboard values above still have to be set.
+
+## Deployment (Vercel)
+
+### Required environment variables
+
+Set these on the Vercel project (Settings → Environment Variables) for **all**
+environments that should reach the database — Production, and Preview if preview
+builds need to work:
+
+| Variable | Required | Notes |
+| --- | --- | --- |
+| `VITE_SUPABASE_URL` | yes | `https://<project-ref>.supabase.co` |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | yes | Public publishable key. `VITE_SUPABASE_ANON_KEY` is accepted as a fallback. Never a service-role key. |
+
+The `VITE_` prefix is mandatory. Vite only exposes variables carrying it, so a
+variable named `SUPABASE_URL` (as Supabase's own docs and the backend
+`.env` show it) is invisible to the frontend and the app silently falls back to
+demo accounts with an empty dashboard.
+
+### Vite inlines these at build time
+
+`VITE_*` values are baked into the emitted bundle by `npm run build`. They are
+**not** read at runtime, so adding or changing them on Vercel has no effect until
+a **new deployment is built** from that commit. A redeploy is required.
+
+`vite.config.ts` prints a `PRODUCTION BUILD IS MISSING ITS SUPABASE
+CONFIGURATION` warning — naming the missing variables, never their values — into
+the build log when this is the case.
+
+### Public access
+
+If the Vercel project has **Settings → Deployment Protection** set to
+"Vercel Authentication", every visitor is redirected to `vercel.com/sso-api` and
+sees a "Protected Deployment" login page instead of the portal. That is
+unrelated to the portal's own login. Turn protection off (or off for Production)
+for a public site.
+
 
 ## Migrations
 

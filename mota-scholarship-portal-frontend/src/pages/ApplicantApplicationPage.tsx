@@ -30,6 +30,7 @@ import {
 import {
   buildDocumentRequirements,
   daysUntil,
+  documentStatusFromRecord,
   type DocumentRequirementLink,
 } from '../lib/applicationFormView';
 import {
@@ -60,7 +61,7 @@ import type { ApplicantDocumentRecord } from '../types/profile';
  * The form has four stages over the same loaded bundle, and the applicant moves
  * between them explicitly rather than having the page re-render underneath them:
  *
- *   Stage 1  additional_information  scheme-specific questions + documents only
+ *   Stage 1  additional_information  renewal + documents, nothing else
  *   Stage 2  full_application        profile + academic + scheme + the above
  *   Review   review                  everything, read back, then submit
  *   Confirm  confirmation            shown once, after a successful submit
@@ -166,28 +167,11 @@ function ProblemCard({
  * would show "1" or "yes" on an official-looking document.
  */
 function answerText(question: SchemeQuestion, answers: SchemeAnswers): string {
-  if (question.fromProfile) {
-    return question.profileValue && question.profileValue.trim() !== ''
-      ? question.profileValue
-      : 'Not provided in My Profile';
-  }
-
-  // A profile-notice question has no input anywhere on this form, so there is no
-  // stored value to read. Saying "Not answered" would imply the applicant forgot
-  // something they were never asked here; the honest reading is that it still has
-  // to be supplied from My Profile.
-  if (question.control === 'profile-notice') {
-    return 'Still to be added in My Profile';
-  }
-
   const stored = readAnswer(answers, question.key).trim();
   if (stored === '') return 'Not answered';
 
-  if (question.control === 'select' && question.options) {
-    const match = question.options.find((option) => option.value === stored);
-    return match ? match.label : stored;
-  }
-
+  // A yes/no is stored as the lowercase token YesNoField produces. Printing it
+  // verbatim would show "yes" on an official-looking document.
   if (question.control === 'yesno') {
     if (stored === 'yes') return 'Yes';
     if (stored === 'no') return 'No';
@@ -336,13 +320,14 @@ export function ApplicantApplicationPage() {
       // Seed the editable state exactly once per application. Re-seeding on every
       // reload would silently discard answers the applicant has typed but not yet
       // saved, which is the worst possible moment to lose them.
-      const { application: loaded, profile: loadedProfile, scheme: loadedScheme } = result.bundle;
+      const { application: loaded, profile: loadedProfile } = result.bundle;
 
       if (seededIdRef.current !== loaded.id) {
         seededIdRef.current = loaded.id;
-        // The known question keys, so stored answers for questions this scheme no
-        // longer asks are dropped on read rather than written back on the next save.
-        const knownKeys = buildSchemeQuestions(loadedProfile, loadedScheme).map((question) => question.key);
+        // The known question keys, so stored answers for questions this form no
+        // longer asks are dropped on read rather than written back on the next
+        // save.
+        const knownKeys = buildSchemeQuestions().map((question) => question.key);
 
         setForm({
           answers: readStoredAnswers(loaded, knownKeys),
@@ -412,11 +397,21 @@ export function ApplicantApplicationPage() {
   const profile = bundle?.profile ?? null;
   const scheme = bundle?.scheme ?? null;
 
-  const questions = useMemo(() => (profile ? buildSchemeQuestions(profile, scheme) : []), [profile, scheme]);
+  const questions = useMemo(() => buildSchemeQuestions(), []);
 
   const requirements = useMemo(
-    () => (scheme ? buildDocumentRequirements(scheme.documents, form.links, form.documents, busyRequirementId, uploadErrors) : []),
-    [scheme, form.links, form.documents, busyRequirementId, uploadErrors],
+    () =>
+      scheme
+        ? buildDocumentRequirements(
+            scheme.documents,
+            form.links,
+            form.documents,
+            busyRequirementId,
+            uploadErrors,
+            profile?.course?.year_of_study ?? null
+          )
+        : [],
+    [scheme, form.links, form.documents, busyRequirementId, uploadErrors, profile?.course?.year_of_study],
   );
 
   const isDraft = application?.status === 'draft';
@@ -453,9 +448,6 @@ export function ApplicantApplicationPage() {
     const issues: string[] = [];
 
     for (const question of questions) {
-      // A question the profile already answers is never a blocker — there is no
-      // input for the applicant to have got wrong.
-      if (question.fromProfile) continue;
       if (question.required && !isAnswered(question, form.answers)) {
         issues.push(question.label);
       }
@@ -608,7 +600,12 @@ export function ApplicantApplicationPage() {
   };
 
   const handleUpload = async (
-    requirement: { id: string; document_name: string },
+    requirement: {
+      id: string;
+      document_name: string;
+      document_type?: string | null;
+      max_file_size_mb?: number | null;
+    },
     file: File,
   ) => {
     if (!application) return;
@@ -622,11 +619,14 @@ export function ApplicantApplicationPage() {
     // certificate, which is what this form is meant to avoid.
     //
     // The code is resolved, not the label: uploadDocument writes it into
-    // document_code, which the profile's certificate slots match on exactly.
+    // document_type, which the profile's certificate slots match on exactly. The
+    // scheme's controlled document_type is passed first so official rows map to
+    // the right slot rather than being slugified from the guideline's prose.
     const uploaded = await uploadDocument({
       applicantId: application.applicant_id,
-      documentCode: resolveDocumentCode(requirement.document_name),
+      documentCode: resolveDocumentCode(requirement.document_name, requirement.document_type),
       file,
+      maxFileSizeMb: requirement.max_file_size_mb ?? null,
     });
 
     if (!uploaded.ok || !uploaded.data) {
@@ -759,7 +759,7 @@ export function ApplicantApplicationPage() {
               </Button>
             </div>
           }
-          description="Answer what this scholarship additionally needs and attach the documents it asks for. Your full application form comes next."
+          description="Answer whether this is a renewal application and attach the documents it needs. Your full application form comes next."
           eyebrow={`Application ${reference}`}
           title={schemeName}
         />
@@ -1023,13 +1023,7 @@ export function ApplicantApplicationPage() {
         <p className="text-[11px] font-bold uppercase tracking-wider text-gov-saffron-dark">Section 4</p>
         <h2 className="mt-1 text-lg font-bold text-gov-blue-dark">Additional information</h2>
 
-        {questions.length === 0 ? (
-          <p className="mt-3 text-[13px] text-slate-600">
-            {scheme
-              ? 'This scholarship needs nothing beyond your profile, so there is nothing to fill in here.'
-              : 'Unavailable because the scheme could not be loaded.'}
-          </p>
-        ) : isReviewing ? (
+        {questions.length === 0 ? null : isReviewing ? (
           /* Review collapses the per-question cards into a plain list. In the
              form each question is a bordered card with a "why this is asked"
              line, which is scaffolding for filling it in; none of that is worth
@@ -1038,23 +1032,17 @@ export function ApplicantApplicationPage() {
             <AnswerReviewList answers={form.answers} questions={questions} />
           </div>
         ) : (
-          <>
-            <p className="mt-1 text-[12px] text-slate-600">
-              What you entered in Step 1. You can still change any of it here, and anything already in your profile is
-              shown as read-only instead of being asked again.
-            </p>
-
-            {/* The same component Stage 1 uses, so a question that was typed in
-                Stage 1 and is corrected here behaves identically — same
-                validation, same "why this is asked" line, same profile routing. */}
+          <div className="mt-4">
+            {/* The same component the Additional Information stage uses, so a
+                value typed there and corrected here behaves identically. */}
             <SchemeQuestionFields
               answers={form.answers}
-              className="mt-4"
+              className=""
               disabled={!isDraft}
               onAnswer={setAnswer}
               questions={questions}
             />
-          </>
+          </div>
         )}
       </Card>
 
@@ -1104,7 +1092,7 @@ export function ApplicantApplicationPage() {
                       }`}
                     >
                       {item.attached
-                        ? (item.attached.file_name ?? item.attached.document_code ?? 'Attached')
+                        ? (item.attached.file_name ?? item.attached.document_name ?? 'Attached')
                         : 'Not attached'}
                     </span>
                   </li>
@@ -1311,22 +1299,23 @@ export function ApplicantApplicationPage() {
               </p>
             ) : (
               <ul className="mt-4 divide-y divide-slate-100">
-                {form.documents.map((document) => (
+                {form.documents.map((document) => {
+                  const documentStatus = documentStatusFromRecord(document);
+                  return (
                   <li className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0" key={document.id}>
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold text-slate-800">
-                        {document.file_name ?? document.document_code ?? 'Document'}
+                        {document.file_name ?? document.document_name ?? document.document_type ?? 'Document'}
                       </p>
                       <p className="mt-1 text-xs text-slate-500">
-                        {document.mime_type ?? 'file'} · {document.status ?? 'uploaded'}
+                        {document.mime_type ?? 'file'} ·{' '}
+                        {(document.verification_status ?? 'pending').replace(/_/g, ' ')}
                       </p>
                     </div>
-                    <DocumentStatusBadge
-                      label={document.status ?? 'Uploaded'}
-                      status={(document.status ?? 'uploaded') as never}
-                    />
+                    <DocumentStatusBadge status={documentStatus} />
                   </li>
-                ))}
+                  );
+                })}
               </ul>
             )}
             <Button className="mt-4" size="sm" to={ROUTES.applicant.documents} variant="outline">

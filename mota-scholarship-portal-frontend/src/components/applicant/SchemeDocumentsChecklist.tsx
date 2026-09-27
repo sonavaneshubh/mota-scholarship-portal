@@ -20,15 +20,55 @@ interface SchemeDocumentsChecklistProps {
 
 function fileHint(document: SchemeDocument): string | null {
   const parts: string[] = [];
-  if (document.accepted_formats) parts.push(document.accepted_formats);
+  if (document.accepted_formats) {
+    // jsonb text[] for the schemes whose guideline states a format, otherwise a
+    // bare string on rows seeded before the column held an array.
+    const formats = Array.isArray(document.accepted_formats)
+      ? document.accepted_formats
+      : [document.accepted_formats];
+    const cleaned = formats.map((format) => format.trim()).filter((format) => format !== '');
+    if (cleaned.length > 0) {
+      parts.push(cleaned.map((format) => format.toUpperCase()).join(', '));
+    }
+  }
   if (typeof document.max_file_size_mb === 'number') {
-    parts.push(`up to ${document.max_file_size_mb} MB`);
+    // The official ceilings are stated in KB (ARG45 500 KB, AZKMI 100 KB) and are
+    // stored in MB, so a sub-megabyte limit is printed back in KB rather than as
+    // a confusing "up to 0.1 MB".
+    const megabytes = document.max_file_size_mb;
+    const kilobytes = megabytes * 1024;
+    parts.push(
+      kilobytes < 1024
+        ? `up to ${Math.round(kilobytes)} KB`
+        : `up to ${Number(megabytes.toFixed(1))} MB`
+    );
   }
   return parts.length > 0 ? parts.join(' · ') : null;
 }
 
+/**
+ * The official fresh/renewal requirement plus the course-year gate, shown only
+ * when they actually say something. A023B is the one scheme with a published
+ * fresh/renewal matrix, and only the two yearly-progression schemes gate a
+ * document on the year of study, so for every other row this returns null.
+ */
+function applicationStageHint(document: SchemeDocument): string | null {
+  if (document.is_required_fresh && !document.is_required_renewal) {
+    return 'Fresh applications only';
+  }
+  if (!document.is_required_fresh && document.is_required_renewal) {
+    return 'Renewal applications only';
+  }
+  if (typeof document.required_from_course_year === 'number') {
+    const from = document.required_from_course_year;
+    return from <= 1 ? 'Required every year' : `Second year and above`;
+  }
+  return null;
+}
+
 function DocumentRow({ document }: { document: SchemeDocument }) {
   const hint = fileHint(document);
+  const stageHint = applicationStageHint(document);
 
   return (
     <li className="flex gap-3 py-2.5">
@@ -43,7 +83,19 @@ function DocumentRow({ document }: { document: SchemeDocument }) {
         <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
       </svg>
       <div className="min-w-0">
-        <p className="text-[13px] font-semibold text-slate-800">{document.document_name}</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-[13px] font-semibold text-slate-800">{document.document_name}</p>
+          {document.document_type ? (
+            <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+              {document.document_type}
+            </span>
+          ) : null}
+          {stageHint ? (
+            <span className="rounded bg-gov-saffron-dark/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gov-saffron-dark">
+              {stageHint}
+            </span>
+          ) : null}
+        </div>
         {document.description ? (
           <p className="mt-0.5 text-xs leading-snug text-slate-600">{document.description}</p>
         ) : null}

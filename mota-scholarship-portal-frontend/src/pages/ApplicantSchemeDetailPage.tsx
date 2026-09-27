@@ -6,7 +6,6 @@ import type { EligibilityEvaluation, SchemeDetailResponse } from '../lib/supabas
 import {
   buildApplicantProfile,
   describeList,
-  describeRules,
   evaluateEligibility,
   formatInr,
 } from '../services/eligibility';
@@ -33,12 +32,79 @@ import { applicantApplicationPath, INFO_NOT_AVAILABLE, ROUTES } from '../lib/con
 const ELIGIBILITY_UNAVAILABLE = 'Detailed eligibility criteria will be updated.';
 
 /**
- * Used where the guideline deliberately sets no limit, which is different from
- * a value that failed to load. The National Fellowship scheme states there is
- * no income criterion, so "no limit" is the accurate answer for it and
- * "not available" would wrongly read as missing data.
+ * Shown when `scheme_eligibility` has no value for a field.
+ *
+ * This deliberately does not claim the scheme has no limit. A NULL in
+ * `maximum_family_income` or `minimum_percentage` cannot be told apart from a
+ * guideline that explicitly waives the limit, because both are stored as NULL
+ * in the one column. Saying "No limit specified" therefore turned a missing
+ * record into a claim about the scheme. Where a scheme really does state that
+ * it has no limit, that sentence is in `other_rules` and is printed verbatim in
+ * the Additional conditions block below.
  */
-const NO_LIMIT = 'No limit specified';
+const NOT_SPECIFIED = 'Not specified in available scheme data';
+
+/** Keys in `other_rules` that are provenance, not conditions to satisfy. */
+const OTHER_RULE_META_KEYS = new Set(['source_ref']);
+
+interface OtherRuleEntry {
+  key: string;
+  label: string;
+  values: string[];
+}
+
+/** Turns a `other_rules` value into one or more displayable lines. */
+function flattenRuleValue(value: unknown): string[] {
+  if (value === null || value === undefined || value === '') {
+    return [];
+  }
+  if (Array.isArray(value)) {
+    return value.flatMap(flattenRuleValue);
+  }
+  if (typeof value === 'object') {
+    return Object.entries(value as Record<string, unknown>)
+      .filter(([, v]) => v !== null && v !== undefined && v !== '')
+      .map(([k, v]) => `${k.replace(/_/g, ' ')}: ${Array.isArray(v) ? v.join(', ') : String(v)}`);
+  }
+  if (typeof value === 'boolean') {
+    return [value ? 'Yes' : 'No'];
+  }
+  return [String(value)];
+}
+
+/**
+ * Builds the labelled list rendered under "Additional conditions".
+ *
+ * Handles both shapes `other_rules` has held: the structured object written by
+ * 20260927000120_official_scheme_data_eligibility.sql, and the plain sentence
+ * of prose the column was seeded with before that migration, so an un-migrated
+ * project still shows its text instead of an empty block.
+ */
+function buildOtherRuleEntries(
+  otherRules: Record<string, unknown> | string | null | undefined
+): OtherRuleEntry[] {
+  if (otherRules === null || otherRules === undefined) {
+    return [];
+  }
+
+  if (typeof otherRules === 'string') {
+    const text = otherRules.trim();
+    return text ? [{ key: 'rules', label: 'Rule', values: [text] }] : [];
+  }
+
+  if (typeof otherRules !== 'object' || Array.isArray(otherRules)) {
+    return [];
+  }
+
+  return Object.entries(otherRules)
+    .filter(([key]) => !OTHER_RULE_META_KEYS.has(key))
+    .map(([key, value]) => ({
+      key,
+      label: key.replace(/_/g, ' '),
+      values: flattenRuleValue(value),
+    }))
+    .filter((entry) => entry.values.length > 0);
+}
 
 /** Scheme window dates. Kept local rather than imported from the records
  * service, which formats for a different purpose. An unparseable or absent
@@ -216,7 +282,23 @@ export function ApplicantSchemeDetailPage() {
   }
 
   const eligibilityStatus = getEligibilityStatus();
-  const otherRulesText = describeRules(schemeData.eligibility?.other_conditions ?? null);
+
+  /**
+   * `other_rules` is jsonb. Since
+   * 20260927000120_official_scheme_data_eligibility.sql it holds a structured
+   * object of official rule names, so it is rendered as a labelled list rather
+   * than concatenated into one sentence. `source_ref` is lifted out and shown
+   * separately, because it is provenance rather than a condition an applicant
+   * has to satisfy.
+   */
+  const otherRules = schemeData.eligibility?.other_rules ?? null;
+  const otherRulesSource =
+    otherRules && typeof otherRules === 'object' && !Array.isArray(otherRules)
+      ? typeof otherRules.source_ref === 'string'
+        ? otherRules.source_ref
+        : null
+      : null;
+  const otherRuleEntries = buildOtherRuleEntries(otherRules);
 
   const keyFacts = [
     { label: 'Academic year', value: scheme.academic_year },
@@ -319,113 +401,126 @@ export function ApplicantSchemeDetailPage() {
             <Badge tone={eligibilityStatus.tone}>{eligibilityStatus.label}</Badge>
           </div>
 
+          {/*
+            Every label below reads a column that exists on `scheme_eligibility`.
+            The disability, attendance, admission and cap rows that used to be here
+            had no column behind them, so they always rendered nothing; they are
+            gone rather than left pointing at fields that are not in the table.
+            Qualifying examination and Institution now read the real
+            `qualifying_examination` and `institution_requirement` columns added by
+            20260927000110_official_scheme_data_ddl.sql, so they state the official
+            value when there is one and NOT_SPECIFIED when the guideline is silent.
+          */}
           <dl className="grid gap-4 rounded border border-slate-200 px-4 py-4 sm:grid-cols-2">
             <div className="sm:col-span-2">
               <dt className="text-xs text-slate-500">Eligible categories</dt>
               <dd className="mt-1 text-sm font-semibold text-slate-800">
-                {describeList(schemeData.eligibility.category_requirement) || INFO_NOT_AVAILABLE}
+                {describeList(schemeData.eligibility.eligible_categories) || NOT_SPECIFIED}
               </dd>
             </div>
             <div>
               <dt className="text-xs text-slate-500">Family income limit</dt>
               <dd className="mt-1 text-sm font-semibold text-slate-800">
-                {typeof schemeData.eligibility.max_income === 'number'
-                  ? `${formatInr(schemeData.eligibility.max_income)}${
-                      schemeData.eligibility.income_period
-                        ? ` ${schemeData.eligibility.income_period}`
-                        : ''
-                    }`
-                  : NO_LIMIT}
+                {typeof schemeData.eligibility.maximum_family_income === 'number'
+                  ? formatInr(schemeData.eligibility.maximum_family_income)
+                  : NOT_SPECIFIED}
               </dd>
             </div>
             <div>
               <dt className="text-xs text-slate-500">Age limit</dt>
               <dd className="mt-1 text-sm font-semibold text-slate-800">
-                {typeof schemeData.eligibility.min_age === 'number' ||
-                typeof schemeData.eligibility.max_age === 'number'
-                  ? `${schemeData.eligibility.min_age ?? 'No min'} - ${
-                      schemeData.eligibility.max_age ?? 'No max'
+                {typeof schemeData.eligibility.minimum_age === 'number' ||
+                typeof schemeData.eligibility.maximum_age === 'number'
+                  ? `${schemeData.eligibility.minimum_age ?? 'No min'} - ${
+                      schemeData.eligibility.maximum_age ?? 'No max'
                     } years`
-                  : INFO_NOT_AVAILABLE}
+                  : NOT_SPECIFIED}
               </dd>
             </div>
             <div>
               <dt className="text-xs text-slate-500">Minimum percentage</dt>
               <dd className="mt-1 text-sm font-semibold text-slate-800">
-                {typeof schemeData.eligibility.min_percentage === 'number'
-                  ? `${schemeData.eligibility.min_percentage}%`
-                  : NO_LIMIT}
+                {typeof schemeData.eligibility.minimum_percentage === 'number'
+                  ? `${schemeData.eligibility.minimum_percentage}%`
+                  : NOT_SPECIFIED}
               </dd>
             </div>
             <div>
               <dt className="text-xs text-slate-500">Gender</dt>
               <dd className="mt-1 text-sm font-semibold text-slate-800">
-                {describeList(schemeData.eligibility.gender_requirement) || 'All genders'}
+                {describeList(schemeData.eligibility.eligible_gender) || NOT_SPECIFIED}
               </dd>
             </div>
             <div className="sm:col-span-2">
               <dt className="text-xs text-slate-500">Qualifying examination</dt>
               <dd className="mt-1 text-sm font-semibold text-slate-800">
-                {describeList(schemeData.eligibility.qualification_requirement) || INFO_NOT_AVAILABLE}
+                {describeList(schemeData.eligibility.qualifying_examination) || NOT_SPECIFIED}
               </dd>
             </div>
             <div className="sm:col-span-2">
-              <dt className="text-xs text-slate-500">Course level</dt>
+              <dt className="text-xs text-slate-500">Course</dt>
               <dd className="mt-1 text-sm font-semibold text-slate-800">
-                {describeList(schemeData.eligibility.course_requirement) || INFO_NOT_AVAILABLE}
+                {describeList(schemeData.eligibility.eligible_course_levels) ??
+                  describeList(schemeData.eligibility.eligible_course_types) ??
+                  NOT_SPECIFIED}
               </dd>
             </div>
+            {schemeData.eligibility.eligible_course_levels &&
+            schemeData.eligibility.eligible_course_types ? (
+              <div className="sm:col-span-2">
+                <dt className="text-xs text-slate-500">Course type</dt>
+                <dd className="mt-1 text-sm font-semibold text-slate-800">
+                  {describeList(schemeData.eligibility.eligible_course_types) || NOT_SPECIFIED}
+                </dd>
+              </div>
+            ) : null}
             <div className="sm:col-span-2">
               <dt className="text-xs text-slate-500">Institution</dt>
               <dd className="mt-1 text-sm font-semibold text-slate-800">
-                {describeList(schemeData.eligibility.institution_requirement) || INFO_NOT_AVAILABLE}
+                {schemeData.eligibility.institution_requirement &&
+                schemeData.eligibility.institution_requirement.length > 0 ? (
+                  <ul className="list-inside list-disc space-y-0.5 font-normal text-slate-700">
+                    {schemeData.eligibility.institution_requirement.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  NOT_SPECIFIED
+                )}
               </dd>
             </div>
             <div className="sm:col-span-2">
               <dt className="text-xs text-slate-500">State / domicile</dt>
               <dd className="mt-1 text-sm font-semibold text-slate-800">
-                {describeList(schemeData.eligibility.residency_requirement) || INFO_NOT_AVAILABLE}
+                {describeList(schemeData.eligibility.eligible_states) || NOT_SPECIFIED}
               </dd>
             </div>
-            {describeList(schemeData.eligibility.disability_requirement) ? (
-              <div className="sm:col-span-2">
-                <dt className="text-xs text-slate-500">Disability</dt>
-                <dd className="mt-1 text-sm font-semibold text-slate-800">
-                  {describeList(schemeData.eligibility.disability_requirement)}
-                </dd>
-              </div>
-            ) : null}
-            {describeList(schemeData.eligibility.attendance_requirement) ? (
-              <div className="sm:col-span-2">
-                <dt className="text-xs text-slate-500">Attendance and conduct</dt>
-                <dd className="mt-1 text-sm font-semibold text-slate-800">
-                  {describeList(schemeData.eligibility.attendance_requirement)}
-                </dd>
-              </div>
-            ) : null}
-            {describeList(schemeData.eligibility.admission_requirement) ? (
-              <div className="sm:col-span-2">
-                <dt className="text-xs text-slate-500">Admission</dt>
-                <dd className="mt-1 text-sm font-semibold text-slate-800">
-                  {describeList(schemeData.eligibility.admission_requirement)}
-                </dd>
-              </div>
-            ) : null}
-            {describeList(schemeData.eligibility.cap_requirement) ? (
-              <div className="sm:col-span-2">
-                <dt className="text-xs text-slate-500">Limits and caps</dt>
-                <dd className="mt-1 text-sm font-semibold text-slate-800">
-                  {describeList(schemeData.eligibility.cap_requirement)}
-                </dd>
-              </div>
-            ) : null}
           </dl>
 
-          {otherRulesText ? (
+          {otherRuleEntries.length > 0 ? (
             <div className="mt-4 rounded border border-amber-200 bg-amber-50 p-3 text-sm leading-relaxed text-amber-950">
               <span className="font-bold">Additional conditions:</span>
-              <p className="mt-1">{otherRulesText}</p>
+              <dl className="mt-1.5 space-y-1.5">
+                {otherRuleEntries.map(({ key, label, values }) => (
+                  <div key={key}>
+                    <dt className="text-[11px] font-bold uppercase tracking-wide text-amber-800">
+                      {label}
+                    </dt>
+                    <dd className="text-[13px]">
+                      {values.map((value, index) => (
+                        <p key={index}>{value}</p>
+                      ))}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
             </div>
+          ) : null}
+
+          {otherRulesSource ? (
+            <p className="mt-2 text-[11px] italic leading-snug text-slate-400">
+              Source: {otherRulesSource}
+            </p>
           ) : null}
         </div>
       ) : (

@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useApplicantAuth } from '../../context/useApplicantAuth';
 import { useAdminAuth } from '../../context/useAdminAuth';
 import { ROUTES } from '../../lib/constants';
+import { isSupabaseConfigured, supabaseConfigNotice } from '../../lib/supabase';
 import type { HomeAuthMode, HomeAuthNavigationState } from '../../types';
 import { Button } from '../ui/Button';
 
@@ -69,6 +70,13 @@ function createRegistrationValues(): RegistrationValues {
 
 function describeIds(...ids: Array<string | undefined>) {
   return ids.filter(Boolean).join(' ') || undefined;
+}
+
+/** Styling for the single status line, kept in one place so the two forms match. */
+function getStatusClass(tone: 'info' | 'error') {
+  return tone === 'error'
+    ? 'rounded border border-red-300 bg-red-50 px-2.5 py-2 text-[11px] font-medium leading-relaxed text-red-800'
+    : 'rounded border border-blue-200 bg-blue-50 px-2.5 py-2 text-[11px] leading-relaxed text-blue-900';
 }
 
 function getInputClass(hasError: boolean, extraClass = '') {
@@ -288,6 +296,15 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
   const [loginErrors, setLoginErrors] = useState<LoginErrors>({});
   const [registrationErrors, setRegistrationErrors] = useState<RegistrationErrors>({});
   const [status, setStatus] = useState('');
+  /**
+   * Whether `status` reports a failure or a neutral notice.
+   *
+   * A rejected sign-in has to be unmistakable. While both kinds shared one
+   * informational blue box, a failed login looked like the form had simply done
+   * nothing, which is exactly how the deployed portal presented a missing
+   * environment variable: no error, no navigation, no network request.
+   */
+  const [statusTone, setStatusTone] = useState<'info' | 'error'>('info');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -333,6 +350,7 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
     setLoginErrors({});
     setRegistrationErrors({});
     setStatus('');
+    setStatusTone('info');
   }, []);
 
   const focusCardHeading = useCallback((shouldScroll: boolean) => {
@@ -402,6 +420,7 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
     setCaptchaInput('');
     setLoginErrors((current) => ({ ...current, captcha: '' }));
     setRegistrationErrors((current) => ({ ...current, captcha: '' }));
+    setStatusTone('info');
     setStatus('CAPTCHA refreshed.');
   }
 
@@ -436,12 +455,14 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
     try {
       if (isAdmin) {
         setIsAuthenticating(true);
+        setStatusTone('info');
         setStatus('Checking admin credentials…');
 
         try {
           const result = await signInAdmin(loginUsername, loginPassword, true);
 
           if (!result.ok) {
+            setStatusTone('error');
             setStatus(result.message ?? 'The admin ID or password is incorrect.');
             return;
           }
@@ -457,12 +478,17 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
       const result = await signIn(loginUsername, loginPassword);
 
       if (!result.success) {
-        setStatus(result.error ?? 'The email or password is incorrect.');
+        // The reason is always shown, including the "not connected to the
+        // authentication service" case. Swallowing it is what made a correctly
+        // filled form appear to do nothing on the deployed site.
+        setStatusTone('error');
+        setStatus(result.error ?? 'Invalid email or password.');
         return;
       }
 
       if (result.role !== 'applicant') {
         await signOut();
+        setStatusTone('error');
         setStatus('This account is not authorized for applicant access.');
         return;
       }
@@ -539,6 +565,7 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
       });
 
       if (!result.success) {
+        setStatusTone('error');
         setStatus(result.error ?? 'Registration could not be completed. Please try again.');
         return;
       }
@@ -554,10 +581,12 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
 
       if (result.role !== 'applicant') {
         await signOut();
+        setStatusTone('error');
         setStatus('This account is not authorized for applicant access.');
         return;
       }
 
+      setStatusTone('info');
       setStatus('Account created. Redirecting to your dashboard.');
       navigate(ROUTES.applicant.dashboard);
     } finally {
@@ -581,10 +610,12 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
       const result = await resetPassword(email);
 
       if (!result.success) {
+        setStatusTone('error');
         setStatus(result.error ?? 'Password reset could not be requested. Please try again.');
         return;
       }
 
+      setStatusTone('info');
       setStatus('If an account exists for this email, a password reset link has been sent.');
     } finally {
       setIsSubmitting(false);
@@ -610,6 +641,20 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
           Supabase Auth
         </span>
       </div>
+
+      {/*
+        A build with no Supabase client cannot authenticate anybody, so it says so
+        on the form rather than accepting a click that leads nowhere. The admin
+        panel has its own, entirely separate sign-in, so it is not shown there.
+      */}
+      {!isAdmin && !isSupabaseConfigured ? (
+        <p
+          className="mb-2 rounded border border-amber-300 bg-amber-50 px-2.5 py-2 text-[11px] leading-relaxed text-amber-900"
+          role="alert"
+        >
+          {supabaseConfigNotice}
+        </p>
+      ) : null}
 
       {isRegistration ? (
         <form
@@ -863,7 +908,7 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
           </div>
 
           {status ? (
-            <p className="rounded border border-blue-200 bg-blue-50 px-2.5 py-2 text-[11px] leading-relaxed text-blue-900 md:col-span-2" role="status">
+            <p className={`${getStatusClass(statusTone)} md:col-span-2`} role={statusTone === 'error' ? 'alert' : 'status'}>
               {status}
             </p>
           ) : null}
@@ -941,7 +986,7 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
           />
 
           {status ? (
-            <p className="rounded border border-blue-200 bg-blue-50 px-2.5 py-2 text-[11px] leading-relaxed text-blue-900" role="status">
+            <p className={getStatusClass(statusTone)} role={statusTone === 'error' ? 'alert' : 'status'}>
               {status}
             </p>
           ) : null}
@@ -979,6 +1024,7 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
       <div className={`${isRegistration ? 'mt-2 pt-2' : 'mt-1 pt-1'} border-t border-slate-200 lg:shrink-0`}>
         {isRegistration ? (
           <div className={isRegistration ? 'space-y-1.5' : 'space-y-2'}>
+
             <p className="text-center text-[11px] font-medium text-slate-600">Already have an account?</p>
             <div className="grid gap-0 sm:grid-cols-2">
               <Button

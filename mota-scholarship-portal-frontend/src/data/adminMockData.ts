@@ -14,14 +14,29 @@ import type {
   ScholarshipDistributionData,
 } from '../types/admin';
 
+/**
+ * DEMO DATA, NOT A SOURCE OF TRUTH.
+ *
+ * Every string below is placeholder content for a mock admin panel. The real
+ * required-document list lives in `public.scheme_documents` and is fetched by the
+ * applicant side. This list previously contained invented entries that exist
+ * nowhere in the database ("Caste Certificate", "Bank Details", "Other Required
+ * Documents", "Identity Proof"), which meant the admin screens could show a
+ * document the portal never asked any applicant for.
+ *
+ * The names below now mirror the real vocabulary written by
+ * 20260927000200_remove_dummy_data_and_normalize_documents.sql so the demo looks
+ * like the system it stands in for. Replacing this with a real query is tracked
+ * as remaining work: the admin panel is still mock-backed end to end.
+ */
 const documentNames = [
-  'Identity Proof',
-  'Income Certificate',
-  'Caste Certificate',
+  'Aadhaar Card',
   'Domicile Certificate',
-  'Marksheet',
-  'Bank Details',
-  'Other Required Documents',
+  'Income Certificate',
+  'ST / PVTG Certificate',
+  '12th Marksheet',
+  'Previous / Last Year Marksheet',
+  'Passport-size Photograph',
 ];
 
 function createDocuments(

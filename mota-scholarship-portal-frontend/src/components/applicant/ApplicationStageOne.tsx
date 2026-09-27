@@ -1,29 +1,27 @@
 /**
  * Stage 1 — Additional Information.
  *
- * The whole point of this stage is what it does NOT contain. The applicant has
- * just clicked Apply Now and has already filled in My Profile, so showing them
- * their own profile back before they have done anything would bury the only
- * things this stage exists to collect. So this view renders:
+ * Two things, and nothing else:
  *
- *   - the scheme-specific questions (from buildSchemeQuestions, the same
- *     source of truth Stage 2 uses)
- *   - the scheme's own document requirements (from scheme_documents)
+ *   1. Is this a renewal application?        yes / no
+ *   2. This scheme's required documents      from scheme_documents
  *
- * and nothing else. No applicant summary, no academic section, no address, no
- * bank details, no declaration, no submit button.
+ * The applicant's own identity, academic, address and bank details are already
+ * in My Profile, so none of it is repeated here. There is no profile summary, no
+ * declaration and no submit button on this screen: the declaration is a
+ * submission-time statement, and Submit is only reachable from review.
  *
- * "Save & Continue" is emphatically not a submission. It writes the answers
- * through saveApplicationDraft, which leaves applications.status at 'draft' and
- * only touches draft_saved_at; the status moves in submitApplication, which is
- * only reachable from the review stage. That is why this component has no submit
- * handler at all — there is no code path here that could mark the application
- * submitted.
+ * "Save & Continue" is emphatically not a submission. It writes the renewal
+ * answer through saveApplicationDraft, which leaves applications.status at
+ * 'draft' and only touches draft_saved_at; the status moves in
+ * submitApplication, which is only reachable from the review stage. That is why
+ * this component has no submit handler at all — there is no code path here that
+ * could mark the application submitted.
  *
  * Document links are persisted as they are made, by the existing
  * attachSchemeDocument call in the page, so "save the uploaded document
  * references" needs no separate step: by the time Save & Continue runs, the
- * links are already in application_documents and only the answers are pending.
+ * links are already in application_documents and only the answer is pending.
  */
 
 import { Badge } from '../ui/Badge';
@@ -82,39 +80,25 @@ export function ApplicationStageOne({
   return (
     <div className="space-y-6">
       <Card accentClass="border-l-4 border-gov-saffron" className="p-5">
-        {/* "Step 1" rather than "Stage 1 of 2", because the progress strip above
-            counts review as step 3. Two different totals on one screen would make
-            the applicant think a step was missing. */}
-        <p className="text-[11px] font-bold uppercase tracking-wider text-gov-saffron-dark">Step 1 — Additional information</p>
-        <h2 className="mt-1 text-lg font-bold text-gov-blue-dark">Additional Information - {schemeName}</h2>
+        <p className="text-[11px] font-bold uppercase tracking-wider text-gov-saffron-dark">Step 1</p>
+        <h2 className="mt-1 text-lg font-bold text-gov-blue-dark">Additional information</h2>
         <p className="mt-1 text-[12px] leading-relaxed text-slate-600">
-          This scholarship asks for a few things on top of your profile. Only they are shown here — your personal,
-          academic, address and bank details are already in My Profile and you do not need to enter them again. The
-          full application form comes after this, once these are saved.
+          One question about {schemeName}, and the documents it needs. Everything else comes from your profile.
         </p>
       </Card>
 
       <Card className="p-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-[11px] font-bold uppercase tracking-wider text-gov-saffron-dark">Questions</p>
-            <h2 className="mt-1 text-lg font-bold text-gov-blue-dark">What this scholarship additionally needs</h2>
-          </div>
-          <Badge tone="slate">{questions.length} asked</Badge>
-        </div>
+        <h3 className="text-lg font-bold text-gov-blue-dark">Additional information</h3>
 
         <SchemeQuestionFields answers={answers} disabled={disabled} onAnswer={onAnswer} questions={questions} />
       </Card>
 
       <Card className="p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-[11px] font-bold uppercase tracking-wider text-gov-saffron-dark">Documents</p>
-            <h2 className="mt-1 text-lg font-bold text-gov-blue-dark">Documents this scholarship asks for</h2>
-          </div>
+          <h3 className="text-lg font-bold text-gov-blue-dark">Required documents</h3>
           {mandatoryTotal > 0 ? (
             <Badge tone={mandatoryDone === mandatoryTotal ? 'green' : 'amber'}>
-              {`${mandatoryDone}/${mandatoryTotal} required attached`}
+              {`${mandatoryDone} of ${mandatoryTotal} attached`}
             </Badge>
           ) : null}
         </div>
@@ -129,18 +113,13 @@ export function ApplicationStageOne({
             requirements={requirements}
           />
         </div>
-
-        <p className="mt-3 text-[11px] leading-snug text-slate-500">
-          Uploading a file here also adds it to your document library, so you are not asked for the same certificate
-          twice. PDF, JPG or PNG, up to 5 MB.
-        </p>
       </Card>
 
-      <Card className="p-5">
-        <h2 className="text-lg font-bold text-gov-blue-dark">Save and continue</h2>
+      <Card accentClass="border-l-4 border-gov-blue" className="p-5">
+        <h3 className="text-lg font-bold text-gov-blue-dark">Save and continue</h3>
         <p className="mt-1 text-[12px] leading-relaxed text-slate-600">
-          This saves your answers and moves you to the full application form. It is <strong>not</strong> a submission —
-          your application stays a draft until you submit it at the end.
+          This keeps your application as a draft and opens the full application form. Nothing is submitted until you
+          confirm it on the last step.
         </p>
 
         {error ? (

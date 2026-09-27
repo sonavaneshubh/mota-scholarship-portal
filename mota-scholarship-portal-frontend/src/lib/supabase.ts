@@ -1,11 +1,92 @@
 import { createClient } from '@supabase/supabase-js';
 import { resolveGuidelineUrl } from '../data/schemeGuidelines';
+import { describeEnvValue, diagnosticError, projectHost } from './diagnostics';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.trim() ?? '';
-const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim() || import.meta.env.VITE_SUPABASE_ANON_KEY?.trim() || '';
+/**
+ * Environment variables, named once.
+ *
+ * Vite inlines `import.meta.env.VITE_*` at **build** time, not at runtime. A
+ * Vercel build therefore reads these from the project's environment variables at
+ * the moment `npm run build` runs, and the values are baked into the emitted
+ * bundle. Adding the variables to Vercel after a deployment has been built
+ * changes nothing until a new deployment is produced.
+ *
+ * Both key names are accepted because Supabase renamed the browser key:
+ * `VITE_SUPABASE_PUBLISHABLE_KEY` is the current name and
+ * `VITE_SUPABASE_ANON_KEY` is the older one. Neither is a secret — both are
+ * public, browser-safe values — but only the publishable/anon key may ever be
+ * used here. The service-role key must never reach a frontend build.
+ */
+const URL_VAR = 'VITE_SUPABASE_URL';
+const PUBLISHABLE_KEY_VAR = 'VITE_SUPABASE_PUBLISHABLE_KEY';
+const ANON_KEY_VAR = 'VITE_SUPABASE_ANON_KEY';
 
-export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseKey);
+const supabaseUrl = import.meta.env[URL_VAR]?.trim() ?? '';
+const publishableKey = import.meta.env[PUBLISHABLE_KEY_VAR]?.trim() ?? '';
+const anonKey = import.meta.env[ANON_KEY_VAR]?.trim() ?? '';
+const supabaseKey = publishableKey || anonKey;
 
+/**
+ * Names of the variables the build is missing.
+ *
+ * Variable *names* only, never values, so this is safe to log or display. Empty
+ * means the backend is configured, which is the only condition under which the
+ * portal talks to a real database.
+ */
+export const missingSupabaseEnvVars: string[] = [
+  ...(supabaseUrl ? [] : [URL_VAR]),
+  ...(supabaseKey ? [] : [PUBLISHABLE_KEY_VAR]),
+];
+
+/**
+ * Whether the URL is something `createClient` will accept.
+ *
+ * `createClient` throws synchronously on a malformed URL, and it is called at
+ * module scope. An unusable value in the environment would therefore take down
+ * the whole bundle before React renders, which is a white screen with one red
+ * console line. Treating it as "not configured" instead keeps the portal
+ * renderable and lets it say *why* it cannot reach the database.
+ */
+function isUsableSupabaseUrl(value: string): boolean {
+  if (!value) {
+    return false;
+  }
+
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === 'https:' || parsed.protocol === 'http:';
+  } catch {
+    return false;
+  }
+}
+
+export const isSupabaseConfigured = isUsableSupabaseUrl(supabaseUrl) && Boolean(supabaseKey);
+
+/**
+ * User-facing explanation for a portal that cannot reach its database.
+ *
+ * Deliberately free of environment variable names, hostnames and anything else
+ * about the deployment: this string is rendered to applicants. The
+ * variable-level detail is available separately through
+ * `missingSupabaseEnvVars` for developers.
+ */
+export const supabaseConfigNotice =
+  'Sign-in and scheme data are temporarily unavailable because this portal is not connected to its authentication service. Please contact the administrator.';
+
+/**
+ * Session persistence for a Vite SPA.
+ *
+ * These three settings are required for a browser-only Supabase client and were
+ * already correct; they are kept explicit because changing any of them silently
+ * logs every applicant out on refresh:
+ *
+ *   persistSession      the session is written to localStorage, so a refresh or a
+ *                       reopened tab does not require signing in again
+ *   autoRefreshToken    the access token is refreshed before it expires, so a
+ *                       long session does not drop the user at the dashboard
+ *   detectSessionInUrl  the tokens in a password-reset / email-confirmation
+ *                       callback URL are consumed and removed from the address bar
+ */
 export const supabase = isSupabaseConfigured
   ? createClient(supabaseUrl, supabaseKey, {
       auth: {
@@ -17,6 +98,38 @@ export const supabase = isSupabaseConfigured
   : null;
 
 export const DEMO_MODE = !isSupabaseConfigured;
+
+/**
+ * Reports the Supabase configuration once, at module load, in development only.
+ *
+ * The single most useful line when the portal is misconfigured: it answers
+ * "was the value inlined into this build at all?", and if it was, "which project
+ * is this build pointed at?" — the question that distinguishes a missing
+ * environment variable from a variable pointing at the wrong Supabase project.
+ */
+diagnosticError('supabase', 'configuration', {
+  configured: isSupabaseConfigured,
+  demoMode: DEMO_MODE,
+  missingEnvVars: missingSupabaseEnvVars,
+  url: describeEnvValue(supabaseUrl),
+  key: {
+    ...describeEnvValue(supabaseKey),
+    // Which of the two accepted names supplied it, so a project configured with
+    // only the older name is obvious rather than a mystery.
+    source: publishableKey ? PUBLISHABLE_KEY_VAR : anonKey ? ANON_KEY_VAR : null,
+  },
+  projectHost: projectHost(supabaseUrl),
+});
+
+if (!isSupabaseConfigured) {
+  diagnosticError(
+    'supabase',
+    'no Supabase client was created, so every database read returns empty and ' +
+      'sign-in falls back to the demo accounts. On Vercel this means the build ' +
+      'ran without its VITE_SUPABASE_* environment variables, or with an unusable URL.',
+    { missingEnvVars: missingSupabaseEnvVars },
+  );
+}
 
 // Types for the new scholarship master tables
 export interface Department {
@@ -160,114 +273,146 @@ export interface Application {
 }
 
 /**
- * Mirrors the deployed `public.scheme_eligibility` table. There is no
- * `academic_year` column here — filtering a query by it returns PostgreSQL
- * 42703 "column does not exist", which is what silently emptied the
- * eligibility section of the scheme detail page.
+ * Mirrors the deployed `public.scheme_eligibility` table exactly.
+ *
+ * The column names here are the live ones, verified against the hosted schema:
+ * `eligible_categories`, `eligible_course_types`, `eligible_states`,
+ * `maximum_family_income`, `other_rules`, `minimum_age`, `maximum_age`,
+ * `minimum_percentage`, `eligible_gender`, `eligible_course_levels`,
+ * `required_domicile`, `required_hosteller`. Naming a column that does not
+ * exist is not a type error, it is a silent `undefined` at runtime, so this
+ * interface deliberately carries nothing the table does not have. The
+ * qualification, institution, disability, attendance, admission and cap
+ * requirements that earlier revisions of this file declared have no column
+ * behind them and are therefore not represented here.
+ *
+ * The descriptive columns are jsonb and currently hold arrays such as
+ * `["ST (Scheduled Tribe)"]`, but the UI normalises both shapes through
+ * describeList() rather than assuming an array.
  */
 export interface SchemeEligibility {
   id: string;
   scheme_id: string;
-  academic_year: string;
-  min_age: number | null;
-  max_age: number | null;
-  // Free-text requirement columns. PostgREST returns these as strings, and
-  // older rows can hold a JSON array, so the UI normalises both shapes through
-  // describeList() rather than calling string methods on them.
-  category_requirement: string[] | string | null;
-  religion_requirement: string[] | string | null;
-  gender_requirement: string[] | string | null;
-  disability_requirement: string[] | string | null;
-  qualification_requirement: string[] | string | null;
-  course_requirement: string[] | string | null;
-  residency_requirement: string[] | string | null;
-  institution_requirement: string[] | string | null;
-  attendance_requirement: string[] | string | null;
-  admission_requirement: string[] | string | null;
-  cap_requirement: string[] | string | null;
-  gap_requirement: string[] | string | null;
-  min_percentage: number | null;
-  max_income: number | null;
-  // 'per annum' or similar. Null when the column is not meaningful, such as on
-  // a scheme with no income criterion at all.
-  income_period: string | null;
-  other_conditions: Record<string, unknown> | string | null;
+  // Present as a column, but seeded as an empty string on every current row, so
+  // it is not usable as a required value.
+  academic_year: string | null;
+  minimum_age: number | null;
+  maximum_age: number | null;
+  eligible_categories: string[] | string | null;
+  eligible_gender: string[] | string | null;
+  eligible_course_levels: string[] | string | null;
+  eligible_course_types: string[] | string | null;
+  eligible_states: string[] | string | null;
+  maximum_family_income: number | null;
+  minimum_percentage: number | null;
+  required_domicile: boolean | null;
+  required_hosteller: boolean | null;
+  /**
+   * jsonb, not text. Populated by
+   * 20260927000120_official_scheme_data_eligibility.sql with a structured object
+   * whose keys are official rule names, plus `source_ref`, `not_specified_officialy`
+   * and `open_conflict`. It used to be a plain sentence of prose, so anything
+   * treating it as a string will now be wrong.
+   */
+  other_rules: Record<string, unknown> | null;
+  /**
+   * Added by 20260927000110_official_scheme_data_ddl.sql. NULL means the
+   * guideline does not state a qualifying examination (BPVGK), which is a real
+   * answer and must be shown as such rather than filled in.
+   */
+  qualifying_examination: string[] | null;
+  /**
+   * Added by the same migration. The official institution categories a student
+   * may study at. NULL means the guideline states no such requirement.
+   */
+  institution_requirement: string[] | null;
   created_at: string;
   updated_at: string;
 }
 
 /**
- * Mirrors the deployed `public.scheme_benefits` table. Amounts are null in the
- * data, and there are no amount_currency/amount_period/coverage/hosteller or
- * day-scholar columns, so the UI must not imply a per-year or per-hosteller
- * figure it cannot source.
+ * Mirrors the deployed `public.scheme_benefits` table exactly: `benefit_type`,
+ * `description`, `amount`, `frequency`, `conditions`, `academic_year`,
+ * `currency` and `amount_basis`. There is no `benefit_group`, `amount_period`,
+ * `coverage`, `hosteller_amount` or `day_scholar_amount` column, and no
+ * `updated_at` either, so none of them are declared here.
+ *
+ * Hosteller and day-scholar rates live in SEPARATE rows, as do the four
+ * BVOBC course groups and the two AZKMI Ph.D tenure bands. Nothing may be
+ * merged back into one row for display.
  */
 export interface SchemeBenefit {
   id: string;
   scheme_id: string;
-  academic_year: string;
+  academic_year: string | null;
   benefit_type: string;
   description: string | null;
+  /**
+   * NULL whenever the official value is not a fixed number: as-per-actuals
+   * items, State-decided fees and the UGC-percentage HRA. NULL must render as
+   * words, never as zero.
+   */
   amount: number | null;
   frequency: string | null;
   conditions: string | null;
-  // Added by 20260927000008_scheme_detail_content.sql.
-  //
-  // A single scalar `amount` cannot express a stipend that differs by
-  // residence, so the hosteller and day-scholar rates get their own columns
-  // instead of being flattened into prose. `benefit_group` labels a tier within
-  // one benefit_type (I, II, III, IV for the stipend groups); it is null for
-  // benefits that are not tiered, which is why these stay nullable rather than
-  // defaulting to an empty string that would look like a real group.
-  benefit_group: string | null;
-  amount_period: string | null;
-  coverage: string | null;
-  hosteller_amount: number | null;
-  day_scholar_amount: number | null;
+  /** ISO code: 'INR', 'USD', 'GBP', or NULL when not stated officially. */
+  currency: string | null;
+  /**
+   * How `amount` must be read: 'fixed' | 'state_fixed' | 'percentage' |
+   * 'actual' | 'pro_rated'. 'actual' and 'state_fixed' rows are expected to
+   * have a NULL amount.
+   */
+  amount_basis: string | null;
   created_at: string;
 }
 
 /**
- * Mirrors the deployed `public.scheme_process_steps` table, added by
- * 20260927000008_scheme_detail_content.sql. One ordered step an applicant
- * passes through, from submission through to payment.
+ * Mirrors the deployed `public.scheme_process_steps` table, created by
+ * 20260927000110_official_scheme_data_ddl.sql and populated by
+ * 20260927000130_official_scheme_data_process_steps.sql.
  *
- * `is_verified` is false until a department officer has checked the step
- * against the scheme's own guideline, so the detail view can mark the pipeline
- * as provisional rather than presenting it as settled.
+ * One ordered step an applicant passes through, from submission through to
+ * payment. `step_order` is the sequence number and is unique per scheme.
+ * `sla_or_timeline` holds a SUGGESTED official date, never a fixed one.
  */
 export interface SchemeProcessStep {
   id: string;
   scheme_id: string;
-  step_number: number;
+  step_order: number;
   title: string;
   description: string | null;
   actor: string | null;
-  is_verified: boolean;
+  /** Official suggested date or timeline, or NULL when none is stated. */
+  sla_or_timeline: string | null;
+  /** Guideline document and page/section the step was taken from. */
+  source_ref: string | null;
   created_at: string;
-  updated_at: string;
 }
 
 /**
- * Mirrors the deployed `public.scheme_criteria` table, added by
- * 20260927000008_scheme_detail_content.sql.
+ * Mirrors the deployed `public.scheme_criteria` table, created by
+ * 20260927000110_official_scheme_data_ddl.sql and populated by
+ * 20260927000140_official_scheme_data_criteria.sql.
  *
- * Separate from SchemeEligibility on purpose: that table holds the
- * machine-checkable values used to pre-evaluate an applicant (income ceiling,
- * minimum percentage, eligible categories), whereas this holds the ordered
- * conditions a person reads. They answer different questions and one cannot be
- * reliably derived from the other.
+ * Separate from SchemeEligibility on purpose: this holds official rules that do
+ * not fit a scalar column — AZKMI's three course-dependent maximum ages, ARG45's
+ * four slot allocations, AZKMI's four field allocations and BVOBC's four course
+ * groups. `criteria_type` groups them and `criteria_key` is unique per type.
  */
 export interface SchemeCriterion {
   id: string;
   scheme_id: string;
-  criterion_order: number;
-  label: string;
-  detail: string | null;
-  is_mandatory: boolean;
-  source_text: string | null;
+  criteria_type: string;
+  criteria_key: string;
+  title: string;
+  description: string | null;
+  /** Numeric rule value, e.g. a maximum age or a slot count. */
+  numeric_value: number | null;
+  text_value: string | null;
+  /** Course, stream or category the rule applies to, or NULL scheme-wide. */
+  applies_to: string | null;
+  source_ref: string | null;
   created_at: string;
-  updated_at: string;
 }
 
 /**
@@ -281,33 +426,50 @@ export interface SchemeDocument {
   document_name: string;
   description: string | null;
   is_mandatory: boolean | null;
-  accepted_formats: string | null;
+  accepted_formats: string[] | string | null;
+  /** Size limit in MB. NULL means no official limit is stated for the scheme. */
   max_file_size_mb: number | null;
+  academic_year: string | null;
+  /**
+   * Added by 20260927000110_official_scheme_data_ddl.sql. Only A023B has an
+   * official fresh/renewal matrix; every other scheme uses true/true.
+   */
+  is_required_fresh: boolean;
+  is_required_renewal: boolean;
+  /**
+   * Added by 20260927000200_remove_dummy_data_and_normalize_documents.sql.
+   * Lowest course year (1-based) at which this document is required, or null
+   * when it is required at every year. Only the "Previous / Last Year Marksheet"
+   * rows on BPVGK and BVOBC use 2, which is how a first-year applicant is kept
+   * from being asked for a previous-year mark sheet.
+   */
+  required_from_course_year: number | null;
   created_at: string;
 }
 
 export interface SchemeSource {
   id: string;
   scheme_id: string;
-  source_type: string;
-  source_url: string;
-  gr_url: string | null;
+  source_type: string | null;
+  source_url: string | null;
   source_title: string | null;
-  source_last_checked_at: string;
+  verification_status: 'pending' | 'verified' | 'rejected';
+  verified_at: string | null;
+  verified_by: string | null;
   content_hash: string | null;
-  verification_status: 'pending_review' | 'verified' | 'rejected';
-  notes: string | null;
+  retrieved_at: string | null;
   created_at: string;
 }
 
 export interface SchemeVersion {
   id: string;
   scheme_id: string;
-  academic_year: string;
-  data_snapshot: Record<string, unknown>;
-  source_url: string | null;
-  verified_at: string | null;
-  verified_by: string | null;
+  version_number: number;
+  academic_year: string | null;
+  /** jsonb. Populated by 20260927000100_snapshot_pre_official_data_migration.sql. */
+  snapshot: Record<string, unknown>;
+  change_summary: string | null;
+  created_by: string | null;
   created_at: string;
 }
 

@@ -57,13 +57,34 @@ function extensionOf(file: File): string {
   return ALLOWED_EXTENSIONS.includes(fromName) ? fromName : '';
 }
 
-/** Validate before spending an upload. Returns a message, or null when valid. */
-export function validateDocumentFile(file: File): string | null {
+/** Human-readable size, in the unit the guideline used. */
+function formatSizeLimit(bytes: number): string {
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/**
+ * Validate before spending an upload. Returns a message, or null when valid.
+ *
+ * `maxFileSizeMb` is the scheme's own `scheme_documents.max_file_size_mb`, which
+ * is NULL for the schemes whose guidelines state no limit — a null means "no
+ * scheme limit recorded", not "zero". When present it is checked as well as the
+ * 5 MB application cap, because ARG45 caps uploads at 500 KB and AZKMI at 100 KB,
+ * and an applicant told "5 MB or smaller" would otherwise only discover the real
+ * limit when the portal rejected the file.
+ */
+export function validateDocumentFile(file: File, maxFileSizeMb?: number | null): string | null {
   if (!ALLOWED.includes(file.type)) {
     return 'Upload a PDF, JPG or PNG file.';
   }
   if (!extensionOf(file)) {
     return 'The file name must end in .pdf, .jpg, .jpeg or .png.';
+  }
+  if (typeof maxFileSizeMb === 'number' && maxFileSizeMb > 0) {
+    const schemeLimit = maxFileSizeMb * 1024 * 1024;
+    if (file.size > schemeLimit) {
+      return `This scheme's guideline caps "${file.name}" at ${formatSizeLimit(schemeLimit)}.`;
+    }
   }
   if (file.size > MAX_BYTES) {
     return 'The file must be 5 MB or smaller.';
@@ -78,16 +99,56 @@ export interface UploadInput {
   applicantId: string;
   documentCode: string;
   file: File;
+  /** scheme_documents.max_file_size_mb, or null when the guideline states none. */
+  maxFileSizeMb?: number | null;
+}
+
+/**
+ * Human label for a document code, used to fill the NOT NULL `document_name`
+ * column. Codes arrive from resolveDocumentCode(), which slugifies whatever the
+ * scheme guideline called the document, so a known code gets a proper name and
+ * anything else is de-slugged rather than shown as a raw identifier.
+ */
+function documentLabel(code: string): string {
+  const labels: Record<string, string> = {
+    aadhaar: 'Aadhaar Card',
+    aadhaar_card: 'Aadhaar Card',
+    income_certificate: 'Income Certificate',
+    caste_certificate: 'Category Certificate',
+    domicile_certificate: 'Domicile Certificate',
+    disability_certificate: 'Disability Certificate',
+    hostel_certificate: 'Hostel Certificate',
+    hosteller_certificate: 'Hostel Certificate',
+    previous_marksheet: 'Previous Marksheet',
+    marksheet: 'Marksheet',
+    bank_passbook: 'Bank Passbook',
+    bank: 'Bank Passbook',
+    admission_proof: 'Admission Proof',
+    admission: 'Admission Proof',
+    birth_certificate: 'Birth Certificate',
+    photo: 'Photograph',
+    signature: 'Signature',
+    offer_letter: 'Offer Letter',
+    degree_certificate: 'Degree Certificate',
+    fee_receipt: 'Fee Receipt',
+  };
+  if (labels[code]) return labels[code];
+  return code
+    .split('_')
+    .filter((part) => part !== '')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ') || 'Document';
 }
 
 export async function uploadDocument({
   applicantId,
   documentCode,
   file,
+  maxFileSizeMb,
 }: UploadInput): Promise<DocumentServiceResult<ApplicantDocumentRecord>> {
   const sb = client();
 
-  const invalid = validateDocumentFile(file);
+  const invalid = validateDocumentFile(file, maxFileSizeMb);
   if (invalid) {
     return { ok: false, error: invalid };
   }
@@ -106,17 +167,24 @@ export async function uploadDocument({
 
   // Metadata only. The bytes are already in storage; this row is what the
   // completeness engine reads to know a document exists.
+  //
+  // `document_type` carries the controlled code because it is the only code
+  // column on `applicant_documents`, and the profile certificate slots plus
+  // matchExistingDocument() both key on it. `document_name` is the human label
+  // and is NOT NULL, so it is derived from the code rather than left to the
+  // caller to supply. `verification_status` defaults to 'pending' in the
+  // database, so it is not written here; the DB CHECK allows only
+  // pending/ai_verified/human_verified/rejected.
   const { data, error } = await sb
     .from('applicant_documents')
     .insert({
       applicant_id: applicantId,
       document_type: documentCode,
-      document_code: documentCode,
+      document_name: documentLabel(safeCode),
       file_name: file.name,
       storage_path: storagePath,
       mime_type: file.type,
       file_size: file.size,
-      status: 'uploaded',
     })
     .select('*')
     .maybeSingle();

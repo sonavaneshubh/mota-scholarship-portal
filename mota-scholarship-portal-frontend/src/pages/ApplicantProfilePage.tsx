@@ -121,6 +121,16 @@ const SECTIONS: Array<{ id: ProfileSectionId; label: string; heading: string; bl
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 
+/**
+ * Write-only fields the service accepted but could not store on the profile,
+ * because the database writer rejected them. They stay required, so the section
+ * is not actually complete and must not be presented as a plain success.
+ */
+const DEGRADED_LABELS: Record<'aadhaar' | 'account', string> = {
+  aadhaar: 'Aadhaar number',
+  account: 'Bank account number',
+};
+
 export function ApplicantProfilePage() {
   const { user, authUser } = useApplicantAuth();
   const userId = authUser?.id ?? null;
@@ -136,6 +146,7 @@ export function ApplicantProfilePage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<SaveState>('idle');
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [degradedFields, setDegradedFields] = useState<readonly ('aadhaar' | 'account')[]>([]);
   const [continueTarget, setContinueTarget] = useState<ContinueTarget>(() =>
     resolveContinueTarget(null),
   );
@@ -220,6 +231,7 @@ export function ApplicantProfilePage() {
 
       setSaveState('saving');
       setSaveError(null);
+      setDegradedFields([]);
 
       const sectionValues = getSectionValues(section);
 
@@ -244,7 +256,7 @@ export function ApplicantProfilePage() {
       } else if (section === 'past_qualification') {
         validation = validateQualifications(sectionValues as QualificationFormValues[]);
       } else if (section === 'hostel') {
-        const hostelCerts = data.documents?.filter(d => d.document_code === 'hosteller_certificate') ?? [];
+        const hostelCerts = data.documents?.filter(d => d.document_type === 'hosteller_certificate' || d.document_type === 'hostel_certificate') ?? [];
         validation = validateHostel(sectionValues as HostelFormValues, { hasCertificate: hostelCerts.length > 0 });
       } else {
         validation = { valid: true, errors: {} };
@@ -257,7 +269,11 @@ export function ApplicantProfilePage() {
         return false;
       }
 
-      let result: { ok: boolean; error?: string } = { ok: true };
+      let result: {
+        ok: boolean;
+        error?: string;
+        pendingLocally?: readonly ('aadhaar' | 'account')[];
+      } = { ok: true };
 
       switch (section) {
         case 'personal': {
@@ -297,7 +313,7 @@ export function ApplicantProfilePage() {
           break;
         }
         case 'hostel': {
-          const hostelCert = data.documents?.find(d => d.document_code === 'hosteller_certificate');
+          const hostelCert = data.documents?.find(d => d.document_type === 'hosteller_certificate' || d.document_type === 'hostel_certificate');
           result = await saveHostelSection(applicantId, data.hostel?.id ?? null, sectionValues as HostelFormValues, hostelCert?.id ?? null);
           break;
         }
@@ -308,6 +324,8 @@ export function ApplicantProfilePage() {
         setSaveError(result.error ?? 'Your changes could not be saved.');
         return false;
       }
+
+      setDegradedFields(result.pendingLocally ?? []);
 
       await reloadAfterSave();
       setDirty(false);
@@ -464,7 +482,7 @@ export function ApplicantProfilePage() {
     percent: completeness.sections[section.id] ?? 0,
   }));
 
-  const hostelCert = data.documents?.find((d: ApplicantDocumentRecord) => d.document_code === 'hosteller_certificate');
+  const hostelCert = data.documents?.find((d: ApplicantDocumentRecord) => d.document_type === 'hosteller_certificate' || d.document_type === 'hostel_certificate');
 
   return (
     <div className="space-y-5 py-2 sm:py-4">
@@ -547,6 +565,17 @@ export function ApplicantProfilePage() {
           </p>
         )}
 
+        {saveState === 'saved' && degradedFields.length > 0 && (
+          <p
+            className="mt-3 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] font-semibold text-amber-900"
+            role="status"
+          >
+            {`${degradedFields.map((field) => DEGRADED_LABELS[field]).join(' and ')} could not be saved to your profile, so ${
+              degradedFields.length === 1 ? 'it still counts as a required item' : 'they still count as required items'
+            } that ${degradedFields.length === 1 ? 'is' : 'are'} still needed. Everything else in this section was saved.`}
+          </p>
+        )}
+
         {saveState === 'error' && saveError && (
           <p
             className="mt-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-[12px] font-semibold text-red-800"
@@ -572,10 +601,9 @@ export function ApplicantProfilePage() {
         )}
 
         <div className="mt-4">
-          {active === 'personal' && master && (
+          {active === 'personal' && (
             <PersonalSection
               errors={errors}
-              master={master}
               onChange={patchPersonal}
               values={personal}
             />

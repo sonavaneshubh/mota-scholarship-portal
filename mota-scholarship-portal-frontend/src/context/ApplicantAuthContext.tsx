@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import { diagnostic, diagnosticError } from '../lib/diagnostics';
 import type { ApplicantProfile, AuthProfile } from '../types';
 import {
   getProfile,
@@ -85,16 +86,28 @@ export function ApplicantAuthProvider({ children }: { children: ReactNode }) {
     let active = true;
 
     if (!supabase) {
+      diagnosticError(
+        'applicant-auth',
+        'no Supabase client, so no session can be restored and every protected route stays signed out',
+      );
       clearAuthState();
       return () => {
         active = false;
       };
     }
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((event, nextSession) => {
       if (!active) {
         return;
       }
+
+      // Event name and presence only. Never the session itself: it carries the
+      // access and refresh tokens.
+      diagnostic('applicant-auth', 'auth state changed', {
+        event,
+        authenticated: Boolean(nextSession),
+        userId: nextSession?.user?.id ?? null,
+      });
 
       setSession(nextSession);
       setAuthUser(nextSession?.user ?? null);
@@ -148,6 +161,20 @@ export function ApplicantAuthProvider({ children }: { children: ReactNode }) {
     void getProfile(authUser.id).then((result) => {
       if (!active) {
         return;
+      }
+
+      // A profile that cannot be read is the difference between "this account has
+      // no profile yet" and "RLS is hiding it", and the two need different fixes.
+      if (result.error) {
+        diagnosticError('applicant-auth', 'profile could not be loaded', {
+          userId: authUser.id,
+          error: result.error,
+        });
+      } else {
+        diagnostic('applicant-auth', 'profile loaded', {
+          userId: authUser.id,
+          role: result.profile?.role ?? null,
+        });
       }
 
       setProfile(result.profile);

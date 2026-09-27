@@ -91,10 +91,10 @@ export async function fetchSchemeDetail(schemeId: string): Promise<SchemeDetailR
       .from('scheme_benefits')
       .select('*')
       .eq('scheme_id', schemeId)
-      // benefit_type alone leaves the tiers of one benefit in arbitrary order,
-      // so benefit_group breaks the tie and Group I precedes Group II.
-      .order('benefit_type')
-      .order('benefit_group'),
+      // Only `benefit_type` exists as a sort key. `benefit_group` was also being
+      // ordered by and is not a column on the table, so that second sort had no
+      // effect; ordering by it on its own returns PostgreSQL 42703.
+      .order('benefit_type'),
     supabase
       .from('scheme_documents')
       .select('*')
@@ -115,12 +115,15 @@ export async function fetchSchemeDetail(schemeId: string): Promise<SchemeDetailR
       .from('scheme_process_steps')
       .select('*')
       .eq('scheme_id', schemeId)
-      .order('step_number'),
+      .order('step_order'),
+    // criteria has no single sequence column: it is grouped by criteria_type and
+    // keyed by criteria_key, so it is ordered by that pair instead.
     supabase
       .from('scheme_criteria')
       .select('*')
       .eq('scheme_id', schemeId)
-      .order('criterion_order'),
+      .order('criteria_type')
+      .order('criteria_key'),
   ]);
 
   // Log each related-table failure instead of silently returning empty lists,

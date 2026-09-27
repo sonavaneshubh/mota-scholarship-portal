@@ -88,7 +88,7 @@ function SubHeading({ children }: { children: ReactNode }) {
  * Section 1 — applicant information, straight from My Profile.
  */
 export function ApplicantInformationSection({ profile }: ReadOnlyGridProps) {
-  const { profile: anchor, address, caste, domicile, parents, bank } = profile;
+  const { profile: anchor, address, domicile, parents, bank } = profile;
 
   return (
     <div className="space-y-5">
@@ -100,16 +100,12 @@ export function ApplicantInformationSection({ profile }: ReadOnlyGridProps) {
             { label: 'Name as per marksheet', value: value(anchor?.applicant_full_name_as_per_marksheet) },
             { label: 'Date of birth', value: formatDate(anchor?.date_of_birth) },
             { label: 'Gender', value: value(anchor?.gender) },
-            { label: 'Religion', value: value(anchor?.religion) },
             { label: 'Marital status', value: value(anchor?.marital_status) },
             { label: 'Mobile', value: value(anchor?.mobile_number) },
             { label: 'Email', value: value(anchor?.email) },
             // The full Aadhaar is write-only by design: the server only ever
             // returns a mask, so this shows what is genuinely held.
             { label: 'Aadhaar', value: value(anchor?.aadhaar_masked ?? anchor?.aadhaar_last4) },
-            { label: 'Category', value: value(caste?.category) },
-            { label: 'Caste', value: value(caste?.caste) },
-            { label: 'Caste certificate held', value: yesNo(caste?.has_caste_certificate) },
             { label: 'Maharashtra domicile', value: yesNo(domicile?.is_maharashtra_domicile) },
           ]}
         />
