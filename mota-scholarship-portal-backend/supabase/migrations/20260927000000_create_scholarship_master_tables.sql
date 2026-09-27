@@ -106,6 +106,15 @@ create table if not exists public.schemes (
   updated_at timestamptz not null default now()
 );
 
+-- Ensure all columns exist (table might have been created without some columns in a previous failed run)
+alter table public.schemes add column if not exists scheme_type text;
+alter table public.schemes add column if not exists overview text;
+alter table public.schemes add column if not exists application_mode text;
+alter table public.schemes add column if not exists official_scheme_url text;
+alter table public.schemes add column if not exists official_application_url text;
+alter table public.schemes add column if not exists gr_url text;
+alter table public.schemes add column if not exists renewal_available boolean;
+
 create index if not exists idx_schemes_name on public.schemes(name);
 create index if not exists idx_schemes_scheme_code on public.schemes(scheme_code);
 create index if not exists idx_schemes_department_id on public.schemes(department_id);
@@ -165,6 +174,9 @@ create table if not exists public.scheme_eligibility (
   unique (scheme_id, academic_year)
 );
 
+-- Ensure academic_year column exists (table might have been created without it in a previous failed run)
+alter table public.scheme_eligibility add column if not exists academic_year text not null default '';
+
 create index if not exists idx_scheme_eligibility_scheme_id on public.scheme_eligibility(scheme_id);
 create index if not exists idx_scheme_eligibility_academic_year on public.scheme_eligibility(academic_year);
 
@@ -208,6 +220,9 @@ create table if not exists public.scheme_benefits (
   updated_at timestamptz not null default now()
 );
 
+-- Ensure academic_year column exists (table might have been created without it in a previous failed run)
+alter table public.scheme_benefits add column if not exists academic_year text not null default '';
+
 create index if not exists idx_scheme_benefits_scheme_id on public.scheme_benefits(scheme_id);
 create index if not exists idx_scheme_benefits_academic_year on public.scheme_benefits(academic_year);
 create index if not exists idx_scheme_benefits_benefit_type on public.scheme_benefits(benefit_type);
@@ -247,6 +262,9 @@ create table if not exists public.scheme_documents (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+-- Ensure academic_year column exists (table might have been created without it in a previous failed run)
+alter table public.scheme_documents add column if not exists academic_year text;
 
 create index if not exists idx_scheme_documents_scheme_id on public.scheme_documents(scheme_id);
 create index if not exists idx_scheme_documents_academic_year on public.scheme_documents(academic_year);
@@ -309,6 +327,9 @@ create table if not exists public.scheme_versions (
   created_at timestamptz not null default now(),
   unique (scheme_id, academic_year)
 );
+
+-- Ensure academic_year column exists (table might have been created without it in a previous failed run)
+alter table public.scheme_versions add column if not exists academic_year text not null default '';
 
 create index if not exists idx_scheme_versions_scheme_id on public.scheme_versions(scheme_id);
 create index if not exists idx_scheme_versions_academic_year on public.scheme_versions(academic_year);
@@ -426,6 +447,9 @@ for all to authenticated
 using (public.is_admin())
 with check (public.is_admin());
 
+-- Ensure departments table has official_url column (might have been created without it in a previous failed run)
+alter table public.departments add column if not exists official_url text;
+
 -- ============================================================
 -- Seed initial departments and categories
 -- ============================================================
@@ -447,6 +471,9 @@ on conflict (code) do update set
   official_url = excluded.official_url,
   is_active = excluded.is_active,
   updated_at = now();
+
+-- Ensure scheme_categories table has updated_at column (might have been created without it in a previous failed run)
+alter table public.scheme_categories add column if not exists updated_at timestamptz not null default now();
 
 insert into public.scheme_categories (name, description, is_active) values
   ('Post Matric Scholarship', 'Scholarships for students after matriculation (Class 10+)', true),

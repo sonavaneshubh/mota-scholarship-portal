@@ -58,6 +58,19 @@ alter table public.scheme_eligibility add column if not exists academic_year tex
 alter table public.scheme_benefits   add column if not exists academic_year text;
 alter table public.scheme_documents  add column if not exists academic_year text;
 
+-- Fix: scheme_documents is missing updated_at column, but the trigger
+-- set_scheme_documents_updated_at tries to set NEW.updated_at = now().
+-- Add the column and backfill before any UPDATE fires the trigger.
+alter table public.scheme_documents
+  add column if not exists updated_at timestamptz;
+
+update public.scheme_documents
+   set updated_at = created_at
+ where updated_at is null;
+
+alter table public.scheme_documents
+  alter column updated_at set default now();
+
 comment on column public.scheme_eligibility.academic_year is
   'Academic year this eligibility rule applies to. Backfilled from the parent scheme when added to an existing database.';
 comment on column public.scheme_benefits.academic_year is

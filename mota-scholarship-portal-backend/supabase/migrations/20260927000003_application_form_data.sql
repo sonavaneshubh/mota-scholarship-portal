@@ -99,16 +99,32 @@ create table if not exists public.application_documents (
     unique (application_id, scheme_document_id)
 );
 
+-- Fix: handle legacy column name 'applicant_document_id' -> 'document_id'
+-- The remote database may have the old column name from a previous schema version.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'application_documents'
+      AND column_name = 'applicant_document_id'
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'application_documents'
+      AND column_name = 'document_id'
+  ) THEN
+    ALTER TABLE public.application_documents
+      RENAME COLUMN applicant_document_id TO document_id;
+  END IF;
+END
+$$;
+
 comment on table public.application_documents is
   'Links an applicant''s uploaded document to the scheme requirement it satisfies for one application. Holds no file data.';
-
-comment on column public.application_documents.applicant_id is
-  'Denormalised from the parent application by set_application_document_owner(). The client never supplies it; it exists so the RLS policies can be a direct column comparison.';
-
--- Defensive, for a table left behind by an earlier revision of this file that
--- predates the applicant_id column. On a fresh create the column is already
--- there and this is a no-op. The backfill is what lets the not-null tightening
--- below succeed instead of erroring on any pre-existing row.
 alter table public.application_documents
   add column if not exists applicant_id uuid references public.applicant_profiles(id) on delete cascade;
 
@@ -120,6 +136,9 @@ where a.id = ad.application_id
 
 alter table public.application_documents
   alter column applicant_id set not null;
+
+comment on column public.application_documents.applicant_id is
+  'Denormalised from the parent application by set_application_document_owner(). The client never supplies it; it exists so the RLS policies can be a direct column comparison.';
 
 create index if not exists idx_application_documents_application_id
   on public.application_documents(application_id);

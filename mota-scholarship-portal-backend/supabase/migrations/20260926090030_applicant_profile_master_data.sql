@@ -213,6 +213,31 @@ insert into public.caste_categories (code, label, sort_order) values
   ('minority', 'Minority', 90)
 on conflict (code) do update set label = excluded.label, sort_order = excluded.sort_order;
 
+-- Dummy castes for testing (linked to caste_categories)
+insert into public.castes (category_id, name)
+select id, 'Mahar' from public.caste_categories where code = 'sc'
+on conflict (category_id, name) do nothing;
+
+insert into public.castes (category_id, name)
+select id, 'Mang' from public.caste_categories where code = 'sc'
+on conflict (category_id, name) do nothing;
+
+insert into public.castes (category_id, name)
+select id, 'Bhil' from public.caste_categories where code = 'st'
+on conflict (category_id, name) do nothing;
+
+insert into public.castes (category_id, name)
+select id, 'Gond' from public.caste_categories where code = 'st'
+on conflict (category_id, name) do nothing;
+
+insert into public.castes (category_id, name)
+select id, 'Kunbi' from public.caste_categories where code = 'obc'
+on conflict (category_id, name) do nothing;
+
+insert into public.castes (category_id, name)
+select id, 'Mali' from public.caste_categories where code = 'obc'
+on conflict (category_id, name) do nothing;
+
 insert into public.course_levels (code, label, sort_order) values
   ('secondary', 'Secondary (Class 10)', 10),
   ('higher_secondary', 'Higher Secondary (Class 12)', 20),

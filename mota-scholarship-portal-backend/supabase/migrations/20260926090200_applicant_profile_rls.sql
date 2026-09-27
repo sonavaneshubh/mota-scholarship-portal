@@ -132,9 +132,10 @@ begin
        and not a.attisdropped
        and a.attname not in ('account_number', 'account_number_ciphertext')
   loop
-    execute format('grant select on public.bank_details.%I to authenticated', c);
-    execute format('grant insert on public.bank_details.%I to authenticated', c);
-    execute format('grant update on public.bank_details.%I to authenticated', c);
+    -- Column-level grants require parentheses: GRANT SELECT (column) ON table TO role
+    execute format('grant select (%I) on public.bank_details to authenticated', c);
+    execute format('grant insert (%I) on public.bank_details to authenticated', c);
+    execute format('grant update (%I) on public.bank_details to authenticated', c);
   end loop;
 end;
 $$;
