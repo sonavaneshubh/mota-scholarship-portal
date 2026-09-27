@@ -2,5 +2,8 @@
   "buildCommand": "cd mota-scholarship-portal-frontend && npm install && npm run build",
   "outputDirectory": "mota-scholarship-portal-frontend/dist",
   "framework": "vite",
-  "installCommand": "cd mota-scholarship-portal-frontend && npm install"
+  "installCommand": "cd mota-scholarship-portal-frontend && npm install",
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
 }
