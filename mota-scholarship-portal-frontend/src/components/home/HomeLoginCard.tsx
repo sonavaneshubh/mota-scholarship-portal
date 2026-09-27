@@ -314,7 +314,7 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
   const cardClassName = `bg-white/95 text-slate-900 rounded-lg shadow-lg border border-slate-200 scroll-mt-24 ${
     isRegistration
       ? 'p-3 lg:col-span-6 lg:h-auto lg:overflow-visible lg:flex lg:flex-col'
-      : 'p-4 lg:col-span-4 lg:h-auto lg:overflow-visible lg:flex lg:flex-col'
+      : 'p-4 lg:col-span-4 lg:col-start-9 lg:h-auto lg:overflow-visible lg:flex lg:flex-col'
   }`;
 
   useEffect(() => {
