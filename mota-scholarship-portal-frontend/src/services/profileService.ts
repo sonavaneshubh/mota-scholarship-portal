@@ -219,24 +219,42 @@ export async function loadProfile(applicantId: string): Promise<ServiceResult<Pr
   };
 }
 
-/** upsert helper for the 1:1 section tables. */
+interface UpsertOptions {
+  /** Columns to return. Defaults to '*'. */
+  columns?: string;
+  /**
+   * Whether the update is additionally scoped by `applicant_id = applicantId`.
+   *
+   * True for every 1:1 section table, where `applicant_id` is the uuid foreign key
+   * and the filter is what keeps an update on one applicant's row.
+   *
+   * False for the anchor table only. On `applicant_profiles` the applicant's own
+   * primary key IS `id`, and `applicant_id` holds the printable reference
+   * ('MOTA-2026-XXXXXXXX'), so filtering on it with a uuid matches nothing.
+   * PostgREST reports no error for a zero-row update, the section claims to be
+   * saved, and every identity field is silently dropped.
+   */
+  scopeByApplicantId?: boolean;
+}
+
+/** upsert helper for the anchor row and the 1:1 section tables. */
 async function upsertOne<T>(
   table: string,
   applicantId: string,
   rowId: string | null,
   payload: Record<string, unknown>,
-  columns = '*',
+  options: UpsertOptions = {},
 ): Promise<ServiceResult<T>> {
   const client = requireClient();
+  const { columns = '*', scopeByApplicantId = true } = options;
 
   if (rowId) {
-    const { data, error } = await client
+    const query = client
       .from(table)
       .update(payload)
-      .eq('id', rowId)
-      .eq('applicant_id', applicantId)
-      .select(columns)
-      .maybeSingle();
+      .eq('id', rowId);
+    const scoped = scopeByApplicantId ? query.eq('applicant_id', applicantId) : query;
+    const { data, error } = await scoped.select(columns).maybeSingle();
     if (error) return { ok: false, error: messageFromError(error, 'Could not save your changes.') };
     return { ok: true, data: data as T };
   }
@@ -355,6 +373,9 @@ export async function savePersonalSection(
     applicantId,
     ids.profile,
     profilePayload,
+    // The anchor row is the applicant's own primary key, so it is addressed by
+    // `id` alone. See UpsertOptions.scopeByApplicantId.
+    { scopeByApplicantId: false },
   );
   if (!profileResult.ok) return { ok: false, error: profileResult.error };
 
@@ -424,7 +445,10 @@ export async function savePersonalSection(
       account_type: text(values.account_type),
       aadhaar_linked: values.aadhaar_linked,
     },
-    'id, applicant_id, bank_name, account_holder_name, ifsc_code, branch_name, account_type, aadhaar_linked, account_number_last4',
+    {
+      columns:
+        'id, applicant_id, bank_name, account_holder_name, ifsc_code, branch_name, account_type, aadhaar_linked, account_number_last4',
+    },
   );
   if (!bank.ok) return { ok: false, error: bank.error };
 

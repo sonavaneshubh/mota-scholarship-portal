@@ -387,8 +387,9 @@ export function documentsToCertificates(documents: ApplicantDocumentRecord[]): {
   certificates: Record<CertificateSlot, ApplicantDocumentRecord | null>;
   hostel: ApplicantDocumentRecord | null;
 } {
+  // `document_type` is the only code column on `applicant_documents`.
   const find = (code: string): ApplicantDocumentRecord | null =>
-    documents.find((document) => document.document_code === code || document.document_type === code) ?? null;
+    documents.find((document) => document.document_type === code) ?? null;
 
   return {
     certificates: {

@@ -152,8 +152,6 @@ export interface PersonalValidationContext {
   /** Document ids attached to each conditional certificate field. */
   hasDomicileDocument: boolean;
   hasIncomeDocument: boolean;
-  hasCasteDocument: boolean;
-  hasDisabilityDocument: boolean;
 }
 
 export function validatePersonal(
@@ -171,7 +169,6 @@ export function validatePersonal(
   f.required('date_of_birth', 'Date of birth', values.date_of_birth);
   f.notFutureDate('date_of_birth', 'Date of birth', values.date_of_birth);
   f.required('gender', 'Gender', values.gender);
-  f.required('religion', 'Religion', values.religion);
   f.required('marital_status', 'Marital status', values.marital_status);
   f.required('applicant_full_name_as_per_marksheet', 'Name as per marksheet', values.applicant_full_name_as_per_marksheet);
   f.required('parent_guardian_mobile', 'Parent/guardian mobile', values.parent_guardian_mobile);
@@ -222,37 +219,9 @@ export function validatePersonal(
     f.required('job_type', 'Job type', values.job_type);
   }
 
-  // Disability
-  f.requiredChoice('is_disabled', 'Disability status', values.is_disabled);
-  if (values.is_disabled) {
-    f.required('disability_type', 'Disability type', values.disability_type);
-    f.requiredChoice('has_disability_certificate', 'Disability certificate status', values.has_disability_certificate);
-    if (values.has_disability_certificate) {
-      f.required('disability_certificate_number', 'Disability certificate number', values.disability_certificate_number);
-      if (!context.hasDisabilityDocument) {
-        f.required('disability_document', 'Disability certificate upload', '');
-      }
-    }
-  }
-
   // Siblings
   f.required('siblings_count', 'Number of siblings', values.siblings_count);
   f.numberRange('siblings_count', 'Number of siblings', values.siblings_count, 0, 30);
-
-  // Caste
-  f.required('category', 'Caste category', values.category);
-  f.required('caste', 'Caste', values.caste);
-  f.requiredChoice('has_caste_certificate', 'Caste certificate status', values.has_caste_certificate);
-  if (values.has_caste_certificate) {
-    f.required('caste_certificate_number', 'Caste certificate number', values.caste_certificate_number);
-    f.required('caste_certificate_holder_name', 'Caste certificate holder name', values.caste_certificate_holder_name);
-    f.required('caste_issuing_authority', 'Caste issuing authority', values.caste_issuing_authority);
-    f.required('caste_date_of_issue', 'Caste certificate date', values.caste_date_of_issue);
-    f.notFutureDate('caste_date_of_issue', 'Caste certificate date', values.caste_date_of_issue);
-    if (!context.hasCasteDocument) {
-      f.required('caste_document', 'Caste certificate upload', '');
-    }
-  }
 
   // Bank
   f.required('bank_name', 'Bank name', values.bank_name);
@@ -471,7 +440,6 @@ export const FIELD_LABELS: Record<string, string> = {
   email: 'Email ID',
   date_of_birth: 'Date of birth',
   gender: 'Gender',
-  religion: 'Religion',
   marital_status: 'Marital status',
   applicant_full_name_as_per_marksheet: 'Name as per marksheet',
   parent_guardian_mobile: 'Parent/guardian mobile',
@@ -492,20 +460,7 @@ export const FIELD_LABELS: Record<string, string> = {
   income_document: 'Income certificate upload',
   is_salaried: 'Salaried status',
   job_type: 'Job type',
-  is_disabled: 'Disability status',
-  disability_type: 'Disability type',
-  has_disability_certificate: 'Disability certificate status',
-  disability_certificate_number: 'Disability certificate number',
-  disability_document: 'Disability certificate upload',
   siblings_count: 'Number of siblings',
-  category: 'Caste category',
-  caste: 'Caste',
-  has_caste_certificate: 'Caste certificate status',
-  caste_certificate_number: 'Caste certificate number',
-  caste_certificate_holder_name: 'Caste certificate holder name',
-  caste_issuing_authority: 'Caste issuing authority',
-  caste_date_of_issue: 'Caste certificate date',
-  caste_document: 'Caste certificate upload',
   bank_name: 'Bank name',
   account_holder_name: 'Account holder name',
   account_number: 'Bank account number',

@@ -53,35 +53,26 @@ export function SchemeDetailsSection({ scheme }: { scheme: SchemeDetailResponse 
   const remaining = daysUntil(row.application_end_date);
   const closed = remaining !== null && remaining < 0;
 
-  // Only the columns the deployed scheme_eligibility table actually has. The
-  // religion, gap lines this used to show had no such column, so they rendered
-  // blank; the older `eligible_*` and `minimum_*` names this list was written
-  // against never existed either, which is why the whole list stayed empty.
-  const otherRules = describeRules(eligibility?.other_conditions ?? null);
+  // Only the columns the deployed `scheme_eligibility` table actually has. The
+  // qualification, institution, disability and cap lines this used to build had
+  // no such column, so they could never produce a line; they are gone rather
+  // than left reading fields that are not in the table. The names below are the
+  // live ones, which is why this list was previously empty for every scheme.
+  const otherRules = describeRules(eligibility?.other_rules ?? null);
   const eligibilityLines = [
-    describeList(eligibility?.category_requirement) &&
-      `Eligible categories: ${describeList(eligibility?.category_requirement)}`,
-    describeList(eligibility?.gender_requirement) &&
-      `Gender: ${describeList(eligibility?.gender_requirement)}`,
-    describeList(eligibility?.qualification_requirement) &&
-      `Qualifying examination: ${describeList(eligibility?.qualification_requirement)}`,
-    describeList(eligibility?.course_requirement) &&
-      `Course level: ${describeList(eligibility?.course_requirement)}`,
-    describeList(eligibility?.institution_requirement) &&
-      `Institution: ${describeList(eligibility?.institution_requirement)}`,
-    describeList(eligibility?.residency_requirement) &&
-      `State / domicile: ${describeList(eligibility?.residency_requirement)}`,
-    describeList(eligibility?.disability_requirement) &&
-      `Disability: ${describeList(eligibility?.disability_requirement)}`,
-    describeList(eligibility?.cap_requirement) &&
-      `Limits and caps: ${describeList(eligibility?.cap_requirement)}`,
-    eligibility?.min_percentage != null && `Minimum marks: ${eligibility.min_percentage}%`,
-    eligibility?.max_income != null &&
-      `Maximum annual family income: ₹${eligibility.max_income.toLocaleString('en-IN')}${
-        eligibility?.income_period ? ` ${eligibility.income_period}` : ''
-      }`,
-    eligibility?.min_age != null && `Minimum age: ${eligibility.min_age}`,
-    eligibility?.max_age != null && `Maximum age: ${eligibility.max_age}`,
+    describeList(eligibility?.eligible_categories) &&
+      `Eligible categories: ${describeList(eligibility?.eligible_categories)}`,
+    describeList(eligibility?.eligible_gender) &&
+      `Gender: ${describeList(eligibility?.eligible_gender)}`,
+    describeList(eligibility?.eligible_course_levels ?? eligibility?.eligible_course_types) &&
+      `Course: ${describeList(eligibility?.eligible_course_levels ?? eligibility?.eligible_course_types)}`,
+    describeList(eligibility?.eligible_states) &&
+      `State / domicile: ${describeList(eligibility?.eligible_states)}`,
+    eligibility?.minimum_percentage != null && `Minimum marks: ${eligibility.minimum_percentage}%`,
+    eligibility?.maximum_family_income != null &&
+      `Maximum annual family income: ₹${eligibility.maximum_family_income.toLocaleString('en-IN')}`,
+    eligibility?.minimum_age != null && `Minimum age: ${eligibility.minimum_age}`,
+    eligibility?.maximum_age != null && `Maximum age: ${eligibility.maximum_age}`,
     otherRules && `Other: ${otherRules}`,
   ].filter((line): line is string => Boolean(line));
 
@@ -140,6 +131,11 @@ export function SchemeDetailsSection({ scheme }: { scheme: SchemeDetailResponse 
                   ) : null}
                   {benefit.frequency ? <Badge tone="slate">{benefit.frequency}</Badge> : null}
                 </div>
+                {benefit.amount == null ? (
+                  <p className="mt-1.5 text-[11px] leading-snug text-slate-500">
+                    Benefit amount not specified in available scheme data
+                  </p>
+                ) : null}
                 {benefit.conditions ? (
                   <p className="mt-1.5 text-[11px] leading-snug text-slate-500">Condition: {benefit.conditions}</p>
                 ) : null}
@@ -167,8 +163,8 @@ export function SchemeDetailsSection({ scheme }: { scheme: SchemeDetailResponse 
       {sources.length > 0 ? (
         <p className="text-[11px] leading-snug text-slate-500">
           Verified against {sources.length} official source{sources.length === 1 ? '' : 's'}
-          {sources[0]?.source_last_checked_at
-            ? `, last checked ${formatDeadline(sources[0].source_last_checked_at)}`
+          {sources[0]?.retrieved_at
+            ? `, last checked ${formatDeadline(sources[0].retrieved_at)}`
             : ''}
           .
         </p>
@@ -211,7 +207,7 @@ function DocumentRow({ view, documents, onAttach, onDetach, onUpload, disabled }
 
   const handleFile = (file: File | undefined) => {
     if (!file) return;
-    const invalid = validateDocumentFile(file);
+    const invalid = validateDocumentFile(file, requirement.max_file_size_mb);
     if (invalid) {
       setViewError(invalid);
       return;
@@ -285,7 +281,7 @@ function DocumentRow({ view, documents, onAttach, onDetach, onUpload, disabled }
                 size="sm"
                 variant="outline"
               >
-                {`Use existing: ${reusable.file_name ?? reusable.document_code ?? 'uploaded file'}`}
+                {`Use existing: ${reusable.file_name ?? reusable.document_name ?? reusable.document_type ?? 'uploaded file'}`}
               </Button>
             ) : null}
           </>
@@ -304,7 +300,7 @@ function DocumentRow({ view, documents, onAttach, onDetach, onUpload, disabled }
             <option value="">Or choose from my documents…</option>
             {documents.map((document) => (
               <option key={document.id} value={document.id}>
-                {document.file_name ?? document.document_code ?? document.document_type ?? 'Document'}
+                {document.file_name ?? document.document_name ?? document.document_type ?? 'Document'}
               </option>
             ))}
           </select>
@@ -350,12 +346,6 @@ export function RequiredDocumentsSection({
 
   return (
     <div className="space-y-3">
-      <p className="text-[12px] leading-snug text-slate-600">
-        Anything you have already uploaded appears as <span className="font-semibold">Available</span> — reuse it
-        rather than uploading the same file twice. Only documents marked{' '}
-        <span className="font-semibold text-red-700">Required</span> must be attached before you can submit. Saving a
-        draft works at any time.
-      </p>
       <ul className="space-y-2.5">
         {requirements.map((view) => (
           <DocumentRow

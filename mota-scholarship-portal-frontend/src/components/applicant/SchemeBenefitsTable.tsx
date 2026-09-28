@@ -1,57 +1,29 @@
 /**
  * Financial benefits, rendered from `scheme_benefits`.
  *
- * The shape of this table is driven by the data rather than fixed. A scheme can
- * record benefits three ways and all three have to look right:
+ * The live table holds `benefit_type`, `description`, `amount`, `frequency`,
+ * `conditions`, `currency` and `amount_basis`. There is no per-residence amount
+ * or tier column, and there does not need to be one: hosteller and day-scholar
+ * rates, the four BVOBC course groups and the two AZKMI Ph.D tenure bands are
+ * stored as SEPARATE rows, each with its own benefit_type, so nothing has to be
+ * merged back together here.
  *
- *   - a tiered benefit (the stipend groups) — one row per group, with a
- *     hosteller and a day-scholar column
- *   - a single benefit with one figure (a one-off payment) — amount on its own
- *   - a benefit with no figure at all (a reimbursement against a fee schedule)
- *     — the coverage text carries the meaning and no number is shown
- *
- * The last case is the important one. A reimbursement "as per the State Fee
- * Committee" has no single amount, and printing a number there would be an
- * invention. So a benefit with no amount renders its coverage and says nothing
- * about money, rather than showing a zero or a dash that reads as "nothing".
+ * A NULL `amount` is a real answer, not a gap. It means the guideline states no
+ * fixed figure because the amount is as-per-actuals, decided by a State fee
+ * fixation committee, or a percentage of another figure. The basis is stated in
+ * words from `amount_basis`, and no number is ever substituted: rendering a
+ * missing amount as ₹0 would tell an applicant they get nothing.
  */
 
 import type { SchemeBenefit } from '../../lib/supabase';
-import { formatInr } from '../../services/eligibility';
+import { formatMoney } from '../../services/eligibility';
 import { Badge } from '../ui/Badge';
 
-/**
- * Orders the tiers of one benefit.
- *
- * The query sorts benefits by `benefit_type` only, so the order of rows that
- * share a `benefit_type` is whatever the database happens to return. For a
- * tiered benefit such as the Post-Matric stipend groups that means Group II
- * can appear above Group I. Sorting here makes the printed order match the
- * order the guideline's table uses, instead of relying on storage order.
- *
- * Tiers sort by their label, case-insensitively and with a leading number read
- * as a number, so 'Group I' precedes 'Group II' and 'Group 2' precedes
- * 'Group 10'. Rows with no tier are kept after the tiered ones.
- */
-function compareTiers(a: SchemeBenefit, b: SchemeBenefit): number {
-  const left = a.benefit_group?.trim();
-  const right = b.benefit_group?.trim();
-
-  if (!left && !right) return 0;
-  if (!left) return 1;
-  if (!right) return -1;
-
-  const leftNumber = /^\d+/.test(left) ? Number(left.match(/^\d+/)?.[0]) : null;
-  const rightNumber = /^\d+/.test(right) ? Number(right.match(/^\d+/)?.[0]) : null;
-
-  if (leftNumber !== null && rightNumber !== null && leftNumber !== rightNumber) {
-    return leftNumber - rightNumber;
-  }
-
-  return left.toLowerCase().localeCompare(right.toLowerCase());
+interface SchemeBenefitsTableProps {
+  benefits: SchemeBenefit[];
 }
 
-/** Grouped so the tiers of one benefit stay together and in order. */
+/** Grouped so several rows of one benefit_type stay under a single heading. */
 interface BenefitGroup {
   benefitType: string;
   rows: SchemeBenefit[];
@@ -69,10 +41,7 @@ function groupBenefits(benefits: SchemeBenefit[]): BenefitGroup[] {
     }
   }
 
-  return Array.from(groups, ([benefitType, rows]) => ({
-    benefitType,
-    rows: [...rows].sort(compareTiers),
-  }));
+  return Array.from(groups, ([benefitType, rows]) => ({ benefitType, rows }));
 }
 
 function humanise(value: string): string {
@@ -80,20 +49,44 @@ function humanise(value: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
-/** True when any row in the group carries a hosteller/day-scholar split. */
-function hasResidenceSplit(rows: SchemeBenefit[]): boolean {
-  return rows.some(
-    (row) => typeof row.hosteller_amount === 'number' || typeof row.day_scholar_amount === 'number',
-  );
+/** Spoken form of a `frequency` value, e.g. 'monthly' -> 'Monthly'. */
+function humaniseFrequency(value: string): string {
+  return humanise(value);
 }
 
-function amountCell(value: number | null, period: string | null): string {
-  if (typeof value !== 'number') return '—';
-  return period ? `${formatInr(value)} / ${period.replace(/^per\s+/i, '')}` : formatInr(value);
+/**
+ * What a NULL amount means, in words, taken from `amount_basis`. Returns null
+ * when there is no amount and no basis to explain it, so the row can fall back
+ * to the generic message.
+ */
+function describeBasis(basis: string | null | undefined): string | null {
+  switch (basis) {
+    case 'actual':
+      return 'Actual cost, as claimed and verified. No fixed amount is stated in the guideline.';
+    case 'state_fixed':
+      return 'Decided by the State Level Fee Fixation Committee. No single central amount is stated.';
+    case 'percentage':
+      return 'A percentage of another official figure, not a fixed amount. The percentage is given in the conditions below.';
+    case 'pro_rated':
+      return 'Pro-rated to the number of months remaining in the financial year.';
+    default:
+      return null;
+  }
 }
 
-interface SchemeBenefitsTableProps {
-  benefits: SchemeBenefit[];
+/**
+ * Pulls the trailing "Source: ..." sentence out of `conditions` so it can be
+ * styled as provenance rather than as part of the rule itself.
+ */
+function splitSource(conditions: string): { body: string; source: string | null } {
+  const match = conditions.match(/\s*Source:\s*([^]*?)\s*$/);
+  if (!match) {
+    return { body: conditions.trim(), source: null };
+  }
+  return {
+    body: conditions.slice(0, match.index).trim(),
+    source: match[1].trim(),
+  };
 }
 
 export function SchemeBenefitsTable({ benefits }: SchemeBenefitsTableProps) {
@@ -108,73 +101,58 @@ export function SchemeBenefitsTable({ benefits }: SchemeBenefitsTableProps) {
   const groups = groupBenefits(benefits);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {groups.map((group) => {
-        const split = hasResidenceSplit(group.rows);
-        const period = group.rows.find((row) => row.amount_period)?.amount_period ?? null;
-        const coverage = group.rows.find((row) => row.coverage)?.coverage ?? null;
-        const conditions = group.rows.find((row) => row.conditions)?.conditions ?? null;
+        const heading = group.rows.find((row) => row.description)?.description ?? humanise(group.benefitType);
 
         return (
           <section key={group.benefitType}>
             <div className="mb-2 flex flex-wrap items-center gap-2">
-              <h3 className="text-sm font-bold text-gov-blue-dark">
-                {group.rows[0]?.description
-                  ? group.rows[0].description
-                  : humanise(group.benefitType)}
-              </h3>
-              {period ? <Badge tone="blue">{humanise(period)}</Badge> : null}
+              <h3 className="text-sm font-bold text-gov-blue-dark">{heading}</h3>
+              {group.benefitType !== heading ? (
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                  {humanise(group.benefitType)}
+                </span>
+              ) : null}
             </div>
 
-            {split ? (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[540px] border-collapse text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-200 text-[11px] uppercase tracking-wide text-slate-500">
-                      <th className="py-2 pr-3 font-semibold" scope="col">Group</th>
-                      <th className="py-2 pr-3 font-semibold" scope="col">Applies to</th>
-                      <th className="py-2 pr-3 text-right font-semibold" scope="col">Hosteller</th>
-                      <th className="py-2 text-right font-semibold" scope="col">Day scholar</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {group.rows.map((row) => (
-                      <tr className="border-b border-slate-100 last:border-0" key={row.id}>
-                        <td className="py-2.5 pr-3 font-semibold text-slate-800">
-                          {row.benefit_group ? `Group ${row.benefit_group}` : humanise(row.benefit_type)}
-                        </td>
-                        <td className="py-2.5 pr-3 text-slate-700">
-                          {row.description ?? row.coverage ?? '—'}
-                        </td>
-                        <td className="py-2.5 pr-3 text-right font-semibold text-slate-800">
-                          {amountCell(row.hosteller_amount ?? row.amount, row.amount_period)}
-                        </td>
-                        <td className="py-2.5 text-right font-semibold text-slate-800">
-                          {amountCell(row.day_scholar_amount ?? row.amount, row.amount_period)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="rounded border border-slate-200 bg-slate-50 px-3 py-3">
-                {coverage ? (
-                  <p className="text-sm leading-relaxed text-slate-700">{coverage}</p>
-                ) : null}
-                {group.rows.map((row) =>
-                  typeof row.amount === 'number' ? (
-                    <p className="text-lg font-bold text-gov-blue-dark" key={row.id}>
-                      {amountCell(row.amount, row.amount_period)}
-                    </p>
-                  ) : null,
-                )}
-              </div>
-            )}
+            <ul className="space-y-2">
+              {group.rows.map((row) => {
+                const { body, source } = row.conditions
+                  ? splitSource(row.conditions)
+                  : { body: '', source: null };
+                const basisNote = describeBasis(row.amount_basis);
 
-            {conditions ? (
-              <p className="mt-2 text-xs leading-snug text-slate-500">{conditions}</p>
-            ) : null}
+                return (
+                  <li className="rounded border border-slate-200 bg-slate-50 px-3 py-2.5" key={row.id}>
+                    {row.frequency || row.currency ? (
+                      <p className="mb-1 flex flex-wrap items-center gap-1.5">
+                        {row.frequency ? <Badge tone="blue">{humaniseFrequency(row.frequency)}</Badge> : null}
+                        {row.currency ? <Badge tone="slate">{row.currency}</Badge> : null}
+                      </p>
+                    ) : null}
+
+                    {typeof row.amount === 'number' ? (
+                      <p className="text-base font-bold text-gov-blue-dark">
+                        {formatMoney(row.amount, row.currency)}
+                      </p>
+                    ) : (
+                      <p className="text-[13px] font-semibold leading-snug text-slate-700">
+                        {basisNote ?? 'Benefit amount not specified in available scheme data'}
+                      </p>
+                    )}
+
+                    {body ? (
+                      <p className="mt-1.5 text-[12px] leading-snug text-slate-600">{body}</p>
+                    ) : null}
+
+                    {source ? (
+                      <p className="mt-1.5 text-[11px] italic leading-snug text-slate-400">Source: {source}</p>
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ul>
           </section>
         );
       })}

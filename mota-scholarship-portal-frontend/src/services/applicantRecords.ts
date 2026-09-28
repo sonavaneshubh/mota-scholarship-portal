@@ -18,10 +18,12 @@
  *   from the caller, and RLS re-checks it server-side.
  */
 
-import { supabase } from '../lib/supabase';
+import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import type { Application } from '../lib/supabase';
+import { diagnosticError } from '../lib/diagnostics';
+import { documentStatusFromRecord } from '../lib/applicationFormView';
 import type { ApplicantDocumentRecord } from '../types/profile';
-import type { ApplicantApplication, ApplicantApplicationStatus, ApplicantDocument } from '../types';
+import type { ApplicantApplication, ApplicantApplicationStatus, ApplicantDocument, ApplicantDocumentStatus } from '../types';
 
 export type RecordsStatus = 'loading' | 'ready' | 'unavailable' | 'error';
 
@@ -58,10 +60,19 @@ function isMissingRelation(error: { code?: string | null; message: string }): bo
  * lookup is. Resolving it in one place means the two cannot drift.
  */
 export async function resolveApplicantId(): Promise<string | null> {
-  if (!supabase) return null;
+  if (!supabase) {
+    diagnosticError('applicant-records', 'cannot resolve the applicant id: no Supabase client');
+    return null;
+  }
 
   const { data: userData, error: userError } = await supabase.auth.getUser();
-  if (userError || !userData?.user) return null;
+  if (userError || !userData?.user) {
+    diagnosticError('applicant-records', 'cannot resolve the applicant id: no authenticated user', {
+      code: userError?.code ?? null,
+      message: userError?.message ?? null,
+    });
+    return null;
+  }
 
   const { data, error } = await supabase
     .from(PROFILE_TABLE)
@@ -69,7 +80,23 @@ export async function resolveApplicantId(): Promise<string | null> {
     .eq('user_id', userData.user.id)
     .maybeSingle();
 
-  if (error || !data) return null;
+  if (error) {
+    diagnosticError('applicant-records', 'applicant_profiles lookup failed', {
+      code: error.code ?? null,
+      message: error.message,
+    });
+    return null;
+  }
+
+  if (!data) {
+    // Not an infrastructure fault: the account is authenticated but has no
+    // applicant profile row, so there is nothing to own records yet.
+    diagnosticError('applicant-records', 'the signed-in user has no applicant_profiles row', {
+      userId: userData.user.id,
+    });
+    return null;
+  }
+
   return (data as { id: string }).id;
 }
 
@@ -77,13 +104,26 @@ export async function resolveApplicantId(): Promise<string | null> {
 /* Documents                                                                    */
 /* -------------------------------------------------------------------------- */
 
-const DOCUMENT_STATUS_LABELS: Record<string, string> = {
+/**
+ * Display labels for ApplicantDocumentStatus, which is hyphenated
+ * ('under-verification'), matching the union in types/index.ts. The underscore
+ * spelling used here previously keyed nothing, so every badge fell back to
+ * "Uploaded" regardless of the real state.
+ */
+const DOCUMENT_STATUS_LABELS: Record<ApplicantDocumentStatus, string> = {
   uploaded: 'Uploaded',
   verified: 'Verified',
   rejected: 'Rejected',
-  needs_correction: 'Needs correction',
-  under_verification: 'Under verification',
+  'needs-correction': 'Needs correction',
+  'under-verification': 'Under verification',
 };
+
+/**
+ * `applicant_documents.verification_status` (DB CHECK: pending | ai_verified |
+ * human_verified | rejected) onto the view model's status vocabulary. Shared with
+ * the application form through documentStatusFromRecord() so both read the same
+ * column the same way.
+ */
 
 function formatBytes(bytes: number | null): string {
   if (!bytes || bytes <= 0) return '—';
@@ -109,13 +149,17 @@ function humaniseCode(code: string | null): string {
 }
 
 function toApplicantDocument(record: ApplicantDocumentRecord): ApplicantDocument {
-  const status = record.status ?? 'uploaded';
+  // `applicant_documents` stores the verification state in `verification_status`
+  // (pending | ai_verified | human_verified | rejected) and has no `status` or
+  // `document_code` column. The view model keeps its own status vocabulary, so the
+  // DB value is mapped here rather than passed through.
+  const status = documentStatusFromRecord(record);
   return {
     id: record.id,
-    name: record.file_name?.trim() || humaniseCode(record.document_code ?? record.document_type),
-    type: humaniseCode(record.document_type ?? record.document_code),
+    name: record.file_name?.trim() || record.document_name?.trim() || humaniseCode(record.document_type),
+    type: humaniseCode(record.document_type),
     description: record.file_name ? `Uploaded file: ${record.file_name}` : 'Uploaded document.',
-    status: (DOCUMENT_STATUS_LABELS[status] ? status : 'uploaded') as ApplicantDocument['status'],
+    status,
     statusLabel: DOCUMENT_STATUS_LABELS[status] ?? 'Uploaded',
     fileSize: formatBytes(record.file_size),
     uploadedAt: formatDate(record.uploaded_at),
@@ -127,6 +171,9 @@ function toApplicantDocument(record: ApplicantDocumentRecord): ApplicantDocument
 
 export async function fetchApplicantDocuments(): Promise<ApplicantRecordsResult<ApplicantDocument[]>> {
   if (!supabase) {
+    diagnosticError('applicant-records', 'documents unavailable: no Supabase client', {
+      configured: isSupabaseConfigured,
+    });
     return { status: 'unavailable', data: [], error: null };
   }
 
@@ -265,6 +312,9 @@ function toApplicantApplication(row: Record<string, unknown>): ApplicantApplicat
 
 export async function fetchApplicantApplications(): Promise<ApplicantRecordsResult<ApplicantApplication[]>> {
   if (!supabase) {
+    diagnosticError('applicant-records', 'applications unavailable: no Supabase client', {
+      configured: isSupabaseConfigured,
+    });
     return { status: 'unavailable', data: [], error: null };
   }
 

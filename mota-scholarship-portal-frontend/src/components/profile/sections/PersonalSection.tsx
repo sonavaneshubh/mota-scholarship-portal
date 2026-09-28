@@ -7,7 +7,6 @@
  * - Mobile Number
  * - Date of Birth
  * - Gender
- * - Religion
  * - Marital Status
  * - Name as per marksheet
  * - Parent/guardian mobile
@@ -17,11 +16,7 @@
  * - Family annual income
  * - Income certificate
  * - Salaried status
- * - Disability status
  * - Siblings count
- * - Caste category
- * - Caste
- * - Caste certificate
  * - Bank details
  */
 
@@ -34,26 +29,23 @@ import {
   MaskedSecretField,
 } from '../ProfileFields';
 import { GENDER_OPTIONS, MARITAL_STATUS_OPTIONS, CERTIFICATE_SOURCE_OPTIONS, ACCOUNT_TYPE_OPTIONS } from '../../../lib/profileValidation';
-import type { ProfileFormValues, ProfileMasterData } from '../../../types/profile';
+import type { ProfileFormValues } from '../../../types/profile';
 
 export interface PersonalSectionProps {
   values: ProfileFormValues;
   onChange: (patch: Partial<ProfileFormValues>) => void;
   errors: Record<string, string>;
-  master: ProfileMasterData;
 }
 
 export function PersonalSection({
   values,
   onChange,
   errors,
-  master,
 }: PersonalSectionProps) {
   const genderOptions = GENDER_OPTIONS.map((option) => ({ value: option, label: option }));
   const maritalStatusOptions = MARITAL_STATUS_OPTIONS.map((option) => ({ value: option, label: option }));
   const certificateSourceOptions = CERTIFICATE_SOURCE_OPTIONS.map((option) => ({ value: option, label: option }));
   const accountTypeOptions = ACCOUNT_TYPE_OPTIONS.map((option) => ({ value: option, label: option }));
-  const casteCategoryOptions = master.casteCategories.map((category) => ({ value: category, label: category }));
 
   return (
     <div className="space-y-6">
@@ -101,15 +93,6 @@ export function PersonalSection({
             options={genderOptions}
             required
             value={values.gender}
-          />
-          <SelectField
-            error={errors.religion}
-            label="Religion"
-            onChange={(value) => onChange({ religion: value })}
-            options={master.religions.map((r) => ({ value: r.name, label: r.name }))}
-            placeholder="Select religion"
-            required
-            value={values.religion}
           />
           <SelectField
             error={errors.marital_status}
@@ -304,45 +287,6 @@ export function PersonalSection({
         </div>
       </Fieldset>
 
-      <Fieldset legend="Disability">
-        <div className={FORM_GRID_CLASS}>
-          <YesNoField
-            error={errors.is_disabled}
-            label="Do you have a disability?"
-            onChange={(value) => onChange({ is_disabled: value, disability_type: '', has_disability_certificate: null })}
-            required
-            value={values.is_disabled}
-          />
-          {values.is_disabled && (
-            <>
-              <TextField
-                error={errors.disability_type}
-                label="Disability type"
-                onChange={(value) => onChange({ disability_type: value })}
-                required
-                value={values.disability_type}
-              />
-              <YesNoField
-                error={errors.has_disability_certificate}
-                label="Do you have a disability certificate?"
-                onChange={(value) => onChange({ has_disability_certificate: value })}
-                required
-                value={values.has_disability_certificate}
-              />
-              {values.has_disability_certificate && (
-                <TextField
-                  error={errors.disability_certificate_number}
-                  label="Certificate number"
-                  onChange={(value) => onChange({ disability_certificate_number: value })}
-                  required
-                  value={values.disability_certificate_number}
-                />
-              )}
-            </>
-          )}
-        </div>
-      </Fieldset>
-
       <Fieldset legend="Siblings">
         <div className={FORM_GRID_CLASS}>
           <TextField
@@ -354,83 +298,6 @@ export function PersonalSection({
             required
             value={values.siblings_count}
           />
-        </div>
-      </Fieldset>
-
-      <Fieldset legend="Caste / Category">
-        <div className={FORM_GRID_CLASS}>
-          <SelectField
-            allowCustom
-            error={errors.category}
-            label="Category"
-            onChange={(value) => onChange({ category: value })}
-            options={casteCategoryOptions}
-            placeholder="Select category"
-            required
-            value={values.category}
-          />
-          <TextField
-            error={errors.caste}
-            label="Caste"
-            onChange={(value) => onChange({ caste: value })}
-            required
-            value={values.caste}
-          />
-          <TextField
-            error={errors.sub_caste}
-            label="Sub-caste"
-            onChange={(value) => onChange({ sub_caste: value })}
-            value={values.sub_caste}
-          />
-          <YesNoField
-            error={errors.has_caste_certificate}
-            label="Do you have a caste certificate?"
-            onChange={(value) => onChange({ has_caste_certificate: value })}
-            required
-            value={values.has_caste_certificate}
-          />
-          {values.has_caste_certificate && (
-            <>
-              <SelectField
-                allowCustom
-                error={errors.caste_certificate_source}
-                label="Certificate source"
-                onChange={(value) => onChange({ caste_certificate_source: value })}
-                options={certificateSourceOptions}
-                required
-                value={values.caste_certificate_source}
-              />
-              <TextField
-                error={errors.caste_certificate_holder_name}
-                label="Certificate holder name"
-                onChange={(value) => onChange({ caste_certificate_holder_name: value })}
-                required
-                value={values.caste_certificate_holder_name}
-              />
-              <TextField
-                error={errors.caste_certificate_number}
-                label="Certificate number"
-                onChange={(value) => onChange({ caste_certificate_number: value })}
-                required
-                value={values.caste_certificate_number}
-              />
-              <TextField
-                error={errors.caste_issuing_authority}
-                label="Issuing authority"
-                onChange={(value) => onChange({ caste_issuing_authority: value })}
-                required
-                value={values.caste_issuing_authority}
-              />
-              <TextField
-                error={errors.caste_date_of_issue}
-                label="Date of issue"
-                onChange={(value) => onChange({ caste_date_of_issue: value })}
-                required
-                type="date"
-                value={values.caste_date_of_issue}
-              />
-            </>
-          )}
         </div>
       </Fieldset>
 

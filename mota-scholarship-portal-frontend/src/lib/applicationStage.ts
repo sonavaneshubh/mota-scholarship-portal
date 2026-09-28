@@ -4,7 +4,7 @@
  * The brief this implements:
  *
  *     Apply Now
- *       -> Stage 1  Additional Information      (scheme-specific only)
+ *       -> Stage 1  Additional Information      (renewal + documents)
  *       -> Save & Continue                       (NOT a submission)
  *       -> Stage 2  Full Application Form        (profile + academic + scheme)
  *       -> Review / Check All Details
@@ -35,6 +35,7 @@
  */
 
 import { isAnswered, type SchemeAnswers, type SchemeQuestion } from './applicationFormRules';
+
 import type { DocumentRequirementView } from './applicationFormView';
 
 export type ApplicationStage =
@@ -84,22 +85,22 @@ export interface StageOneInput {
 /**
  * Everything that stops "Save & Continue", phrased for the applicant.
  *
- * The same three categories the brief lists, each already owned by the existing
- * pipeline rather than re-implemented here:
+ * Two categories, each already owned by the existing pipeline rather than
+ * re-implemented here:
  *
- *   - a required Yes/No (or other) answer that is still blank
+ *   - a required answer that is missing or unusable. "Unusable" matters: a value
+ *     that is present in scheme_answers but is not an answer this form accepts
+ *     must still block, and isAnswered is what decides that. Letting it through
+ *     here would defer the complaint to the department instead of the applicant.
  *   - a mandatory scheme document with nothing attached
- *   - nothing else: file type and size are enforced by documentService before
- *     the upload is even attempted, and a rejected file never becomes a link
  *
- * A question the profile already answers is never a blocker, because the form
- * renders no input for it — there is nothing the applicant could have got wrong.
+ * Nothing else: file type and size are enforced by documentService before the
+ * upload is even attempted, and a rejected file never becomes a link.
  */
 export function stageOneBlockers(input: StageOneInput): string[] {
   const issues: string[] = [];
 
   for (const question of input.questions) {
-    if (question.fromProfile) continue;
     if (question.required && !isAnswered(question, input.answers)) {
       issues.push(question.label);
     }

@@ -206,16 +206,29 @@ export interface HostelDetailsRecord {
   certificate_document_id: string | null;
 }
 
+/**
+ * A row in `applicant_documents`.
+ *
+ * `document_type` is the controlled code ("aadhaar", "income_certificate",
+ * "caste_certificate", ...) and is what the profile certificate slots and the
+ * scheme-requirement matcher both key on. `document_name` is the human label
+ * shown in the UI. There is no separate `document_code` column, and the
+ * verification state lives in `verification_status`, not `status`.
+ *
+ * See 20260927 database audit of `information_schema.columns` for
+ * `public.applicant_documents`.
+ */
 export interface ApplicantDocumentRecord {
   id: string;
   applicant_id: string;
   document_type: string | null;
-  document_code: string | null;
+  document_name: string | null;
   file_name: string | null;
   storage_path: string | null;
   mime_type: string | null;
   file_size: number | null;
-  status: string | null;
+  document_number: string | null;
+  verification_status: string | null;
   uploaded_at: string | null;
 }
 
