@@ -61,10 +61,10 @@ export function Masthead() {
               uses flex-grow, so dropping the cap simply lets the column size
               to its content; the leftover width still goes to space-between. */}
           <div className="masthead-col masthead-col-title hidden lg:flex">
-            <span className="font-serif text-[13px] font-bold uppercase leading-tight tracking-[0.06em] text-gov-blue-dark">
-              National Tribal Fellowship
-              <span className="mx-[0.45em] text-slate-400">·</span>
-              Scholarship Portal
+            <span className="text-[18px] font-bold uppercase leading-snug tracking-[0.04em] text-gov-blue-dark text-center" style={{ fontFamily: "'Poppins', sans-serif" }}>
+              National Tribal
+              <br />
+              Fellowship &amp; Scholarship Portal
             </span>
           </div>
 
