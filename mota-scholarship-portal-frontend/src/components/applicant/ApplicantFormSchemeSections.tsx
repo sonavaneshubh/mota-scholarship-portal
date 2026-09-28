@@ -1,180 +1,30 @@
 /**
- * Section 3 — Important Scheme Details, and section 5 — Required Documents.
+ * The Stage 1 document checklist.
  *
- * Both read entirely from the selected scheme's real rows. Nothing here is
- * hardcoded per scholarship: the deadline, the benefits, the eligibility text and
- * the document checklist all come from `schemes`, `scheme_benefits`,
- * `scheme_eligibility` and `scheme_documents`, which the data importer populates
- * per scheme. A scheme that declares no documents renders an honest empty state
- * rather than a default checklist that might be wrong for it.
+ * Everything here reads from the selected scheme's real rows. Nothing is
+ * hardcoded per scholarship: the document list, and which documents are
+ * conditional on the course year, come from `scheme_documents`, which the data
+ * importer populates per scheme. A scheme that declares no documents renders an
+ * honest empty state rather than a default checklist that might be wrong for it.
+ *
+ * This file used to also export SchemeDetailsSection, a second copy of the
+ * scheme's description, benefits, eligibility and conditions, rendered on the
+ * application form. It is gone: the form is now only the applicant's own
+ * information, and the scheme's own information lives on the Scheme Details page,
+ * which has its own rendering (SchemeBenefitsTable and SchemeCriteriaList) and is
+ * what the applicant is pointed at. Nothing else imported it.
  */
 
 import { useRef, useState } from 'react';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
-import type { SchemeDetailResponse, SchemeDocument } from '../../lib/supabase';
+import type { SchemeDocument } from '../../lib/supabase';
 import type { ApplicantDocumentRecord } from '../../types/profile';
 import type { DocumentRequirementView } from '../../lib/applicationFormView';
-import { daysUntil } from '../../lib/applicationFormView';
 import { createViewUrl, validateDocumentFile } from '../../services/documentService';
-import { describeList, describeRules } from '../../services/eligibility';
 
 /* -------------------------------------------------------------------------- */
-/* Section 3 — Important Scheme Details                                        */
-/* -------------------------------------------------------------------------- */
-
-function formatDeadline(value: string | null | undefined): string {
-  if (!value) return 'Not published';
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return value;
-  return parsed.toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' });
-}
-
-interface DetailRow {
-  label: string;
-  value: string;
-}
-
-function DetailRowList({ rows }: { rows: DetailRow[] }) {
-  return (
-    <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
-      {rows.map((row) => (
-        <div className="min-w-0" key={row.label}>
-          <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{row.label}</dt>
-          <dd className="mt-0.5 break-words text-[13px] text-slate-800">{row.value}</dd>
-        </div>
-      ))}
-    </dl>
-  );
-}
-
-export function SchemeDetailsSection({ scheme }: { scheme: SchemeDetailResponse }) {
-  const { scheme: row, eligibility, benefits, sources } = scheme;
-  const remaining = daysUntil(row.application_end_date);
-  const closed = remaining !== null && remaining < 0;
-
-  // Only the columns the deployed `scheme_eligibility` table actually has. The
-  // qualification, institution, disability and cap lines this used to build had
-  // no such column, so they could never produce a line; they are gone rather
-  // than left reading fields that are not in the table. The names below are the
-  // live ones, which is why this list was previously empty for every scheme.
-  const otherRules = describeRules(eligibility?.other_rules ?? null);
-  const eligibilityLines = [
-    describeList(eligibility?.eligible_categories) &&
-      `Eligible categories: ${describeList(eligibility?.eligible_categories)}`,
-    describeList(eligibility?.eligible_gender) &&
-      `Gender: ${describeList(eligibility?.eligible_gender)}`,
-    describeList(eligibility?.eligible_course_levels ?? eligibility?.eligible_course_types) &&
-      `Course: ${describeList(eligibility?.eligible_course_levels ?? eligibility?.eligible_course_types)}`,
-    describeList(eligibility?.eligible_states) &&
-      `State / domicile: ${describeList(eligibility?.eligible_states)}`,
-    eligibility?.minimum_percentage != null && `Minimum marks: ${eligibility.minimum_percentage}%`,
-    eligibility?.maximum_family_income != null &&
-      `Maximum annual family income: ₹${eligibility.maximum_family_income.toLocaleString('en-IN')}`,
-    eligibility?.minimum_age != null && `Minimum age: ${eligibility.minimum_age}`,
-    eligibility?.maximum_age != null && `Maximum age: ${eligibility.maximum_age}`,
-    otherRules && `Other: ${otherRules}`,
-  ].filter((line): line is string => Boolean(line));
-
-  return (
-    <div className="space-y-5">
-      <DetailRowList
-        rows={[
-          { label: 'Scheme name', value: row.name },
-          { label: 'Scheme code', value: row.scheme_code },
-          { label: 'Department', value: row.departments?.name ?? 'Not published' },
-          { label: 'Category', value: row.scheme_categories?.name ?? 'Not published' },
-          { label: 'Academic year', value: row.academic_year },
-          { label: 'Application opens', value: formatDeadline(row.application_start_date) },
-          { label: 'Application deadline', value: formatDeadline(row.application_end_date) },
-        ]}
-      />
-
-      {remaining !== null ? (
-        <p
-          className={`text-[12px] font-semibold ${closed ? 'text-red-700' : 'text-amber-700'}`}
-          role="status"
-        >
-          {closed
-            ? `Applications for this scheme closed ${Math.abs(remaining)} day(s) ago.`
-            : `${remaining} day(s) left to apply.`}
-        </p>
-      ) : null}
-
-      {row.description ? (
-        <div>
-          <h3 className="mb-1.5 text-[12px] font-bold uppercase tracking-wide text-gov-blue-dark">About this scheme</h3>
-          <p className="whitespace-pre-line text-[13px] leading-relaxed text-slate-700">
-            {row.description}
-          </p>
-        </div>
-      ) : null}
-
-      {benefits.length > 0 ? (
-        <div>
-          <h3 className="mb-2 text-[12px] font-bold uppercase tracking-wide text-gov-blue-dark">Scholarship benefits</h3>
-          <ul className="space-y-2">
-            {benefits.map((benefit) => (
-              <li className="rounded border border-slate-200 bg-slate-50 px-3 py-2" key={benefit.id}>
-                <p className="text-[13px] font-semibold text-slate-800">
-                  {benefit.benefit_type.replace(/_/g, ' ')}
-                </p>
-                {benefit.description ? (
-                  <p className="mt-0.5 text-[12px] leading-snug text-slate-600">{benefit.description}</p>
-                ) : null}
-                <div className="mt-1.5 flex flex-wrap gap-1.5">
-                  {/* Only `amount` and `frequency` exist on scheme_benefits. The
-                      hosteller/day-scholar/coverage badges this used to render
-                      had no column behind them, so they always showed nothing. */}
-                  {benefit.amount != null ? (
-                    <Badge tone="emerald">{`₹${benefit.amount.toLocaleString('en-IN')}`}</Badge>
-                  ) : null}
-                  {benefit.frequency ? <Badge tone="slate">{benefit.frequency}</Badge> : null}
-                </div>
-                {benefit.amount == null ? (
-                  <p className="mt-1.5 text-[11px] leading-snug text-slate-500">
-                    Benefit amount not specified in available scheme data
-                  </p>
-                ) : null}
-                {benefit.conditions ? (
-                  <p className="mt-1.5 text-[11px] leading-snug text-slate-500">Condition: {benefit.conditions}</p>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : (
-        <p className="text-[12px] italic text-slate-400">No benefits have been published for this scheme yet.</p>
-      )}
-
-      {eligibilityLines.length > 0 ? (
-        <div>
-          <h3 className="mb-1.5 text-[12px] font-bold uppercase tracking-wide text-gov-blue-dark">
-            Eligibility requirements
-          </h3>
-          <ul className="list-inside list-disc space-y-1 text-[13px] leading-snug text-slate-700">
-            {eligibilityLines.map((line) => (
-              <li key={line}>{line}</li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-
-      {sources.length > 0 ? (
-        <p className="text-[11px] leading-snug text-slate-500">
-          Verified against {sources.length} official source{sources.length === 1 ? '' : 's'}
-          {sources[0]?.retrieved_at
-            ? `, last checked ${formatDeadline(sources[0].retrieved_at)}`
-            : ''}
-          .
-        </p>
-      ) : null}
-    </div>
-  );
-}
-
-/* -------------------------------------------------------------------------- */
-/* Section 5 — Required Documents                                              */
+/* Stage 1 — the document checklist                                            */
 /* -------------------------------------------------------------------------- */
 
 interface ChecklistProps {

@@ -7,13 +7,26 @@
  * after they submit it, and how many hands it passes through before money moves.
  *
  * Every row was written from the scheme's own guideline rather than from a shared
- * pipeline, and each one carries the document and page it came from in
- * `source_ref`, which is shown beneath the step so the process is traceable.
- * `sla_or_timeline` holds dates the guidelines describe as SUGGESTED, so it is
- * labelled as such and never presented as a fixed deadline.
+ * pipeline. `sla_or_timeline` holds dates the guidelines describe as SUGGESTED, so
+ * it is labelled as such and never presented as a fixed deadline.
+ *
+ * `source_ref` — the guideline document and page each step was taken from — is
+ * not rendered. It is provenance, and it was printed in 11px grey italics under
+ * every step, where it added a file name to a list the applicant reads to find
+ * out what happens after they submit. It stays in the table for the importer and
+ * for review.
+ *
+ * The remaining text columns go through `stripInternalProvenance` for the same
+ * reason. No step currently carries a citation in its prose, so this changes
+ * nothing today, but `title`, `description`, `actor` and `sla_or_timeline` are
+ * free text on a table maintained from guideline PDFs, exactly like the benefit
+ * conditions that did carry "Source: … p.7 §2.6" on 30-odd rows. Filtering on
+ * the way out is what keeps the next import from putting a file name back in
+ * front of an applicant.
  */
 
 import type { SchemeProcessStep } from '../../lib/supabase';
+import { stripInternalProvenance } from '../../lib/schemeEligibilityView';
 
 interface SchemeProcessStepsProps {
   steps: SchemeProcessStep[];
@@ -38,6 +51,11 @@ export function SchemeProcessSteps({ steps }: SchemeProcessStepsProps) {
       <ol className="space-y-0">
         {steps.map((step, index) => {
           const isLast = index === steps.length - 1;
+          const title = stripInternalProvenance(step.title);
+          const description = stripInternalProvenance(step.description);
+          const actor = stripInternalProvenance(step.actor);
+          const timeline = stripInternalProvenance(step.sla_or_timeline);
+          if (!title) return null;
 
           return (
             <li className="flex gap-4" key={step.id}>
@@ -52,23 +70,18 @@ export function SchemeProcessSteps({ steps }: SchemeProcessStepsProps) {
               </div>
 
               <div className={isLast ? 'pb-0' : 'pb-6'}>
-                <p className="text-sm font-bold text-slate-800">{step.title}</p>
-                {step.description ? (
-                  <p className="mt-1 text-[13px] leading-relaxed text-slate-600">{step.description}</p>
+                <p className="text-sm font-bold text-slate-800">{title}</p>
+                {description ? (
+                  <p className="mt-1 text-[13px] leading-relaxed text-slate-600">{description}</p>
                 ) : null}
-                {step.actor ? (
+                {actor ? (
                   <p className="mt-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                    {step.actor}
+                    {actor}
                   </p>
                 ) : null}
-                {step.sla_or_timeline ? (
+                {timeline ? (
                   <p className="mt-1.5 text-[12px] leading-snug text-slate-700">
-                    <span className="font-semibold">Timeline:</span> {step.sla_or_timeline}
-                  </p>
-                ) : null}
-                {step.source_ref ? (
-                  <p className="mt-1.5 text-[11px] italic leading-snug text-slate-400">
-                    Source: {step.source_ref}
+                    <span className="font-semibold">Timeline:</span> {timeline}
                   </p>
                 ) : null}
               </div>

@@ -17,8 +17,6 @@ import {
 } from '../components/applicant/ApplicantFormReadOnlySections';
 import { ApplicantSummary } from '../components/applicant/ApplicantSummary';
 import { ApplicationStageOne } from '../components/applicant/ApplicationStageOne';
-import { SchemeQuestionFields } from '../components/applicant/SchemeQuestionFields';
-import { RequiredDocumentsSection, SchemeDetailsSection } from '../components/applicant/ApplicantFormSchemeSections';
 import {
   STAGE_LABEL,
   isStageOneComplete,
@@ -32,6 +30,7 @@ import {
   daysUntil,
   documentStatusFromRecord,
   type DocumentRequirementLink,
+  type DocumentRequirementView,
 } from '../lib/applicationFormView';
 import {
   attachSchemeDocument,
@@ -42,7 +41,7 @@ import {
   submitApplication,
   type ApplicationFormLoad,
 } from '../services/applicationFormService';
-import { uploadDocument } from '../services/documentService';
+import { createViewUrl, uploadDocument } from '../services/documentService';
 import { toUiApplicationStatus } from '../services/applicantRecords';
 import { useApplicantApplications } from '../hooks/useApplicantRecords';
 import {
@@ -58,12 +57,11 @@ import type { ApplicantDocumentRecord } from '../types/profile';
 /**
  * The applicant application form, in two stages.
  *
- * The form has four stages over the same loaded bundle, and the applicant moves
+ * The form has two steps over the same loaded bundle, and the applicant moves
  * between them explicitly rather than having the page re-render underneath them:
  *
- *   Stage 1  additional_information  renewal + documents, nothing else
- *   Stage 2  full_application        profile + academic + scheme + the above
- *   Review   review                  everything, read back, then submit
+ *   Stage 1  additional_information  renewal + documents, the only editing stage
+ *   Stage 2  full_application        everything read back, then submit
  *   Confirm  confirmation            shown once, after a successful submit
  *
  * Stage 1 exists because the previous single-view form answered Apply Now with
@@ -71,6 +69,14 @@ import type { ApplicantDocumentRecord } from '../types/profile';
  * had entered anything. All of that is already in My Profile, so it buried the
  * only things the applicant actually had to do. Stage 1 shows those things and
  * nothing else; the rest arrives after Save & Continue.
+ *
+ * There is no separate Review stage. There used to be one, which showed the same
+ * information a second time as a read-back after the applicant had filled it in -
+ * the same fields, once to type into and once to read. Stage 2 is that read-back,
+ * so the editable form and the review are one view, the declaration is ticked in
+ * the place it is stated, and the submit button sits directly under everything it
+ * submits. Corrections are made in Stage 1 or in My Profile, and Stage 2 links
+ * back to Stage 1 rather than offering a second editable copy.
  *
  * The stages are real, separate views with their own components, not one tree
  * with parts hidden. There is no `stage` column and no migration for this: the
@@ -80,22 +86,33 @@ import type { ApplicantDocumentRecord } from '../types/profile';
  *
  * Save & Continue is not a submission. It writes answers through
  * saveApplicationDraft, which leaves applications.status at 'draft'; only
- * submitApplication moves the status, and it is reachable only from review.
+ * submitApplication moves the status, and it is reachable only from Stage 2.
  *
  * Within each stage the organising principle is unchanged: the form never asks
  * for something the profile already holds, and never becomes a second copy of
  * it. So Stage 2 leads with the profile summary and leaves editing to My
- * Profile, and the full profile renders in review, which is where an applicant
- * goes to read every field rather than glance at the essentials.
+ * Profile, and the full profile renders there, which is where an applicant goes
+ * to read every field rather than glance at the essentials.
+ *
+ *   Stage 1 layout
+ *   1. Renewal / application-specific answers
+ *   2. Required documents
  *
  *   Stage 2 layout
  *   1. Applicant information   from My Profile
  *   2. Academic information    from My Profile
- *   3. Scheme information      from the real scheme row
- *   4. Additional information  the Stage 1 answers, kept editable
- *   5. Required documents      the Stage 1 uploads, replaceable while a draft
+ *   3. Personal information    the full profile, read back
+ *   4. Additional information  the Stage 1 answers, read back
+ *   5. Required documents      the Stage 1 uploads, each viewable
  *   6. Declaration
- *   7. Review and submit
+ *   7. Submit application
+ *
+ * Stage 2 carries no scheme information at all. The scheme's description,
+ * benefits, eligibility requirements and conditions belong to the Scheme Details
+ * page, and re-printing them here asked the applicant to read the rules a second
+ * time to check their own form. The scheme row is still loaded, because the
+ * questions in Section 4 and the document requirements in Section 5 derive from
+ * it.
  *
  * A draft is editable; anything already submitted is read-only with the
  * pre-existing timeline, verification panel and deficiency context.
@@ -159,7 +176,7 @@ function ProblemCard({
 }
 
 /**
- * Human-readable text for one question's stored answer, for the review view.
+ * Human-readable text for one question's stored answer, for the Stage 2 read-back.
  *
  * Two shapes need translating, because what is stored is not what a person
  * should read back: a select stores the option's machine value, and a yes/no
@@ -180,7 +197,105 @@ function answerText(question: SchemeQuestion, answers: SchemeAnswers): string {
   return stored;
 }
 
-/** Read-only question/answer pairs, shared by the review view and the printout. */
+/**
+ * One document requirement, read back, with a way to open what was attached.
+ *
+ * The view row opens the stored file through the same short-lived signed URL the
+ * upload checklist uses, rather than linking a Storage path: the bucket is
+ * private, so a direct path would 404. It is a component rather than an inline
+ * handler because the error state belongs to the row that failed to open, and a
+ * hook cannot live inside the map.
+ */
+function DocumentReviewRow({ item }: { item: DocumentRequirementView }) {
+  const [viewError, setViewError] = useState<string | null>(null);
+  const { requirement, attached } = item;
+
+  const openAttached = async () => {
+    if (!attached) return;
+    setViewError(null);
+    const result = await createViewUrl(attached);
+    if (!result.ok || !result.data) {
+      setViewError(result.error ?? 'The document could not be opened.');
+      return;
+    }
+    window.open(result.data, '_blank', 'noopener,noreferrer');
+  };
+
+  return (
+    <li className="flex flex-wrap items-start justify-between gap-2 py-2.5">
+      <div className="min-w-0">
+        <p className="text-[13px] font-semibold text-slate-800">
+          {requirement.document_name}
+          <span className="ml-1.5 text-[11px] font-medium text-slate-500">
+            {requirement.is_mandatory ? '(required)' : '(optional)'}
+          </span>
+        </p>
+        {attached ? (
+          <p className="mt-0.5 break-all text-[11px] text-slate-500">
+            {attached.file_name ?? attached.document_name ?? 'Attached'}
+          </p>
+        ) : null}
+        {viewError ? <p className="mt-1 text-[11px] font-semibold text-red-700">{viewError}</p> : null}
+      </div>
+
+      <div className="flex shrink-0 items-center gap-2">
+        {attached ? (
+          <Button onClick={() => void openAttached()} size="sm" variant="outline">
+            View
+          </Button>
+        ) : null}
+        <span
+          className={`text-[13px] ${
+            attached
+              ? 'font-semibold text-emerald-700'
+              : requirement.is_mandatory
+                ? 'font-semibold italic text-red-700'
+                : 'italic text-slate-400'
+          }`}
+        >
+          {attached ? 'Attached' : 'Not attached'}
+        </span>
+      </div>
+    </li>
+  );
+}
+
+/**
+ * The documents this application is submitting, read back against what the scheme
+ * asked for.
+ *
+ * Stage 2 is the last look at the application before it is sent, so the gap
+ * matters as much as the list: a missing mandatory document is stated in red
+ * rather than left as an empty row, and it is also one of the blockers on the
+ * submit button below. Upload and replace stay in Stage 1, where the answers are.
+ */
+function DocumentReviewList({
+  requirements,
+  schemeLoaded,
+}: {
+  requirements: DocumentRequirementView[];
+  schemeLoaded: boolean;
+}) {
+  if (requirements.length === 0) {
+    return (
+      <p className="text-[13px] text-slate-600">
+        {schemeLoaded
+          ? 'This scholarship asks for no documents.'
+          : 'Unavailable because the scheme could not be loaded.'}
+      </p>
+    );
+  }
+
+  return (
+    <ul className="divide-y divide-slate-100">
+      {requirements.map((item) => (
+        <DocumentReviewRow item={item} key={item.requirement.id} />
+      ))}
+    </ul>
+  );
+}
+
+/** Read-only question/answer pairs, for Stage 2 and the printout. */
 function AnswerReviewList({
   questions,
   answers,
@@ -223,16 +338,14 @@ function AnswerReviewList({
  * saving Stage 1 was not the submission.
  *
  * Reads as an ordered list rather than a set of pills because the order is the
- * point. The confirmation step is deliberately not numbered separately — it is
- * the outcome of submitting from review, not a further step — so review and
- * confirmation share number 3.
+ * point. Confirmation is deliberately not numbered - it is the outcome of
+ * submitting from Stage 2, not a further step - so there are two numbers.
  */
 function StageProgress({ current }: { current: ApplicationStage }) {
   const currentNumber = stageNumber(current);
-  const steps: Array<{ number: 1 | 2 | 3; label: string }> = [
+  const steps: Array<{ number: 1 | 2; label: string }> = [
     { number: 1, label: STAGE_LABEL.additional_information },
     { number: 2, label: STAGE_LABEL.full_application },
-    { number: 3, label: STAGE_LABEL.review },
   ];
 
   return (
@@ -440,7 +553,6 @@ export function ApplicantApplicationPage() {
 
   const isStageOne = stage === 'additional_information';
   const isFormStage = stage === 'full_application';
-  const isReviewing = stage === 'review' || stage === 'confirmation';
 
   /** Everything that stops Submit, phrased for the applicant. */
   const blockers = useMemo(() => {
@@ -803,42 +915,10 @@ export function ApplicantApplicationPage() {
       <ApplicantPageHeader
         action={
           <div className="no-print flex flex-wrap items-center gap-2">
-            {isFormStage ? (
-              <Button
-                onClick={() => {
-                  setActionError(null);
-                  setSubmitArmed(false);
-                  setChosenStage('review');
-                }}
-                size="md"
-                variant="outline"
-              >
-                Review application
-              </Button>
-            ) : null}
-
-            {/* Back a stage. On a submitted application there is nothing to go
-                back to, so the control is withheld rather than rendered
-                disabled. Back from review returns to the full form, because
-                Stage 1 is already saved and re-asking for it would be a worse
-                experience than leaving a correct stage one behind. */}
-            {stage === 'review' && isDraft ? (
-              <Button
-                onClick={() => {
-                  setActionError(null);
-                  setSubmitArmed(false);
-                  setChosenStage('full_application');
-                }}
-                size="md"
-                variant="outline"
-              >
-                Back to edit
-              </Button>
-            ) : null}
-
             {/* Stage 1 stays reachable from Stage 2 so an applicant who spots a
                 wrong answer or a wrong document can fix it where they entered
-                it, without hunting through the form. */}
+                it, without hunting through the form. This is the only way back:
+                there is no second editable copy of the answers in Stage 2. */}
             {isFormStage && isDraft ? (
               <Button
                 onClick={() => {
@@ -851,7 +931,7 @@ export function ApplicantApplicationPage() {
                   setChosenStage('additional_information');
                 }}
                 size="md"
-                variant="ghost"
+                variant="outline"
               >
                 Back to additional information
               </Button>
@@ -865,11 +945,7 @@ export function ApplicantApplicationPage() {
             </Button>
           </div>
         }
-        description={
-          stage === 'review'
-            ? 'Check every detail below. Nothing is submitted until you press Submit application and then confirm.'
-            : 'Your profile details are filled in from My Profile. Check them, answer anything this scholarship additionally needs, and attach the documents it asks for.'
-        }
+        description="Everything you are submitting, read back. Check it, tick the declaration, then submit. Changes are made in Additional Information or My Profile."
         eyebrow={`Application ${reference}`}
         title={schemeName}
       />
@@ -968,8 +1044,8 @@ export function ApplicantApplicationPage() {
         <p className="text-[11px] font-bold uppercase tracking-wider text-gov-saffron-dark">Section 1</p>
         <h2 className="mt-1 text-lg font-bold text-gov-blue-dark">Applicant information</h2>
         <p className="mt-1 text-[12px] text-slate-600">
-          The essentials, taken from My Profile. You do not need to type any of this again. Use Review to read your
-          full profile.
+          The essentials, taken from My Profile. You do not need to type any of this again. Personal information below
+          has the rest.
         </p>
         <div className="mt-4">
           <ApplicantSummary profile={profile} />
@@ -989,64 +1065,43 @@ export function ApplicantApplicationPage() {
         </div>
       </Card>
 
-      {/* The full personal profile is not hidden, just not the default. It
-          renders in the review view and in the printout, because that is where
-          an applicant goes to check every field rather than glance at the
-          essentials. */}
-      {isReviewing ? (
-        <Card className="print-flat print-keep p-5">
-          <p className="text-[11px] font-bold uppercase tracking-wider text-gov-saffron-dark">Full profile</p>
-          <h2 className="mt-1 text-lg font-bold text-gov-blue-dark">Personal information</h2>
-          <p className="mt-1 text-[12px] text-slate-600">
-            Everything My Profile holds, shown in full so you can check it before submitting. Changes are made in My
-            Profile, not here.
-          </p>
-          <div className="mt-4">
-            <ApplicantInformationSection profile={profile} />
-          </div>
-        </Card>
-      ) : null}
+      {/* 3. The rest of the personal profile. This is the only view an applicant
+          gets of every profile field before submitting, so it is not hidden
+          behind a link - this is where they check it, and My Profile is where
+          they change it. */}
+      <Card className="print-flat print-keep p-5">
+        <p className="text-[11px] font-bold uppercase tracking-wider text-gov-saffron-dark">Section 3</p>
+        <h2 className="mt-1 text-lg font-bold text-gov-blue-dark">Personal information</h2>
+        <p className="mt-1 text-[12px] text-slate-600">
+          Everything else My Profile holds, shown in full so you can check it before submitting. Changes are made in My
+          Profile, not here.
+        </p>
+        <div className="mt-4">
+          <ApplicantInformationSection profile={profile} />
+        </div>
+      </Card>
 
-      {/* 3. Scheme information — from the real scheme row */}
-      {scheme ? (
-        <Card className="print-flat print-keep p-5">
-          <p className="text-[11px] font-bold uppercase tracking-wider text-gov-saffron-dark">Section 3</p>
-          <h2 className="mt-1 text-lg font-bold text-gov-blue-dark">Scheme information</h2>
-          <div className="mt-4">
-            <SchemeDetailsSection scheme={scheme} />
-          </div>
-        </Card>
-      ) : null}
-
-      {/* 4. Additional information — the answers saved in Stage 1 */}
+      {/* 4. Additional information — the answers saved in Stage 1, read back.
+          The editable per-question cards and their "why this is asked" lines are
+          scaffolding for filling an answer in; once it is answered, what the
+          applicant needs is the value they gave. Corrections go back to Stage 1,
+          which the header links to. */}
       <Card className="print-flat print-keep p-5" accentClass="border-l-4 border-gov-saffron">
         <p className="text-[11px] font-bold uppercase tracking-wider text-gov-saffron-dark">Section 4</p>
         <h2 className="mt-1 text-lg font-bold text-gov-blue-dark">Additional information</h2>
 
-        {questions.length === 0 ? null : isReviewing ? (
-          /* Review collapses the per-question cards into a plain list. In the
-             form each question is a bordered card with a "why this is asked"
-             line, which is scaffolding for filling it in; none of that is worth
-             printing or re-reading once it is answered. */
-          <div className="mt-4">
-            <AnswerReviewList answers={form.answers} questions={questions} />
-          </div>
+        {questions.length === 0 ? (
+          <p className="mt-4 text-[13px] text-slate-600">
+            This scholarship asks for no additional information beyond your profile and documents.
+          </p>
         ) : (
           <div className="mt-4">
-            {/* The same component the Additional Information stage uses, so a
-                value typed there and corrected here behaves identically. */}
-            <SchemeQuestionFields
-              answers={form.answers}
-              className=""
-              disabled={!isDraft}
-              onAnswer={setAnswer}
-              questions={questions}
-            />
+            <AnswerReviewList answers={form.answers} questions={questions} />
           </div>
         )}
       </Card>
 
-      {/* 5. Required documents — from the scheme's own document list */}
+      {/* 5. Required documents — the Stage 1 uploads, read back and viewable */}
       <Card className="print-flat print-keep p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -1061,91 +1116,47 @@ export function ApplicantApplicationPage() {
         </div>
 
         <div className="mt-4">
-          {isReviewing ? (
-            /* The checklist's upload/attach/detach controls are meaningless on
-               paper, so review lists what is attached against what was asked
-               for — including the gap, which is the whole point of reading it
-               back. */
-            requirements.length === 0 ? (
-              <p className="text-[13px] text-slate-600">
-                {scheme ? 'This scholarship asks for no documents.' : 'Unavailable because the scheme could not be loaded.'}
-              </p>
-            ) : (
-              <ul className="divide-y divide-slate-100">
-                {requirements.map((item) => (
-                  <li className="flex flex-wrap items-baseline justify-between gap-2 py-2.5" key={item.requirement.id}>
-                    <span className="text-[13px] font-semibold text-slate-800">
-                      {item.requirement.document_name}
-                      {item.requirement.is_mandatory ? (
-                        <span className="ml-1.5 text-[11px] font-medium text-slate-500">(required)</span>
-                      ) : (
-                        <span className="ml-1.5 text-[11px] font-medium text-slate-500">(optional)</span>
-                      )}
-                    </span>
-                    <span
-                      className={`text-[13px] ${
-                        item.attached
-                          ? 'font-semibold text-slate-800'
-                          : item.requirement.is_mandatory
-                            ? 'font-semibold italic text-red-700'
-                            : 'italic text-slate-400'
-                      }`}
-                    >
-                      {item.attached
-                        ? (item.attached.file_name ?? item.attached.document_name ?? 'Attached')
-                        : 'Not attached'}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )
-          ) : (
-            <RequiredDocumentsSection
-              disabled={!isDraft}
-              documents={form.documents}
-              onAttach={(requirementId, documentId) => void handleAttach(requirementId, documentId)}
-              onDetach={(linkId) => void handleDetach(linkId)}
-              onUpload={(requirement, file) => void handleUpload(requirement, file)}
-              requirements={requirements}
-            />
-          )}
+          <DocumentReviewList requirements={requirements} schemeLoaded={Boolean(scheme)} />
         </div>
       </Card>
 
-      {/* 6. Declaration */}
+      {/* 6. Declaration — the one input in Stage 2, because it is the only
+          statement the applicant makes themselves and it has to be given where
+          the thing it confirms is on screen. Ticking it is blocked from submit,
+          not from saving a draft, so an unfinished application can still be
+          saved. Once submitted it is read-only and shown as a statement. */}
       <Card className="print-flat print-keep p-5">
         <p className="text-[11px] font-bold uppercase tracking-wider text-gov-saffron-dark">Section 6</p>
         <h2 className="mt-1 text-lg font-bold text-gov-blue-dark">Declaration</h2>
+
         <div className="mt-4 rounded border border-slate-200 bg-slate-50 px-3 py-3">
-          {isReviewing ? (
-            <p className="text-[13px] text-slate-800">
-              I confirm that the information in this application, and the profile information it draws from, is correct
-              and complete to the best of my knowledge.
-              <span className="mt-1.5 block text-[12px] font-semibold">
-                {form.declaration ? 'Accepted' : 'Not yet accepted'}
-              </span>
-            </p>
-          ) : (
+          {isDraft ? (
             <CheckboxField
               checked={form.declaration}
-              disabled={!isDraft}
-              hint="Required before the application can be submitted. Saving a draft does not need it."
+              hint="Required before the application can be submitted. This tick belongs to the submission below: Save draft keeps your answers and documents, and you tick it again when you submit."
               label="I confirm that the information in this application, and the profile information it draws from, is correct and complete to the best of my knowledge."
               onChange={(checked) => {
                 setSavedAt(null);
                 setForm((previous) => ({ ...previous, declaration: checked }));
               }}
             />
+          ) : (
+            <p className="text-[13px] text-slate-800">
+              I confirm that the information in this application, and the profile information it draws from, is correct
+              and complete to the best of my knowledge.
+              <span className="mt-1.5 block text-[12px] font-semibold">
+                {form.declaration ? 'Accepted' : 'Not recorded'}
+              </span>
+            </p>
           )}
         </div>
       </Card>
 
-      {/* 7. Save / Review / Submit */}
+      {/* 7. Save / Submit */}
       <Card className="no-print p-5" accentClass="border-l-4 border-gov-blue">
         <p className="text-[11px] font-bold uppercase tracking-wider text-gov-saffron-dark">Section 7</p>
-        <h2 className="mt-1 text-lg font-bold text-gov-blue-dark">
-          {stage === 'review' ? 'Check and submit' : 'Save and submit'}
-        </h2>
+        <h2 className="mt-1 text-lg font-bold text-gov-blue-dark">Save and submit</h2>
+
 
         {actionError ? (
           <p className="mt-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-[12px] font-semibold text-red-800" role="alert">
@@ -1170,21 +1181,6 @@ export function ApplicantApplicationPage() {
         ) : null}
 
         <div className="mt-4 flex flex-wrap items-center gap-3">
-          {isFormStage ? (
-            <Button
-              disabled={!isDraft || saving || submitting}
-              onClick={() => {
-                setActionError(null);
-                setSubmitArmed(false);
-                setChosenStage('review');
-              }}
-              size="md"
-              variant="outline"
-            >
-              Review before submitting
-            </Button>
-          ) : null}
-
           <Button
             disabled={!isDraft || saving || submitting}
             onClick={() => void handleSaveDraft()}
@@ -1197,9 +1193,10 @@ export function ApplicantApplicationPage() {
           {/* Two deliberate presses, not one. The first arms the submission and
               states plainly that it locks the application; the second is the one
               that calls submitApplication. A single button is too easy to fire
-              by accident on a form this long, and this is the one irreversible
-              action in the whole flow. */}
-          {stage === 'review' ? (
+              by accident, and this is the one irreversible action in the whole
+              flow. The button sits directly under everything it submits, so
+              there is no separate review step to move through first. */}
+          {isFormStage ? (
             submitArmed ? (
               <div className="flex flex-wrap items-center gap-2">
                 <Button
@@ -1236,7 +1233,7 @@ export function ApplicantApplicationPage() {
           ) : null}
         </div>
 
-        {stage === 'review' && submitArmed ? (
+        {isFormStage && submitArmed ? (
           <div className="mt-3 rounded border border-amber-300 bg-amber-50 px-3 py-2.5" role="alert">
             <p className="text-[13px] font-semibold text-amber-900">
               This is the final step. Pressing confirm submits the application to the department and locks it.
@@ -1248,7 +1245,7 @@ export function ApplicantApplicationPage() {
           </div>
         ) : null}
 
-        {isDraft && stage === 'review' && !submitArmed ? (
+        {isDraft && !submitArmed ? (
           <p className="mt-3 text-[12px] leading-snug text-slate-600">
             Nothing has been sent yet. Pressing submit application will ask you to confirm, and only the confirmation
             submits it. Print or save this page first if you want a copy.

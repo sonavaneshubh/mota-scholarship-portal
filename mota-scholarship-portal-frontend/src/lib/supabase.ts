@@ -596,8 +596,21 @@ export type EligibilityResult = 'ELIGIBLE' | 'NOT_ELIGIBLE' | 'NEEDS_REVIEW';
 export interface EligibilityEvaluation {
   result: EligibilityResult;
   reasons: string[];
+  /** Requirements decided from the profile that the applicant meets. */
   matched: string[];
+  /**
+   * Requirements that are not met, plus requirements that could not be decided
+   * because the profile is missing the value. Drives NOT_ELIGIBLE / NEEDS_REVIEW.
+   */
   missing: string[];
+  /**
+   * Requirements satisfied by a document or a committee rather than by a number
+   * — `Category: ST`, `Course: M.Phil, Ph.D`, `Institution: ...`. Reported so the
+   * applicant knows what to upload, and deliberately NOT part of `missing`: these
+   * are true of the scheme regardless of who is reading, so counting them would
+   * make NEEDS_REVIEW the only reachable non-rejection result.
+   */
+  toConfirm: string[];
 }
 
 export interface ApplicantProfileForEligibility {

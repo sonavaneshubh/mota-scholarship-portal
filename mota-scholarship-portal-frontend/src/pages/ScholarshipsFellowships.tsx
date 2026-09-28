@@ -24,8 +24,8 @@ export function ScholarshipsFellowships() {
               Scholarships &amp; Fellowships
             </h1>
             <p className="mt-3 text-sm md:text-base leading-relaxed text-slate-700">
-              Browse the existing sample scheme directory for this prototype. Entries remain
-              explicitly marked as demo configurations rather than official schemes.
+              Every scholarship scheme published on this portal. Eligibility, benefits, required
+              documents and deadlines are taken from each scheme&rsquo;s own official notification.
             </p>
           </div>
         </div>

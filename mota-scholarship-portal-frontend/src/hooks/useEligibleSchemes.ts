@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { fetchSchemes } from '../services/schemes';
-import { isSupabaseConfigured, mapSchemeToFrontend } from '../lib/supabase';
+import { supabase, isSupabaseConfigured, mapSchemeToFrontend } from '../lib/supabase';
 import { diagnosticError } from '../lib/diagnostics';
 import type { ApplicantScheme, Scheme } from '../lib/supabase';
 
@@ -8,6 +8,18 @@ export interface EligibleSchemesState {
   schemes: ApplicantScheme[];
   loading: boolean;
   error: boolean;
+  /**
+   * Whether the visitor is signed in.
+   *
+   * This is not cosmetic. Every RLS policy on `schemes` and its child tables is
+   * scoped `to authenticated` (20260927000000_create_scholarship_master_tables.sql),
+   * so an anonymous read is *allowed* and returns 200 with zero rows rather than a
+   * permission error. `fetchSchemes` cannot tell that apart from "the portal has
+   * published no schemes", so a signed-out visitor on the public directory was
+   * told "No schemes are published yet" while five verified schemes were sitting
+   * in the table. The caller needs this flag to describe the real reason.
+   */
+  signedIn: boolean;
 }
 
 /**
@@ -26,6 +38,7 @@ export function useEligibleSchemes(): EligibleSchemesState {
   const [schemes, setSchemes] = useState<ApplicantScheme[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [signedIn, setSignedIn] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -34,6 +47,15 @@ export function useEligibleSchemes(): EligibleSchemesState {
       setLoading(true);
       setError(false);
       try {
+        // Read the session first, and independently of the scheme query, so the
+        // caller can explain an empty directory accurately even when the query
+        // itself succeeds with zero rows.
+        if (supabase) {
+          const { data } = await supabase.auth.getSession();
+          if (!active) return;
+          setSignedIn(Boolean(data.session));
+        }
+
         const result = await fetchSchemes({ page: 1, limit: 100 });
         if (!active) return;
         setSchemes((result.schemes as Scheme[]).map(mapSchemeToFrontend));
@@ -61,5 +83,5 @@ export function useEligibleSchemes(): EligibleSchemesState {
     };
   }, []);
 
-  return { schemes, loading, error };
+  return { schemes, loading, error, signedIn };
 }

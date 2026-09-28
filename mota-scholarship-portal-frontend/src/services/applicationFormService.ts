@@ -95,6 +95,19 @@ function isUndefinedColumn(error: { code?: string; message?: string }): boolean 
 }
 
 /**
+ * 42P10: the conflict target has no unique index PostgreSQL can infer.
+ *
+ * Not something the applicant can cause or retry past, and not fixable from the
+ * client — PostgREST's `on_conflict` cannot carry the partial-index predicate
+ * that would make the inference work. It means the index backing this pair is
+ * still the partial form created by 20260927000200, so naming the migration is
+ * the only useful thing to say.
+ */
+function isUninferrableConflictTarget(error: { code?: string; message?: string }): boolean {
+  return error.code === '42P10' || /no unique or exclusion constraint matching/i.test(error.message ?? '');
+}
+
+/**
  * Works out which column a URL handle refers to, or null if it is neither shape.
  *
  * The obvious way to accept "uuid or reference" is a PostgREST `.or()` filter,
@@ -404,21 +417,45 @@ export async function attachSchemeDocument(
 ): Promise<{ ok: true; link: ApplicationDocumentLink } | { ok: false; error: string }> {
   if (!supabase) return { ok: false, error: 'Supabase is not configured.' };
 
+  const payload = {
+    application_id: applicationId,
+    scheme_document_id: schemeDocumentId,
+    document_id: documentId,
+  };
+
   const { data, error } = await supabase
     .from(APPLICATION_DOCUMENTS_TABLE)
-    .upsert(
-      { application_id: applicationId, scheme_document_id: schemeDocumentId, document_id: documentId },
-      { onConflict: 'application_id,scheme_document_id' },
-    )
+    .upsert(payload, { onConflict: 'application_id,scheme_document_id' })
     .select('id, application_id, scheme_document_id, document_id, created_at')
     .maybeSingle();
 
   if (error) {
+    // Logged in full because a bare `error` object collapses to nothing useful in
+    // some consoles, and a PostgREST failure is usually distinguished only by
+    // `code` + `details` (e.g. 23505 for a unique violation, 23503 for a foreign
+    // key). Nothing sensitive is logged: three UUIDs and the server's own error.
+    console.error('application_documents payload', payload);
+    console.error('Failed to attach document', {
+      applicationId,
+      schemeDocumentId,
+      documentId,
+      error: {
+        message: error?.message,
+        details: error?.details,
+        hint: error?.hint,
+        code: error?.code,
+      },
+    });
     if (isMissingRelation(error)) {
       return { ok: false, error: 'Document attachments are not available yet. Apply migration 20260927000003.' };
     }
-    console.error('Failed to attach document', { applicationId, schemeDocumentId, documentId, error });
-    return { ok: false, error: 'That document could not be attached. Please try again.' };
+    if (isUninferrableConflictTarget(error)) {
+      return {
+        ok: false,
+        error: 'Document attachments are not available yet. Apply migration 20260927000250.',
+      };
+    }
+    return { ok: false, error: error.message || 'That document could not be attached. Please try again.' };
   }
 
   if (!data) {

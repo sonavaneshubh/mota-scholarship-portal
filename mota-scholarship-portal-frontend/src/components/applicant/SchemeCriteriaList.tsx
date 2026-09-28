@@ -9,19 +9,45 @@
  * Rows are therefore grouped by `criteria_type` and shown as a definition list
  * per group, not as one numbered list. A single running number across four
  * different kinds of rule would imply an order the guidelines do not state.
+ *
+ * ## Two things deliberately not rendered
+ *
+ * `source_ref` holds the guideline document and page a row was taken from. It is
+ * provenance, and it was printed in 11px grey italics under every criterion. It
+ * said "national-fellowship-scholarship.pdf Part-A p.5-7 §2.1" to an applicant
+ * who has no way to act on it, while the rule that actually matters sat above it
+ * unlabelled. The data is untouched in the database; the column is simply not
+ * applicant-facing. An administrator reviewing the import can still read it.
+ *
+ * `slot_allocation` and `field_allocation` are quotas, not conditions. Grouped
+ * under "Eligibility criteria" they read as requirements — an applicant adds up
+ * 225 female slots and concludes that a scheme restricted to women has 225
+ * places. They are headed as reservation and priority below, and the
+ * `slot_cascade` rule that decides what happens to unfilled places stays in
+ * internal metadata.
  */
 
 import type { SchemeCriterion } from '../../lib/supabase';
+import { stripInternalProvenance } from '../../lib/schemeEligibilityView';
 import { Badge } from '../ui/Badge';
 
 interface SchemeCriteriaListProps {
   criteria: SchemeCriterion[];
+  /**
+   * `criteria_type` values already shown in the eligibility criteria table.
+   *
+   * AZKMI's `maximum_age` rows are read into that table by
+   * `courseDependentAges()`, because an applicant needs one "Maximum age" line,
+   * not three repeated cards. Passing the type here keeps the value in one place
+   * instead of printing it twice.
+   */
+  excludeTypes?: string[];
 }
 
 /** Human heading for each criteria_type, with its official total where known. */
 const GROUP_HEADINGS: Record<string, { title: string; note?: string }> = {
   maximum_age: { title: 'Maximum age by course' },
-  slot_allocation: { title: 'Award slots by category', note: '750 awards in total' },
+  slot_allocation: { title: 'Reservation and priority', note: '750 awards in total' },
   field_allocation: { title: 'Awards by field of study', note: '20 awards in total' },
   course_group: { title: 'Official course groups' },
 };
@@ -45,6 +71,10 @@ function groupCriteria(criteria: SchemeCriterion[]): [string, SchemeCriterion[]]
  * The numeric rule value, e.g. "32 years" or "225 slots". A rule with no numeric
  * value falls back to its text_value, and to nothing at all when it has neither,
  * rather than showing a placeholder zero.
+ *
+ * `text_value` is free text on a table maintained from guideline PDFs, so it goes
+ * through the provenance filter. It is currently clean across all five schemes,
+ * which is why the filter is invisible here.
  */
 function describeValue(criterion: SchemeCriterion): string | null {
   if (typeof criterion.numeric_value === 'number') {
@@ -57,13 +87,15 @@ function describeValue(criterion: SchemeCriterion): string | null {
     return `${criterion.numeric_value.toLocaleString('en-IN')}${unit}`;
   }
   if (criterion.text_value) {
-    return criterion.text_value;
+    return stripInternalProvenance(criterion.text_value);
   }
   return null;
 }
 
-export function SchemeCriteriaList({ criteria }: SchemeCriteriaListProps) {
-  if (criteria.length === 0) {
+export function SchemeCriteriaList({ criteria, excludeTypes = [] }: SchemeCriteriaListProps) {
+  const visible = criteria.filter((criterion) => !excludeTypes.includes(criterion.criteria_type));
+
+  if (visible.length === 0) {
     return (
       <p className="text-sm text-slate-600">
         An eligibility checklist has not been recorded for this scheme yet. Please refer to the official guideline.
@@ -73,7 +105,7 @@ export function SchemeCriteriaList({ criteria }: SchemeCriteriaListProps) {
 
   return (
     <div className="space-y-5">
-      {groupCriteria(criteria).map(([criteriaType, rows]) => {
+      {groupCriteria(visible).map(([criteriaType, rows]) => {
         const heading = GROUP_HEADINGS[criteriaType];
 
         return (
@@ -88,6 +120,14 @@ export function SchemeCriteriaList({ criteria }: SchemeCriteriaListProps) {
             <ul className="space-y-2">
               {rows.map((criterion) => {
                 const value = describeValue(criterion);
+                const appliesTo = stripInternalProvenance(criterion.applies_to);
+                // AZKMI's Fine Arts allocation carries an unresolved conflict in
+                // its description: "Separate merit list is drawn per field of
+                // study. Open conflict (report 7.6): the MoTA FAQ does not list
+                // Fine Arts as a separate covered field, whereas the guideline
+                // does." The second sentence is why the row is in the table; it is
+                // not something an applicant can act on, so it stays internal.
+                const description = stripInternalProvenance(criterion.description);
 
                 return (
                   <li
@@ -101,22 +141,14 @@ export function SchemeCriteriaList({ criteria }: SchemeCriteriaListProps) {
                       ) : null}
                     </div>
 
-                    {criterion.applies_to ? (
+                    {appliesTo ? (
                       <p className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                        Applies to: {criterion.applies_to}
+                        Applies to: {appliesTo}
                       </p>
                     ) : null}
 
-                    {criterion.description ? (
-                      <p className="mt-1.5 text-xs leading-relaxed text-slate-600">
-                        {criterion.description}
-                      </p>
-                    ) : null}
-
-                    {criterion.source_ref ? (
-                      <p className="mt-1.5 text-[11px] italic leading-snug text-slate-400">
-                        Source: {criterion.source_ref}
-                      </p>
+                    {description ? (
+                      <p className="mt-1.5 text-xs leading-relaxed text-slate-600">{description}</p>
                     ) : null}
                   </li>
                 );

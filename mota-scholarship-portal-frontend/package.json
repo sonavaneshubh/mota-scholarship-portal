@@ -9,7 +9,10 @@
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b --noEmit",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:e2e": "node scripts/applicant-pipeline.e2e.mjs",
+    "test:eligibility": "node scripts/scheme-eligibility.test.mjs",
+    "verify": "npm run lint && npm run typecheck && npm run build && npm run test:eligibility && npm run test:e2e"
   },
   "dependencies": {
     "@fortawesome/fontawesome-free": "^7.3.1",
