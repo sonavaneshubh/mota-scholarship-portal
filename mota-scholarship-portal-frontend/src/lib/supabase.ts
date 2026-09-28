@@ -63,6 +63,34 @@ function isUsableSupabaseUrl(value: string): boolean {
 export const isSupabaseConfigured = isUsableSupabaseUrl(supabaseUrl) && Boolean(supabaseKey);
 
 /**
+ * The project URL, exported for the callers that talk to a Supabase Edge
+ * Function over plain `fetch` rather than through the client.
+ *
+ * `supabase.functions.invoke()` attaches the current session as a bearer token,
+ * which is exactly wrong for the registration endpoints: an applicant halfway
+ * through registering has no session yet, and those functions must not honour
+ * one. They are called directly instead, and that needs the URL.
+ *
+ * This is the project's own address, not a credential, and it is already in the
+ * bundle as part of the client that is created above.
+ */
+export const supabaseProjectUrl = supabaseUrl;
+
+/**
+ * The public browser key, exported for the callers that talk to a Supabase Edge
+ * Function over plain `fetch`.
+ *
+ * This is the anon/publishable key, which is designed to be public and is
+ * already present in the bundle as part of the client above -- sending it as the
+ * `apikey` header adds no exposure. It is sent because the Functions gateway
+ * expects it, and a call without it is rejected at the gateway with an opaque
+ * 401 long before the function runs.
+ *
+ * Only this key may ever be exported. The service-role key must not.
+ */
+export const supabasePublicKey = supabaseKey;
+
+/**
  * User-facing explanation for a portal that cannot reach its database.
  *
  * Deliberately free of environment variable names, hostnames and anything else

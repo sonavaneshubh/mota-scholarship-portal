@@ -41,7 +41,11 @@ export function TopAccessibilityBar() {
   return (
     <header id={SECTION_IDS.TOP.replace('#', '')} className="w-full bg-slate-100 border-b border-slate-300 text-xs text-slate-700" role="banner">
       <div aria-hidden="true" className="tricolor-strip w-full" />
-      <div className="max-w-7xl mx-auto px-4 py-1.5 flex flex-wrap items-center justify-between gap-2">
+      {/* py-1 rather than py-1.5: the tallest control in the row is the A-/A/A+
+          group and the language select, both 22px, so the section padding was
+          adding 12px of blank above and below 22px of content. 8px of padding
+          still clears the focus ring on every control. */}
+      <div className="max-w-7xl mx-auto px-4 py-1 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center space-x-4">
           <a
             className="skip-link sr-only focus:not-sr-only focus:bg-amber-100 focus:text-slate-900 focus:p-1 font-semibold"

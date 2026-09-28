@@ -4,30 +4,30 @@ import logo from '../../assets/logo.png';
 export function Masthead() {
   return (
     <header className="masthead-gradient relative border-b border-slate-200 shadow-sm">
-      {/* No horizontal padding here on purpose: the 32px left and 20px right
-          insets are owned by columns 1 and 4, so container padding would
-          silently add to the edge spacing the spec asks for. */}
+      {/* No horizontal padding on this wrapper on purpose: the 24px left and
+          20px right insets are owned by the left and right sections in
+          index.css, so container padding would silently add to them. */}
       <div className="mx-auto max-w-full">
         {/*
-          Four balanced columns in a single flex row, per spec.
-          Sizing, spacing and the portrait/nav gap all live in index.css
-          (.masthead-col-*); nothing here sets a dimension.
+          Three sections in one CSS Grid row: [branding] [title] [logos].
+          The track template in index.css is minmax(0,1fr) auto minmax(0,1fr),
+          which is what keeps the title dead centre - the two outer tracks are
+          equal, so the title cannot be pushed off centre by the branding or the
+          logo group getting wider. It used to be four flex columns with
+          space-between, which put the title 40px left of centre at 1280px.
 
-            1. identity  32% cap  emblem + ministry text
-            2. title     22% cap  NATIONAL TRIBAL FELLOWSHIP / SCHOLARSHIP PORTAL
-            3. logos     26% cap  G20 + Azadi Ka Amrit Mahotsav
-            4. portrait  20% cap  Modi, bottom-right
-
-          The columns are content-sized and capped at those percentages, so
-          justify-content: space-between (set in CSS) spreads the leftover
-          width evenly and all three inter-column gaps come out equal. If they
-          were flex-basis percentages instead they would total 100%, leaving
-          space-between nothing to distribute and the gaps would be accidental
-          leftovers of each column's alignment - visibly uneven.
+          Every dimension lives in index.css as a custom property on
+          .masthead-hero; nothing here sets a size. Which assets are visible at
+          which width is a markup concern, so the responsive breakpoints sit on
+          the elements themselves.
         */}
         <div className="masthead-hero">
-          {/* Column 1 - government emblem + ministry text */}
-          <div className="masthead-col masthead-col-identity">
+          {/* Section 1 - GoI emblem + ministry branding. */}
+          <div className="masthead-left">
+            {/* The wrapper is a plain flex-shrink:0 box. The emblem's own
+                negative inline margins (see .masthead-emblem) reclaim the
+                19.4% transparent padding on each side of this 469x532 asset,
+                so the wrapper ends up exactly as wide as the VISIBLE emblem. */}
             <div className="relative flex-shrink-0">
               <img
                 src={logo}
@@ -36,59 +36,66 @@ export function Masthead() {
               />
             </div>
             <div className="min-w-0">
-              <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider text-slate-600">
+              {/* leading-[1.2] on the two 10px lines trims their line boxes from
+                  15px to 12px. Font SIZE, weight, colour and letter-spacing are
+                  unchanged - only the leading. The four-line branding block is
+                  the tallest fixed element in the header at 67.5px, so it, not
+                  the portrait, is what sets the floor for --hero-h; tightening
+                  it is what lets the whole section come down. */}
+              <div className="flex items-center gap-2 text-[10px] font-semibold uppercase leading-[1.2] tracking-wider text-slate-600">
                 <span>{SITE.govtLineHi}</span>
                 <span className="text-slate-400">|</span>
                 <span>{SITE.govtLineEn}</span>
               </div>
               <h1 className="text-base font-bold leading-tight text-gov-blue-dark">{SITE.nameHi}</h1>
               <div className="text-sm font-semibold leading-tight text-slate-800">{SITE.nameEn}</div>
-              <div className="text-[10px] font-medium text-gov-saffron-dark">{SITE.portalName}</div>
+              <div className="text-[10px] font-medium leading-[1.2] text-gov-saffron-dark">{SITE.portalName}</div>
             </div>
           </div>
 
-          {/* Column 2 - portal title, centred on both axes, on ONE row.
-              Serif (Georgia/Cambria) rather than the page sans, so the title
-              reads as a title instead of blending into the ministry text next
-              to it. The two phrases are separated by a middot rather than run
-              together, because a single 41-character uppercase serif run is
-              genuinely hard to parse without a visible phrase break.
+          {/* Section 2 - the portal title, the visual centre of the header.
+              Serif-style weight kept as-is: the existing dark-blue Poppins
+              treatment, unchanged.
 
-              This column carries no max-width cap (unlike columns 1, 3 and 4).
-              The 22% it was previously capped at came from the four-column
-              split, but a one-line title needs ~402px at 13px, which the 22%
-              cap - 282px at 1280px - would have forced to wrap. Nothing here
-              uses flex-grow, so dropping the cap simply lets the column size
-              to its content; the leftover width still goes to space-between. */}
-          <div className="masthead-col masthead-col-title hidden lg:flex">
-            <span className="text-[18px] font-bold uppercase leading-snug tracking-[0.04em] text-gov-blue-dark text-center" style={{ fontFamily: "'Poppins', sans-serif" }}>
+              Hidden below xl (1280px), the same breakpoint as the two
+              wordmarks. That is deliberate: the full three-section header only
+              works when all three sections coexist. Measured at 1024px, the
+              centre track came out 307px against 331px of branding content, so
+              the "AI-Enabled Scholarship & Fellowship Management System" line
+              wrapped to two lines - a squeezed band where the title was
+              present but the logo pair was not. Dropping the title below 1280
+              leaves two comfortable tracks of ~632px each instead. */}
+          <div className="masthead-center hidden xl:block">
+            <span
+              className="text-[18px] font-bold uppercase leading-snug tracking-[0.04em] text-gov-blue-dark"
+              style={{ fontFamily: "'Poppins', sans-serif" }}
+            >
               National Tribal
               <br />
               Fellowship &amp; Scholarship Portal
             </span>
           </div>
 
-          {/* Column 3 - G20 + Azadi Ka Amrit Mahotsav, side by side.
-              Dropped below 1280px: the pair needs 342px and stops fitting. */}
-          <div className="masthead-col masthead-col-logos hidden xl:flex">
+          {/* Section 3 - G20, Azadi Ka Amrit Mahotsav and the PM portrait as
+              one optically centred group. The two wordmarks are hidden below
+              xl (1280px): together they need 217px, which stops fitting beside
+              the ministry block and the title at narrower widths. The portrait
+              is hidden below sm. */}
+          <div className="masthead-right">
             <img
               src="/images/g20-logo.png"
               alt="G20 Presidency of India logo"
-              className="masthead-logo-g20"
+              className="masthead-logo-g20 hidden xl:block"
             />
             <img
               src="/images/azadi75.png"
               alt="Azadi Ka Amrit Mahotsav logo"
-              className="masthead-logo-azadi"
+              className="masthead-logo-azadi hidden xl:block"
             />
-          </div>
-
-          {/* Column 4 - PM portrait, bottom-right, 6px clear of the nav bar */}
-          <div className="masthead-col masthead-col-portrait hidden sm:flex">
             <img
               src="/images/modi.png"
               alt="Shri Narendra Modi, Prime Minister of India"
-              className="masthead-portrait"
+              className="masthead-portrait hidden sm:block"
             />
           </div>
         </div>

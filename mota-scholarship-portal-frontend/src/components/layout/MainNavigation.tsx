@@ -28,7 +28,7 @@ function NavigationItems({ mobile = false, onNavigate }: NavigationItemsProps) {
                         ? 'text-white font-bold border-l-2 border-amber-400'
                         : 'text-slate-100 hover:bg-gov-blue-light'
                     }`
-                  : `inline-block py-2.5 px-3 ${
+                  : `inline-block py-1 px-3 ${
                       isActive
                         ? 'bg-gov-blue-dark text-white border-b-2 border-amber-400 font-bold'
                         : 'text-slate-100 hover:bg-gov-blue-light transition'
@@ -73,10 +73,15 @@ export function MainNavigation() {
   return (
     <nav aria-label="Main Navigation" className="bg-gov-blue text-white sticky top-0 z-40 shadow">
       <div className="mx-auto max-w-full px-3 sm:px-4 lg:px-6">
-        <div className="flex items-center justify-between min-h-[52px]">
+        {/* 40px, down from 52px originally. The link row is 30px (20px line
+            + 4px above and below + the 2px amber active underline), so 5px of
+            breathing room remains top and bottom. This is the floor I would
+            take the bar to without pushing desktop links under a 40px touch
+            target, so please treat it as the minimum. */}
+        <div className="flex items-center justify-between min-h-[40px]">
           <NavigationItems onNavigate={() => setMobileOpen(false)} />
 
-          <div className="hidden lg:flex items-center space-x-2 py-1.5">
+          <div className="hidden lg:flex items-center space-x-2 py-1">
             <Button
               variant="ghost"
               size="sm"

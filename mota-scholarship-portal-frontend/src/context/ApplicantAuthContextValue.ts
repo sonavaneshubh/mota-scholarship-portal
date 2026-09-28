@@ -1,7 +1,7 @@
 import { createContext } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import type { AuthProfile, ApplicantProfile, UserRole } from '../types';
-import type { AuthResult, SignInResult, SignUpInput, SignUpResult } from '../services/auth/authService';
+import type { AuthResult, SignInResult } from '../services/auth/authService';
 
 export interface ApplicantAuthContextValue {
   session: Session | null;
@@ -13,7 +13,6 @@ export interface ApplicantAuthContextValue {
   loading: boolean;
   isAuthenticated: boolean;
   signIn: (email: string, password: string) => Promise<SignInResult>;
-  signUp: (input: SignUpInput) => Promise<SignUpResult>;
   signOut: () => Promise<AuthResult>;
   resetPassword: (email: string) => Promise<AuthResult>;
   updatePassword: (password: string) => Promise<AuthResult>;
