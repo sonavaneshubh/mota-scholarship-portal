@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { RefObject } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { AdminIcon } from './AdminIcon';
 import {
-  ADMIN_NAVIGATION,
+  getAdminNavigation,
   isNavEntryActive,
   isNavGroup,
   isNavItemActive,
@@ -13,6 +13,7 @@ import type { AdminNavGroup, AdminNavItem } from './adminNavigation';
 interface AdminSidebarProps {
   unreadNotifications: number;
   isMobile: boolean;
+  isDemoAdmin: boolean;
   open: boolean;
   onNavigate: () => void;
   onClose: () => void;
@@ -143,6 +144,7 @@ function SidebarGroup({ group, open, pathname, search, unreadNotifications, acti
 export function AdminSidebar({
   unreadNotifications,
   isMobile,
+  isDemoAdmin,
   open,
   onNavigate,
   onClose,
@@ -152,6 +154,7 @@ export function AdminSidebar({
   const search = location.search;
   const [groupOverrides, setGroupOverrides] = useState<Record<string, boolean>>({});
   const activeItemRef = useRef<HTMLAnchorElement>(null);
+  const navigation = useMemo(() => getAdminNavigation(isDemoAdmin), [isDemoAdmin]);
 
   useEffect(() => {
     activeItemRef.current?.scrollIntoView({ block: 'nearest' });
@@ -195,7 +198,7 @@ export function AdminSidebar({
       </div>
 
       <nav aria-label="Admin sections" className="scrollbar-none flex-1 space-y-1 overflow-y-auto px-3 py-4">
-        {ADMIN_NAVIGATION.map((entry) =>
+        {navigation.map((entry) =>
           isNavGroup(entry) ? (
             <SidebarGroup
               activeItemRef={activeItemRef}
@@ -225,7 +228,7 @@ export function AdminSidebar({
       <div className="shrink-0 border-t border-white/10 px-4 py-3">
         <div className="flex items-center gap-2 text-[10px] text-blue-200/60">
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-          <span>Demo environment</span>
+          <span>{isDemoAdmin ? 'Read-only demo' : 'Demo environment'}</span>
         </div>
       </div>
     </aside>

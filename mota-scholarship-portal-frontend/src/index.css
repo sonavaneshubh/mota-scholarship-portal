@@ -1,4 +1,4 @@
-@tailwind base;
+﻿@tailwind base;
 @tailwind components;
 @tailwind utilities;
 
@@ -31,123 +31,174 @@
   }
 
   /* ---- Main hero header (Masthead) ---------------------------------------
-     Four balanced flex columns, as specified:
+     Three sections, one row, CSS Grid:
 
-       1. identity  (32% cap)  emblem + ministry text, 18px left padding
-       2. title     (uncapped)  NATIONAL TRIBAL FELLOWSHIP · SCHOLARSHIP PORTAL
-       3. logos     (26% cap)  G20 58px + Azadi 54px, 28px apart
-       4. portrait  (20% cap)  Modi, 96px, bottom-right, 20px right padding
+       1. .masthead-left    GoI emblem + ministry branding, 18px left inset
+       2. .masthead-center  NATIONAL TRIBAL FELLOWSHIP & SCHOLARSHIP PORTAL
+       3. .masthead-right   G20 + Azadi Ka Amrit Mahotsav + PM portrait
 
-     --hero-h is the single source of truth for the bar's height, and the
-     portrait is derived from it as calc(--hero-h - --portrait-gap) rather than
-     being set independently. That coupling is what guarantees the photo can
-     never overlap the blue navigation bar: the portrait height, the gap above
-     the nav and the hero height are one unit, so changing --hero-h at any
-     breakpoint moves all three together. At the base size this resolves to
-     100px hero = 96px portrait + 4px gap.
+     WHY GRID AND NOT FLEX: the old layout was four flex columns with
+     justify-content: space-between. That cannot hold a centred title. The
+     sections are different widths, so the leftover space is split evenly
+     between however many gaps happen to exist, and the title ends up wherever
+     the left column happens to end. Measured at 1280px: left content 329px,
+     right content 343px, title 355px - the title's centre landed at x=592 in a
+     1265px row, i.e. 40px LEFT of true centre. Every time the left branding or
+     the right logo group changed width, the title shifted.
 
-     The percentage widths above are applied as max-width CAPS rather than
-     flex-basis. With flex-basis the four columns always total 100%, which
-     leaves justify-content: space-between with no free space to distribute -
-     the gaps between columns would then be accidental leftovers of each
-     column's internal alignment and would be visibly unequal. Sizing columns to
-     their content and capping them at the stated percentages lets
-     space-between do its job, so all three gaps come out identical while the
-     32/22/26/20 proportions still act as the upper bound. */
+     minmax(0, 1fr) auto minmax(0, 1fr) fixes that by construction: the two
+     outer tracks are identical, so the auto centre track is always exactly
+     centred in the row no matter how wide the branding or the logos get. The
+     side content is then aligned to the outer edge of its own track with
+     justify-self, which puts the asymmetry into the gutters where it belongs
+     instead of into the title's position. At 1280px the two 1fr tracks come
+     out 435px each, against content of 323px left and 390px right, so both
+     fit and the title keeps its 355px.
+
+     SIZING IS BY VISIBLE INK, NOT BY BOX. Every asset here is a PNG with
+     transparency, and the amount of it differs wildly, so "height: 40px" does
+     not mean "40px of logo". Measured from the alpha channel:
+
+       asset            natural    visible ink    padding        ink density
+       GoI emblem       469x532    287x488        19.4% L/R      54%
+       G20              363x232    363x232        none           24%
+       Azadi            356x194    356x194        none           31%
+       PM portrait      446x373    446x373        none           60%
+
+     Two consequences drove the numbers below:
+
+       - The emblem is 469x532 with 19.4% dead space on each side, so the old
+         height:40px produced a VISIBLE emblem of only 21.4x36.7px - a sliver.
+         It is now sized to a visible ~46px and the dead space is reclaimed
+         with negative inline margins rather than by making the box huge.
+       - G20 and Azadi have no padding at all, so there is nothing to reclaim,
+         but they are sparse wordmarks: only 24% and 31% of their own bounding
+         box is ink. Sizing them to the same HEIGHT as the denser PM photo
+         (60%) made them read as small print. They are given heights below the
+         photo's that account for that density, which is why --g20-h and
+         --azadi-h are not simple fractions of --pm-h. */
+
   .masthead-hero {
-    --hero-h: 100px;
-    --portrait-gap: 4px;
-    --g20-h: 58px;
-    --azadi-h: 54px;
-    --logo-pair-gap: 28px;
+    /* Single source of truth for every size in the header. --hero-h is the
+       row height; the assets are sized to FILL that row, not to define it.
+       --hero-h is a floor (min-height), so the row can never be smaller than
+       this and will grow only if an asset or the text block outgrows it. */
+    --hero-h: 96px;
+    /* Assets are deliberately kept UNDER --hero-h so that enlarging them never
+       grows the section. The portrait is the binding constraint because it is
+       the tallest of the four: --pm-h must stay at or below
+       (--hero-h - 2 * clearance).
+
+       88px in a 96px row is the CEILING for the portrait at this row height:
+       4px above and below, plus the header's 1px border, i.e. 5px of clear
+       space to the navigation bar. Going larger requires a taller --hero-h -
+       there is no further headroom to reclaim, because the portrait, G20 and
+       Azadi assets carry no transparent padding to pull back (only the emblem
+       does, and that is already reclaimed via .masthead-emblem's negative
+       margins).
+
+       --emblem-h is 76px, so the visible emblem is ~70px tall: taller than the
+       four-line branding block (61.5px) it sits beside. That is a deliberate
+       override of matching the type height - the emblem is a 0.88-ratio square
+       mark, and matching the 61.5px text would cap it at 61px, which read too
+       small next to the 88px portrait on the other side of the header. It is
+       still comfortably under --pm-h, so the row height is unaffected. */
+    --emblem-h: 76px;   /* BOX height; the visible emblem is 91.7% of this */
+    --g20-h: 70px;
+    --azadi-h: 66px;
+    --pm-h: 90px;
+    --asset-gap: 24px;
+    --left-inset: 24px;
+    --right-inset: 20px;
+
     position: relative;
     z-index: 1;
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
     align-items: center;
-    justify-content: space-between;
     min-height: var(--hero-h);
-    gap: 1rem;
   }
 
-  .masthead-col {
+  .masthead-left {
     display: flex;
     align-items: center;
+    gap: 16px;
     min-width: 0;
-    flex: 0 1 auto;
+    padding-left: var(--left-inset);
+    justify-self: start;
   }
 
-  /* Column 1 - emblem + ministry text, small left padding, text centred. */
-  .masthead-col-identity {
-    gap: 12px;
-    padding-left: 18px;
-  }
-
-  /* Column 2 - portal title, centred on both axes. Single line, so there is
-     no inter-line gap and nothing to justify: the one span is the whole
-     content, so align-items:stretch and text-align-last:justify would both be
-     no-ops. Plain centring is all this needs. */
-  .masthead-col-title {
-    flex-direction: column;
-    justify-content: center;
-    text-align: center;
+  /* Centre track: the title, plus symmetric padding so the two lines of type
+     are not optically pinched against the section edges. */
+  .masthead-center {
     padding: 0 20px;
+    justify-self: center;
+    text-align: center;
   }
 
-  /* Column 3 - the two emblem marks, side by side, optically centred. */
-  .masthead-col-logos {
-    justify-content: center;
-    gap: var(--logo-pair-gap);
+  /* Right track: G20, Azadi and the PM portrait as one optically centred
+     group. align-items:center is what makes the two wordmarks and the photo
+     share a common mid-line; the photo is the tallest element and anchors the
+     group, and the wordmarks sit centred against it. */
+  .masthead-right {
+    display: flex;
+    align-items: center;
+    gap: var(--asset-gap);
+    min-width: 0;
+    padding-right: var(--right-inset);
+    justify-self: end;
   }
 
-  /* Column 4 - portrait, bottom-right, 20px right padding. align-self:flex-end
-     overrides the row's align-items:center so the photo sits on the bottom
-     edge, and the bottom padding is the gap to the navigation bar. */
-  .masthead-col-portrait {
-    align-self: flex-end;
-    justify-content: flex-end;
-    align-items: flex-end;
-    padding-right: 20px;
-    padding-bottom: var(--portrait-gap);
-  }
-
+  /* Shared behaviour for every image in the header. Deliberately does NOT set
+     width or height: a rule of the form ".masthead-hero img" has specificity
+     (0,1,1), which beats a bare ".masthead-emblem" at (0,1,0) and silently
+     overrode every per-asset value - first height:auto, then max-width:100%.
+     Each asset rule below is therefore scoped as ".masthead-hero .masthead-x"
+     at (0,2,0) so it always wins, whatever this shared rule goes on to
+     contain. Height belongs to each asset rule, which sets width:auto
+     alongside it so the aspect ratio is preserved by construction. */
   .masthead-hero img {
-    width: auto;
     max-width: 100%;
     object-fit: contain;
     flex-shrink: 0;
   }
 
-  .masthead-emblem {
-    height: 40px;
+  .masthead-hero .masthead-emblem {
+    width: auto;
+    height: var(--emblem-h);
+    /* max-width:none, deliberately exempting this one asset from the shared
+       clamp above. The negative margins below make the wrapper's shrink-to-fit
+       width 27px (the visible ink), so a max-width:100% here would resolve
+       against that 27px and squeeze the image into it - object-fit then
+       letterboxes the emblem down to about 27x23 instead of 27x46, which is
+       the opposite of making it more visible. With the clamp lifted the box
+       stays 44.1x50 and the visible ink fills the wrapper exactly. Safe to
+       exempt: the widest this asset can ever be is 44px at --hero-h 110. */
+    max-width: none;
+    /* Reclaim the asset's 19.4% transparent side padding.
+       Padding is a fraction of WIDTH, and width is --emblem-h * 0.882 (the
+       asset's natural w/h), so each side is --emblem-h * 0.194 * 0.882 =
+       --emblem-h * 0.171. Pulling that back with negative inline margins makes
+       the VISIBLE emblem occupy the space the layout reserved for it, instead
+       of the box reserving 17px of nothing on each side. Because the visible
+       ink then ends exactly at the wrapper's edge, the 16px flex gap is the
+       real visual gap to the ministry text - the padding does not eat into it. */
+    margin-inline: calc(var(--emblem-h) * -0.171);
   }
 
-  .masthead-logo-g20 {
+  .masthead-hero .masthead-logo-g20 {
+    width: auto;
     height: var(--g20-h);
   }
 
-  .masthead-logo-azadi {
+  .masthead-hero .masthead-logo-azadi {
+    width: auto;
     height: var(--azadi-h);
   }
 
-  .masthead-portrait {
-    height: calc(var(--hero-h) - var(--portrait-gap));
-  }
-
-  /* Column caps, applied at >=1280px only. The title column is deliberately
-     absent: it is a single 41-character line needing ~402px at 13px, and the
-     22% it would otherwise be capped at resolves to 282px at 1280px, which
-     would wrap it. No column here uses flex-grow, so an uncapped column simply
-     sizes to its content and the leftover width still goes to space-between. */
-  @media (min-width: 1280px) {
-    .masthead-col-identity {
-      max-width: 32%;
-    }
-    .masthead-col-logos {
-      max-width: 26%;
-    }
-    .masthead-col-portrait {
-      max-width: 20%;
-    }
+  .masthead-hero .masthead-portrait {
+    width: auto;
+    height: var(--pm-h);
   }
 
   /* Government of India tricolour wash, per spec: #FDE7C2 -> #FFFFFF -> #DDF6D6.
@@ -265,7 +316,7 @@
   }
 }
 
-/* Announcement ticker marquee — two copies translated by -50% */
+/* Announcement ticker marquee â€” two copies translated by -50% */
 .marquee-track {
   display: flex;
   width: max-content;
@@ -310,33 +361,65 @@
   }
 }
 
-/* The hero is a single flex row: [text] [G20] [Azadi] [portrait]. The image
-   trio is right-weighted, and --masthead-gap keeps all three gaps identical.
-   Below lg the logo pair is hidden and only text + portrait remain. */
-/* Responsive ladder. Only --hero-h moves; the portrait is derived from it, so
-   the 6px gap to the navigation bar holds at every width. The logo pair is
-   hidden below 1280px (see the xl: classes in Masthead.tsx) because G20 95px +
-   Azadi 90px + 28px needs 342px, which stops fitting alongside the ministry
-   block and title at that width. */
+/* Responsive ladder. Only the size custom properties move; every rule in the
+   header block derives from them, so there is exactly one place to change a
+   size and no rule is duplicated per breakpoint.
+
+   The group scales together rather than each asset being re-decided: the PM
+   photo is the tallest element in the right-hand group and the row height is
+   derived from it, so scaling --pm-h and --hero-h together keeps the 11px of
+   breathing room above and below the group at every width.
+
+   Which assets are visible is a markup concern, not a CSS one (see the
+   hidden sm:block / xl:block classes in Masthead.tsx):
+     >= 1280px  emblem + branding + title + G20 + Azadi + PM  (full header)
+     1024-1279  logo pair and title both hidden - they only work together
+     640-1023   emblem + branding + PM
+     < 640px    PM hidden, emblem + branding only
+
+   --hero-h cannot be driven below the branding text block, which measures
+   ~68px (four lines: 15 + 20 + 17.5 + 15). That block is the tallest fixed
+   element in the header, so it - not the portrait - is what sets the floor.
+   min-height is a floor rather than a fixed height, so if the type ever
+   reflowed taller the row would grow instead of clipping. */
 @media (max-width: 1279px) {
   .masthead-hero {
-    --hero-h: 94px;
+    --hero-h: 88px;
+    --emblem-h: 64px;
+    --g20-h: 54px;
+    --azadi-h: 50px;
+    --pm-h: 62px;
+
+    /* The centre track is empty here (the title is hidden below xl), and a
+       display:none grid item is not placed, so it would consume no track - but
+       the three-column template would still auto-place the right group into
+       the CENTRE column and leave the third column empty. Switch to two
+       columns: the right track then hugs the portrait and the left track takes
+       the whole remainder.
+
+       This matters because the two tracks do not need equal content. The
+       branding needs ~370px for its longest line while the right group needs
+       ~106px (portrait 96 + 20 inset), but 1fr 1fr split them evenly and left
+       the branding only ~309px at 768px, wrapping "AI-Enabled Scholarship &
+       Fellowship Management System" onto a second line while 300px of empty
+       space sat in the right-hand track. */
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 }
 
 @media (max-width: 1023px) {
   .masthead-hero {
-    --hero-h: 88px;
+    --hero-h: 84px;
+    --emblem-h: 58px;
+    --pm-h: 60px;
   }
 }
 
 @media (max-width: 767px) {
   .masthead-hero {
-    --hero-h: 80px;
-  }
-
-  .masthead-emblem {
-    height: 34px;
+    --hero-h: 76px;
+    --emblem-h: 50px;
+    --pm-h: 52px;
   }
 }
 
@@ -369,8 +452,8 @@
 
 @media print {
   /* Shell chrome. These are the only <header>/<footer>/<aside> elements in the
-     applicant layout — Masthead and CompactNavbar both render a <header>, and
-     the sidebar is the <aside> — so the selectors do not need to reach into
+     applicant layout â€” Masthead and CompactNavbar both render a <header>, and
+     the sidebar is the <aside> â€” so the selectors do not need to reach into
      shared components to add opt-out classes. */
   header,
   footer,

@@ -1,12 +1,13 @@
-import { useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ADMIN_ACTIVITIES, ADMIN_APPLICATIONS, ADMIN_NOTIFICATIONS, DASHBOARD_STATS, SCHOLARSHIP_DISTRIBUTION_DATA } from '../data/adminMockData';
+import { useAdminAuth } from '../context/useAdminAuth';
+import { fetchSubmittedApplications } from '../services/demoAdminData';
 import { adminApplicationPath, ROUTES } from '../lib/constants';
+import type { AdminApplication } from '../types/admin';
 import { AdminIcon } from '../components/admin/AdminIcon';
 import { ApplicationTable } from '../components/admin/ApplicationTable';
 import { AdminPageHeader } from '../components/admin/AdminPageHeader';
 import { StatCard } from '../components/admin/StatCard';
-import { StatusBadge } from '../components/admin/StatusBadge';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 
@@ -14,167 +15,154 @@ function formatNumber(value: number) {
   return new Intl.NumberFormat('en-IN').format(value);
 }
 
-function formatCurrency(value: number) {
-  if (value >= 10000000) {
-    return `₹${(value / 10000000).toFixed(2)} crore`;
+function formatDate(value: string) {
+  if (!value) {
+    return 'Not recorded';
   }
-
-  return `₹${formatNumber(value)}`;
+  return new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(value));
 }
 
 export function AdminDashboard() {
-  const recentApplications = useMemo(() => ADMIN_APPLICATIONS.slice(0, 5), []);
-  const pendingApplications = useMemo(
-    () => ADMIN_APPLICATIONS.filter((application) => application.documentStatus === 'Pending Verification').slice(0, 4),
-    [],
-  );
-  const unreadNotifications = ADMIN_NOTIFICATIONS.filter((notification) => !notification.read);
+  const { session } = useAdminAuth();
+  const isDemoAdmin = session?.mode === 'demo';
+  const [applications, setApplications] = useState<AdminApplication[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  const statusSummary = [
-    { label: 'Approved', value: DASHBOARD_STATS.approvedApplications, total: DASHBOARD_STATS.totalApplications, className: 'bg-emerald-600' },
-    { label: 'Pending / under review', value: DASHBOARD_STATS.pendingApplications, total: DASHBOARD_STATS.totalApplications, className: 'bg-blue-600' },
-    { label: 'Rejected', value: DASHBOARD_STATS.rejectedApplications, total: DASHBOARD_STATS.totalApplications, className: 'bg-red-500' },
-  ];
+  useEffect(() => {
+    let active = true;
+
+    async function load() {
+      const result = await fetchSubmittedApplications();
+
+      if (!active) {
+        return;
+      }
+
+      if (result.ok) {
+        setApplications(result.rows);
+        setError('');
+      } else {
+        setApplications([]);
+        setError(result.error);
+      }
+
+      setLoading(false);
+    }
+
+    void load();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const recentApplications = applications.slice(0, 5);
+  const documentsReady = applications.filter((application) => application.documentStatus === 'Complete').length;
+  const uniqueApplicants = new Set(applications.map((application) => application.applicantId)).size;
+  const schemeCount = new Set(applications.map((application) => application.schemeId).filter(Boolean)).size;
 
   return (
     <div className="space-y-6">
       <AdminPageHeader
-        action={<Button size="md" to={ROUTES.admin.applications} variant="primary"><AdminIcon className="h-4 w-4" name="applications" /> Review applications</Button>}
-        description="Monitor application volume, document verification, scheme performance and operational activity across the scholarship lifecycle."
-        eyebrow="Operations dashboard"
-        title="Good morning, portal administrator"
+        action={<Button size="md" to={ROUTES.admin.applications} variant="outline"><AdminIcon className="h-4 w-4" name="applications" /> All applications</Button>}
+        description="Read-only overview of what applicants have actually submitted, plus the prototype screens that are not yet connected."
+        eyebrow="Administration workspace"
+        title="Dashboard"
       />
 
-      <section aria-label="Dashboard statistics" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard detail="registered applicants" icon="users" label="Total Applicants" tone="blue" value={formatNumber(DASHBOARD_STATS.totalApplicants)} />
-        <StatCard detail="all time submissions" icon="applications" label="Total Applications" tone="purple" value={formatNumber(DASHBOARD_STATS.totalApplications)} />
-        <StatCard detail="awaiting a decision" icon="clock" label="Pending Applications" tone="amber" value={formatNumber(DASHBOARD_STATS.pendingApplications)} />
-        <StatCard detail="approved applications" icon="check" label="Approved Applications" tone="green" value={formatNumber(DASHBOARD_STATS.approvedApplications)} />
-        <StatCard detail="closed applications" icon="warning" label="Rejected Applications" tone="slate" value={formatNumber(DASHBOARD_STATS.rejectedApplications)} />
-        <StatCard detail="document sets in queue" icon="documents" label="Documents Pending" tone="amber" value={formatNumber(DASHBOARD_STATS.documentsPendingVerification)} />
-        <StatCard detail="scholarships processed" icon="scholarships" label="Scholarships Disbursed" tone="green" value={formatNumber(DASHBOARD_STATS.scholarshipsDisbursed)} />
-        <StatCard detail="across all schemes" icon="bank" label="Total Amount Disbursed" tone="blue" value={formatCurrency(DASHBOARD_STATS.totalAmountDisbursed)} />
-      </section>
+      {isDemoAdmin ? (
+        <div className="rounded-md border-2 border-amber-400 bg-amber-50 px-4 py-3">
+          <p className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-amber-900">
+            <AdminIcon className="h-4 w-4" name="lock" /> Demo Admin Mode — Read Only
+          </p>
+          <p className="mt-1 text-sm leading-relaxed text-amber-900/90">
+            You are viewing real submitted applications from the scholarship portal. No applicant or
+            application data can be modified from Demo Admin.
+          </p>
+        </div>
+      ) : null}
 
-      <div className="grid gap-6 2xl:grid-cols-[minmax(0,1.65fr)_minmax(340px,0.85fr)]">
-        <section className="space-y-3" aria-labelledby="recent-applications-heading">
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-gov-saffron-dark">Application queue</p>
-              <h2 className="mt-1 text-lg font-bold text-gov-blue-dark" id="recent-applications-heading">Recent applications</h2>
-            </div>
-            <Button size="sm" to={ROUTES.admin.applications} variant="outline">View all applications <AdminIcon className="h-4 w-4" name="arrow-right" /></Button>
-          </div>
-          <ApplicationTable applications={recentApplications} />
-        </section>
+      {error ? (
+        <div aria-live="assertive" className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          <p className="font-semibold">Could not load live application figures.</p>
+          <p className="mt-1 text-xs leading-relaxed">{error}</p>
+        </div>
+      ) : null}
 
-        <section className="space-y-3" aria-labelledby="verification-queue-heading">
-          <div className="flex items-end justify-between gap-3">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-gov-saffron-dark">Action required</p>
-              <h2 className="mt-1 text-lg font-bold text-gov-blue-dark" id="verification-queue-heading">Pending verifications</h2>
-            </div>
-            <Button size="sm" to={ROUTES.admin.documentVerification} variant="outline">Open queue</Button>
-          </div>
-          <Card className="divide-y divide-slate-100" accentClass="">
-            {pendingApplications.length > 0 ? pendingApplications.map((application) => (
-              <div className="flex items-center gap-3 p-4" key={application.id}>
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-50 text-amber-700"><AdminIcon className="h-4 w-4" name="documents" /></span>
-                <div className="min-w-0 flex-1">
-                  <Link className="block truncate text-sm font-bold text-slate-800 hover:text-gov-blue" to={adminApplicationPath(application.id)}>{application.applicantName}</Link>
-                  <p className="mt-1 truncate text-xs text-slate-500">{application.id} · {application.schemeName}</p>
-                </div>
-                <StatusBadge status="Under Verification" />
-              </div>
-            )) : <p className="p-5 text-sm text-slate-500">No documents are waiting for verification.</p>}
-          </Card>
-        </section>
+      {isDemoAdmin && !loading && !error ? (
+        <div className="rounded-md border border-blue-100 bg-blue-50 px-4 py-3 text-xs leading-relaxed text-blue-900">
+          Every figure on this dashboard is read live from the portal database through a select-only
+          policy. None of it is sample content, and none of it can be edited from here.
+        </div>
+      ) : null}
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard detail="Applications with status = submitted" icon="applications" label="Submitted applications" tone="blue" value={loading ? '—' : formatNumber(applications.length)} />
+        <StatCard detail="Distinct applicants who submitted" icon="user" label="Applicants" tone="green" value={loading ? '—' : formatNumber(uniqueApplicants)} />
+        <StatCard detail="Schemes these applications target" icon="scholarships" label="Schemes in use" tone="purple" value={loading ? '—' : formatNumber(schemeCount)} />
+        <StatCard detail="Submitted with every mandatory document attached" icon="check" label="Document-complete" tone="amber" value={loading ? '—' : formatNumber(documentsReady)} />
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-3">
-        <section aria-labelledby="status-summary-heading">
-          <Card className="h-full p-5" accentClass="">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-gov-saffron-dark">Portfolio view</p>
-                <h2 className="mt-1 text-lg font-bold text-gov-blue-dark" id="status-summary-heading">Application status</h2>
-              </div>
-              <AdminIcon className="h-5 w-5 text-slate-400" name="reports" />
-            </div>
-            <div className="mt-5 space-y-4">
-              {statusSummary.map((item) => {
-                const percentage = Math.round((item.value / item.total) * 100);
-                return (
-                  <div key={item.label}>
-                    <div className="flex items-center justify-between gap-3 text-xs"><span className="font-semibold text-slate-600">{item.label}</span><span className="font-bold text-slate-800">{formatNumber(item.value)} <span className="font-normal text-slate-400">({percentage}%)</span></span></div>
-                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100"><div className={`h-full rounded-full ${item.className}`} style={{ width: `${percentage}%` }} /></div>
-                  </div>
-                );
-              })}
-            </div>
-            <div className="mt-5 border-t border-slate-100 pt-4 text-xs text-slate-500">Decision totals are demo aggregates and will be replaced by API reporting.</div>
-          </Card>
-        </section>
-
-        <section aria-labelledby="scholarship-summary-heading">
-          <Card className="h-full p-5" accentClass="">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-gov-saffron-dark">Scheme portfolio</p>
-                <h2 className="mt-1 text-lg font-bold text-gov-blue-dark" id="scholarship-summary-heading">Scholarship summary</h2>
-              </div>
-              <AdminIcon className="h-5 w-5 text-slate-400" name="scholarships" />
-            </div>
-            <div className="mt-4 space-y-3">
-              {SCHOLARSHIP_DISTRIBUTION_DATA.map((item) => (
-                <div className="rounded-md bg-slate-50 p-3" key={item.name}>
-                  <div className="flex items-center justify-between gap-2 text-xs"><span className="font-semibold text-slate-700">{item.name}</span><span className="font-bold text-gov-blue">{item.percentage}%</span></div>
-                  <div className="mt-2 flex items-center justify-between text-[11px] text-slate-500"><span>{formatNumber(item.applicants)} applicants</span><span>{formatCurrency(item.amount)}</span></div>
-                </div>
-              ))}
-            </div>
-          </Card>
-        </section>
-
-        <section aria-labelledby="activity-heading">
-          <Card className="h-full p-5" accentClass="">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-gov-saffron-dark">Audit trail</p>
-                <h2 className="mt-1 text-lg font-bold text-gov-blue-dark" id="activity-heading">Recent activities</h2>
-              </div>
-              <AdminIcon className="h-5 w-5 text-slate-400" name="clock" />
-            </div>
-            <div className="mt-4 space-y-4">
-              {ADMIN_ACTIVITIES.slice(0, 4).map((activity) => (
-                <div className="flex gap-3" key={activity.id}>
-                  <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${activity.tone === 'green' ? 'bg-emerald-500' : activity.tone === 'amber' ? 'bg-amber-500' : activity.tone === 'blue' ? 'bg-blue-500' : 'bg-slate-400'}`} />
-                  <div className="min-w-0"><p className="text-xs leading-relaxed text-slate-700"><span className="font-bold">{activity.actor}</span> {activity.action} <span className="font-semibold text-gov-blue">{activity.target}</span></p><p className="mt-1 text-[11px] text-slate-400">{activity.timestamp}</p></div>
-                </div>
-              ))}
-            </div>
-          </Card>
-        </section>
-      </div>
-
-      <section aria-labelledby="dashboard-notifications-heading">
-        <Card className="p-5" accentClass="">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-gov-saffron-dark">Attention centre</p>
-              <h2 className="mt-1 text-lg font-bold text-gov-blue-dark" id="dashboard-notifications-heading">Latest notifications</h2>
-            </div>
-            <Button size="sm" to={ROUTES.admin.notifications} variant="outline">Manage notifications</Button>
+      <div className="grid gap-6 xl:grid-cols-[1.6fr_1fr]">
+        <Card className="overflow-hidden" accentClass="">
+          <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
+            <div><h2 className="text-lg font-bold text-gov-blue-dark">Latest submitted applications</h2><p className="mt-1 text-xs text-slate-500">Read live from the portal database.</p></div>
+            <Button size="sm" to={ROUTES.admin.applications} variant="outline">View all</Button>
           </div>
-          <div className="mt-4 grid gap-3 md:grid-cols-3">
-            {unreadNotifications.map((notification) => (
-              <Link className="rounded-md border border-slate-100 bg-slate-50 p-4 transition hover:border-blue-200 hover:bg-blue-50" key={notification.id} to={notification.href}>
-                <div className="flex items-start gap-3"><span className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-gov-saffron" /><div><p className="text-sm font-bold text-slate-800">{notification.title}</p><p className="mt-1 line-clamp-2 text-xs leading-relaxed text-slate-600">{notification.message}</p><p className="mt-2 text-[11px] text-slate-400">{notification.timestamp}</p></div></div>
-              </Link>
-            ))}
-          </div>
+          {loading ? (
+            <div aria-live="polite" className="px-5 py-10 text-center text-sm text-slate-600">Loading submitted applications…</div>
+          ) : recentApplications.length === 0 ? (
+            <div className="px-5 py-10 text-center">
+              <p className="text-sm font-semibold text-slate-800">Nothing has been submitted yet</p>
+              <p className="mx-auto mt-2 max-w-md text-xs leading-relaxed text-slate-500">
+                No application is in the submitted state, so there is no live activity to show. Once an applicant
+                completes the declaration and presses Submit, it appears here and on the Applications screen.
+              </p>
+            </div>
+          ) : (
+            <ApplicationTable applications={recentApplications} />
+          )}
         </Card>
-      </section>
+
+        <div className="space-y-6">
+          <Card className="p-5" accentClass="">
+            <div className="flex items-center gap-3"><span className="flex h-9 w-9 items-center justify-center rounded-md bg-amber-50 text-amber-700"><AdminIcon className="h-5 w-5" name="documents" /></span><div><h2 className="text-lg font-bold text-gov-blue-dark">Submitted by scheme</h2><p className="text-xs text-slate-500">Live counts</p></div></div>
+            {loading ? (
+              <p className="mt-4 text-xs text-slate-500">Loading…</p>
+            ) : schemeCount === 0 ? (
+              <p className="mt-4 text-xs text-slate-500">No submitted applications to group yet.</p>
+            ) : (
+              <ul className="mt-4 space-y-2">
+                {Array.from(new Set(applications.map((application) => application.schemeName))).map((name) => (
+                  <li className="flex items-center justify-between gap-3 text-sm" key={name}>
+                    <span className="truncate text-slate-700">{name}</span>
+                    <span className="font-bold text-gov-blue">{applications.filter((application) => application.schemeName === name).length}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+
+          <Card className="p-5" accentClass="">
+            <div className="flex items-center gap-3"><span className="flex h-9 w-9 items-center justify-center rounded-md bg-blue-50 text-gov-blue"><AdminIcon className="h-5 w-5" name="user" /></span><div><h2 className="text-lg font-bold text-gov-blue-dark">Recently submitted</h2><p className="text-xs text-slate-500">Live from the database</p></div></div>
+            {loading ? (
+              <p className="mt-4 text-xs text-slate-500">Loading…</p>
+            ) : recentApplications.length === 0 ? (
+              <p className="mt-4 text-xs text-slate-500">No submissions yet.</p>
+            ) : (
+              <ul className="mt-4 space-y-3">
+                {recentApplications.map((application) => (
+                  <li key={application.id}>
+                    <Link className="text-sm font-semibold text-gov-blue hover:underline" to={adminApplicationPath(application.id)}>{application.applicantName}</Link>
+                    <p className="mt-0.5 text-[11px] text-slate-500">{application.schemeName} · {formatDate(application.applicationDate)}</p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+        </div>
+      </div>
     </div>
   );
 }

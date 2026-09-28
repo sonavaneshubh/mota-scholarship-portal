@@ -5,8 +5,18 @@ import { useApplicantAuth } from '../../context/useApplicantAuth';
 import { useAdminAuth } from '../../context/useAdminAuth';
 import { ROUTES } from '../../lib/constants';
 import { isSupabaseConfigured, supabaseConfigNotice } from '../../lib/supabase';
+import {
+  getRegistrationErrors,
+  isValidOtp,
+  isValidUsername,
+  OTP_LENGTH,
+  RESEND_COOLDOWN_SECONDS,
+} from '../../lib/registrationConfig';
+import { completeRegistration, resendOtp, startRegistration, verifyOtp } from '../../services/auth/registrationOtpService';
+import type { RegistrationChannel, StartRegistrationData } from '../../services/auth/registrationOtpService';
 import type { HomeAuthMode, HomeAuthNavigationState } from '../../types';
 import { Button } from '../ui/Button';
+import { OtpInput } from '../auth/OtpInput';
 
 interface LoginErrors {
   username?: string;
@@ -50,7 +60,6 @@ interface HomeLoginCardProps {
 
 const captchaAlphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const usernamePattern = /^[A-Za-z][A-Za-z0-9._]{3,31}$/;
 
 function createCaptchaCode() {
   const values = globalThis.crypto.getRandomValues(new Uint32Array(6));
@@ -104,10 +113,6 @@ function getRequestedHomeAuthMode(state: unknown, pathname: string): HomeAuthMod
     return 'registration';
   }
 
-  if (pathname === ROUTES.admin.login) {
-    return 'admin';
-  }
-
   return null;
 }
 
@@ -121,24 +126,6 @@ function getLoginUsernameError(username: string) {
   return emailPattern.test(value) ? '' : 'Enter a valid email address.';
 }
 
-function getApplicantNameError(applicantName: string) {
-  const value = applicantName.trim().replace(/\s+/g, ' ');
-
-  if (!value) {
-    return 'Enter the applicant name.';
-  }
-
-  if (value.length < 2) {
-    return 'Enter the full applicant name.';
-  }
-
-  if (value.length > 80) {
-    return 'Enter an applicant name within 80 characters.';
-  }
-
-  return '';
-}
-
 function getRegistrationUsernameError(username: string) {
   const value = username.trim();
 
@@ -146,47 +133,14 @@ function getRegistrationUsernameError(username: string) {
     return 'Enter a username.';
   }
 
-  if (!usernamePattern.test(value)) {
+  // The rule itself lives in registrationConfig, beside the copy the server
+  // applies, so the guidance shown while typing cannot drift from the rule that
+  // is actually enforced.
+  if (!isValidUsername(value)) {
     return 'Use 4–32 characters, start with a letter, and include only letters, numbers, dots, or underscores.';
   }
 
   return '';
-}
-
-function getRegistrationPasswordError(password: string) {
-  if (!password) {
-    return 'Enter a password.';
-  }
-
-  const valid =
-    password.length >= 10 &&
-    /[A-Z]/.test(password) &&
-    /[a-z]/.test(password) &&
-    /\d/.test(password) &&
-    /[^A-Za-z0-9\s]/.test(password);
-
-  return valid ? '' : 'Use at least 10 characters with uppercase, lowercase, number, and symbol.';
-}
-
-function getEmailError(email: string) {
-  const value = email.trim();
-
-  if (!value) {
-    return 'Enter your email address.';
-  }
-
-  return emailPattern.test(value) ? '' : 'Enter a valid Email ID.';
-}
-
-function getMobileError(mobile: string) {
-  const value = mobile.trim();
-
-  if (!value) {
-    return '';
-  }
-
-  const normalized = value.replace(/[\s()-]/g, '');
-  return /^\+?[0-9]{10,15}$/.test(normalized) ? '' : 'Enter a valid mobile number with country code if needed.';
 }
 
 function getCaptchaError(value: string, code: string) {
@@ -223,12 +177,30 @@ function CaptchaFields({
   const errorId = `${inputId}-error`;
 
   return (
-    <>
+    /*
+     * The code and the field that types it share one row from sm up. Stacked,
+     * these two blocks cost 58px + 52px plus a gap; side by side they cost one
+     * 40px control row, which is where most of this card's height saving comes
+     * from. It needs the card to be a col-span-5 (about 514px) rather than
+     * col-span-4 (about 405px) - at 405 the code box, the refresh button and the
+     * input cannot share a row without squeezing the 6-character code.
+     *
+     * The refresh button keeps its full accessible name via aria-label/title
+     * while the visible text shortens to "Refresh", which is what makes the row
+     * fit; it sits directly under a "CAPTCHA" label, so the context is there.
+     * Below sm the grid collapses back to one column and nothing is lost.
+     */
+    <div className="grid gap-2 sm:grid-cols-2 sm:gap-3">
       <div>
-        <span className="block text-xs font-semibold text-slate-700 mb-1">CAPTCHA</span>
+        <span className="block text-xs font-semibold text-slate-700 mb-0.5">CAPTCHA</span>
         <div className="flex items-center gap-2">
 
-          <div className="flex min-w-0 flex-1 items-center justify-center rounded border border-slate-300 bg-slate-100 px-3 py-2">
+          {/* h-[34px] matches getInputClass exactly (px-2.5 py-2 text-xs =
+              8 + 8 + 16 + 2px border). The code box was 38px and the button
+              40px, so the three controls in this row were visibly ragged; all
+              three now sit on the same 34px line as the email and password
+              inputs above them. */}
+          <div className="flex h-[34px] min-w-0 flex-1 items-center justify-center rounded border border-slate-300 bg-slate-100 px-2">
             <span
               className="font-mono text-sm font-bold tracking-[0.3em] text-gov-blue-dark"
               id={codeId}
@@ -238,19 +210,21 @@ function CaptchaFields({
             </span>
           </div>
           <Button
-            className="min-h-11 flex-shrink-0 rounded px-3 text-[11px]"
+            aria-label="Refresh CAPTCHA"
+            className="h-[34px] flex-shrink-0 rounded px-2 text-[11px]"
             onClick={onRefresh}
             size="md"
+            title="Refresh CAPTCHA"
             type="button"
             variant="outline"
           >
-            Refresh CAPTCHA
+            Refresh
           </Button>
         </div>
       </div>
 
       <div>
-        <label className="block text-xs font-semibold text-slate-700 mb-1" htmlFor={inputId}>
+        <label className="block text-xs font-semibold text-slate-700 mb-0.5" htmlFor={inputId}>
           Enter CAPTCHA
         </label>
         <input
@@ -267,7 +241,7 @@ function CaptchaFields({
           aria-invalid={Boolean(error)}
           aria-describedby={describeIds(codeId, error ? errorId : undefined)}
           onChange={(event) => onChange(event.target.value)}
-          className={`${getInputClass(Boolean(error))} uppercase tracking-wider`}
+          className={`${getInputClass(Boolean(error), 'h-[34px]')} uppercase tracking-wider`}
         />
         {error ? (
           <p className="mt-1 text-[11px] font-medium text-red-700" id={errorId}>
@@ -275,15 +249,15 @@ function CaptchaFields({
           </p>
         ) : null}
       </div>
-    </>
+    </div>
   );
 }
 
 export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
   const location = useLocation();
   const navigate = useNavigate();
-  const { signIn, signUp, signOut, resetPassword } = useApplicantAuth();
-  const { signIn: signInAdmin } = useAdminAuth();
+  const { signIn, signOut, resetPassword } = useApplicantAuth();
+  const { signIn: signInAdmin, signInDemo } = useAdminAuth();
   const requestedMode = getRequestedHomeAuthMode(location.state, location.pathname);
   const [mode, setMode] = useState<HomeAuthMode>(() => requestedMode ?? 'applicant');
   const [loginUsername, setLoginUsername] = useState('');
@@ -295,6 +269,43 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
   const [captchaInput, setCaptchaInput] = useState('');
   const [loginErrors, setLoginErrors] = useState<LoginErrors>({});
   const [registrationErrors, setRegistrationErrors] = useState<RegistrationErrors>({});
+  /**
+   * Non-null once the form has been accepted and both codes are on their way.
+   * Its presence is what swaps the registration form for the two verification
+   * steps, so the applicant cannot go back to editing a submission that has
+   * already been sent.
+   */
+  const [pendingAttempt, setPendingAttempt] = useState<StartRegistrationData | null>(null);
+  /**
+   * The chosen password, held for the length of the verification steps and sent
+   * once, when the applicant completes registration. Deliberately React state
+   * and nothing else: it is never written to localStorage or sessionStorage, so
+   * a refresh loses it and the final step asks for it again rather than leaving
+   * a plaintext copy in browser storage.
+   */
+  const [pendingPassword, setPendingPassword] = useState('');
+  /**
+   * The two codes, entered side by side on this same registration page.
+   *
+   * They are deliberately both visible at once rather than one channel at a
+   * time. The applicant already has both messages on their phone, and making
+   * them retype one code, wait for a panel swap, and then find the second box
+   * is the part of this flow that used to be the most confusing. The server is
+   * still the authority: `completeRegistration` refuses unless both proofs are
+   * already recorded, so showing both boxes decides nothing.
+   */
+  const [emailOtp, setEmailOtp] = useState('');
+  const [mobileOtp, setMobileOtp] = useState('');
+  const [emailOtpVerified, setEmailOtpVerified] = useState(false);
+  const [mobileOtpVerified, setMobileOtpVerified] = useState(false);
+  const [otpErrors, setOtpErrors] = useState<{ email?: string; mobile?: string }>({});
+  const [otpNotice, setOtpNotice] = useState('');
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
+  const [isCompletingRegistration, setIsCompletingRegistration] = useState(false);
+  const [resendCooldownUntil, setResendCooldownUntil] = useState(0);
+  // Drives the countdown label. One timer for both channels, cleared when the
+  // wait is over, rather than one per resend.
+  const [resendTick, setResendTick] = useState(() => Date.now());
   const [status, setStatus] = useState('');
   /**
    * Whether `status` reports a failure or a neutral notice.
@@ -307,6 +318,8 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
   const [statusTone, setStatusTone] = useState<'info' | 'error'>('info');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const [isDemoSubmitting, setIsDemoSubmitting] = useState(false);
+  const [demoAdminError, setDemoAdminError] = useState('');
   const headingRef = useRef<HTMLHeadingElement>(null);
   const loginUsernameRef = useRef<HTMLInputElement>(null);
   const loginPasswordRef = useRef<HTMLInputElement>(null);
@@ -331,7 +344,21 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
   const cardClassName = `bg-white/95 text-slate-900 rounded-lg shadow-lg border border-slate-200 scroll-mt-24 ${
     isRegistration
       ? 'p-3 lg:col-span-6 lg:h-auto lg:overflow-visible lg:flex lg:flex-col'
-      : 'p-4 lg:col-span-4 lg:col-start-9 lg:h-auto lg:overflow-visible lg:flex lg:flex-col'
+      : /*
+          lg:max-w-[440px] trims the card from the 515px that col-span-5 gives
+          at 1366px, and justify-self-end keeps its right edge on the
+          container's right edge, so the space that comes back falls in the gap
+          between the two columns instead of dangling off the page margin.
+          Below ~1000px the column is already narrower than 440px, the cap does
+          not bite, and the card just fills the track.
+
+          440px is the floor while the CAPTCHA row stays on one line: it leaves
+          (440 - 24px padding - 12px gutter) / 2 = 202px per column, and the
+          code box plus the Refresh button need about 166px of that. The code
+          box is min-w-0 flex-1, so below this width the code would start to
+          compress against the button rather than the layout overflowing.
+        */
+        'p-3 lg:col-span-5 lg:col-start-8 lg:max-w-[440px] lg:justify-self-end lg:h-auto lg:overflow-visible lg:flex lg:flex-col'
   }`;
 
   useEffect(() => {
@@ -351,6 +378,10 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
     setRegistrationErrors({});
     setStatus('');
     setStatusTone('info');
+    setDemoAdminError('');
+    setIsDemoSubmitting(false);
+    setPendingAttempt(null);
+    setPendingPassword('');
   }, []);
 
   const focusCardHeading = useCallback((shouldScroll: boolean) => {
@@ -385,9 +416,44 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
     focusCardHeading(true);
   }, [focusCardHeading, location.key, location.pathname, requestedMode, resetCard]);
 
+  useEffect(() => {
+    if (resendCooldownUntil <= Date.now()) {
+      return;
+    }
+
+    const timer = window.setInterval(() => setResendTick(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [resendCooldownUntil]);
+
   function switchMode(nextMode: HomeAuthMode) {
     resetCard(nextMode);
     focusCardHeading(false);
+  }
+
+  /**
+   * Abandons an in-flight registration and returns to the form.
+   *
+   * The attempt itself is left to expire on the server, which is what releases
+   * the email address and the mobile number for a genuine second try. Deleting
+   * it here would let anyone cancel somebody else's attempt by guessing an id,
+   * and would free the number while the codes are still deliverable.
+   */
+  function handleRegistrationRestart() {
+    setPendingAttempt(null);
+    setPendingPassword('');
+    setEmailOtp('');
+    setMobileOtp('');
+    setEmailOtpVerified(false);
+    setMobileOtpVerified(false);
+    setOtpErrors({});
+    setOtpNotice('');
+    setResendCooldownUntil(0);
+    setCaptchaCode(createCaptchaCode());
+    setCaptchaInput('');
+    setRegistrationErrors({});
+    setStatus('');
+    setStatusTone('info');
+    focusCardHeading(true);
   }
 
   function updateLoginUsername(value: string) {
@@ -420,8 +486,14 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
     setCaptchaInput('');
     setLoginErrors((current) => ({ ...current, captcha: '' }));
     setRegistrationErrors((current) => ({ ...current, captcha: '' }));
-    setStatusTone('info');
-    setStatus('CAPTCHA refreshed.');
+    /*
+      Deliberately silent. This used to set "CAPTCHA refreshed.", which pushed a
+      status paragraph into the form between the CAPTCHA row and the Login
+      button and shoved the button down every time the code was refreshed. The
+      code visibly changing is the whole feedback, so the status line is only
+      cleared here, never written.
+    */
+    setStatus('');
   }
 
   async function handleLoginSubmit(event: FormEvent<HTMLFormElement>) {
@@ -503,16 +575,7 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
     event.preventDefault();
 
     const nextErrors: RegistrationErrors = {
-      applicantName: getApplicantNameError(registrationValues.applicantName),
-      username: getRegistrationUsernameError(registrationValues.username),
-      password: getRegistrationPasswordError(registrationValues.password),
-      confirmPassword: !registrationValues.confirmPassword
-        ? 'Confirm the password.'
-        : registrationValues.confirmPassword === registrationValues.password
-          ? ''
-          : 'Passwords do not match.',
-      email: getEmailError(registrationValues.email),
-      mobile: getMobileError(registrationValues.mobile),
+      ...getRegistrationErrors(registrationValues),
       captcha: getCaptchaError(captchaInput, captchaCode),
     };
 
@@ -554,43 +617,275 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
     }
 
     setIsSubmitting(true);
+    setStatus('');
+    setStatusTone('info');
 
     try {
-      const result = await signUp({
+      /*
+       * Nothing is created here. This call only asks the server to open an
+       * attempt and send the two codes, and it is the server that checks the
+       * address and the number against the registered applicants. A duplicate
+       * therefore comes back as a message on this form, before anything has
+       * been sent and before any account exists.
+       */
+      const result = await startRegistration({
         email: registrationValues.email,
-        password: registrationValues.password,
+        mobile: registrationValues.mobile,
         fullName: registrationValues.applicantName,
         username: registrationValues.username,
-        mobile: registrationValues.mobile,
+        password: registrationValues.password,
       });
 
-      if (!result.success) {
+      if (!result.ok) {
         setStatusTone('error');
-        setStatus(result.error ?? 'Registration could not be completed. Please try again.');
+        setStatus(result.message);
+
+        // The server is the authority on which field is the problem, so its
+        // answer is mapped back onto the field it belongs to.
+        if (result.code === 'EMAIL_TAKEN' || result.code === 'INVALID_EMAIL') {
+          setRegistrationErrors((current) => ({ ...current, email: result.message }));
+          emailRef.current?.focus();
+        }
+
+        if (result.code === 'MOBILE_TAKEN' || result.code === 'INVALID_MOBILE') {
+          setRegistrationErrors((current) => ({ ...current, mobile: result.message }));
+          mobileRef.current?.focus();
+        }
+
+        if (result.code === 'WEAK_PASSWORD') {
+          setRegistrationErrors((current) => ({ ...current, password: result.message }));
+          registrationPasswordRef.current?.focus();
+        }
+
+        if (result.code === 'INVALID_USERNAME') {
+          setRegistrationErrors((current) => ({ ...current, username: result.message }));
+          registrationUsernameRef.current?.focus();
+        }
+
         return;
       }
 
+      // The codes are away. From here the password is no longer on the form, so
+      // it moves out of the inputs and into the single piece of state the
+      // verification steps need, and out of the two password inputs below.
+      setPendingPassword(registrationValues.password);
       setRegistrationValues((current) => ({ ...current, password: '', confirmPassword: '' }));
       setShowRegistrationPassword(false);
       setShowConfirmPassword(false);
-
-      if (result.requiresEmailConfirmation) {
-        setStatus('Account created. Check your email to confirm your address before signing in.');
-        return;
-      }
-
-      if (result.role !== 'applicant') {
-        await signOut();
-        setStatusTone('error');
-        setStatus('This account is not authorized for applicant access.');
-        return;
-      }
-
-      setStatusTone('info');
-      setStatus('Account created. Redirecting to your dashboard.');
-      navigate(ROUTES.applicant.dashboard);
+      setPendingAttempt(result);
     } finally {
       setIsSubmitting(false);
+    }
+  }
+
+  const resendSecondsLeft = Math.max(0, Math.ceil((resendCooldownUntil - resendTick) / 1000));
+  const isOtpBusy = isVerifyingOtp || isCompletingRegistration;
+
+  function startResendCooldown(seconds?: number) {
+    const wait = seconds && seconds > 0 ? seconds : RESEND_COOLDOWN_SECONDS;
+    setResendCooldownUntil(Date.now() + wait * 1000);
+    setResendTick(Date.now());
+  }
+
+  function clearOtpError(channel: RegistrationChannel) {
+    setOtpErrors((current) => (channel === 'email' ? { ...current, email: '' } : { ...current, mobile: '' }));
+  }
+
+  /**
+   * Sends a fresh code for one channel, subject to the server's cooldown.
+   *
+   * The code already typed into that box is dropped, because a resent code
+   * invalidates the one it replaces and leaving it in place invites a second,
+   * avoidable wrong-code failure.
+   */
+  async function handleResendOtp(channel: RegistrationChannel) {
+    if (!pendingAttempt || resendSecondsLeft > 0 || isOtpBusy) {
+      return;
+    }
+
+    setIsVerifyingOtp(true);
+    clearOtpError(channel);
+    setOtpNotice('');
+
+    try {
+      const result = await resendOtp(pendingAttempt.attemptId, channel);
+
+      if (!result.ok) {
+        if (result.code === 'RESEND_COOLDOWN') {
+          startResendCooldown(result.retryAfterSeconds);
+        }
+
+        setOtpErrors((current) =>
+          channel === 'email' ? { ...current, email: result.message } : { ...current, mobile: result.message },
+        );
+        return;
+      }
+
+      startResendCooldown(result.resendCooldownSeconds);
+
+      if (channel === 'email') {
+        setEmailOtp('');
+      } else {
+        setMobileOtp('');
+      }
+
+      setOtpNotice(
+        `A new code was sent to ${channel === 'email' ? pendingAttempt.maskedEmail : pendingAttempt.maskedMobile}.`,
+      );
+    } finally {
+      setIsVerifyingOtp(false);
+    }
+  }
+
+  /**
+   * Verifies one channel and records the outcome.
+   *
+   * The failure message is returned rather than thrown so the caller can put it
+   * under the box it belongs to, instead of reporting one channel's problem as a
+   * generic failure of the whole form.
+   */
+  async function verifyOtpChannel(
+    attempt: StartRegistrationData,
+    channel: RegistrationChannel,
+    token: string,
+  ): Promise<string> {
+    const result = await verifyOtp(attempt.attemptId, channel, token);
+
+    if (!result.ok) {
+      if (result.code === 'OTP_EXPIRED' || result.code === 'OTP_LOCKED') {
+        startResendCooldown(RESEND_COOLDOWN_SECONDS);
+      }
+
+      return result.message;
+    }
+
+    // The server reports the state of both proofs, so a channel that was proven
+    // in another tab, or before a refresh, is credited here rather than being
+    // asked for a second time.
+    if (channel === 'email') {
+      setEmailOtpVerified(true);
+    } else {
+      setMobileOtpVerified(true);
+    }
+
+    if (result.emailVerified) {
+      setEmailOtpVerified(true);
+    }
+
+    if (result.mobileVerified) {
+      setMobileOtpVerified(true);
+    }
+
+    return '';
+  }
+
+  /**
+   * Checks both codes on this page, then finishes the registration, then sends
+   * the applicant straight to the login page.
+   *
+   * Both channels are verified in one pass, in the order they appear on the
+   * form, and the account is completed only once the server has recorded both
+   * proofs. The local "already verified" flags decide which codes still need
+   * checking; they never decide the outcome, because `completeRegistration` is
+   * refused by the server unless the database agrees.
+   */
+  async function handleOtpSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const attempt = pendingAttempt;
+
+    if (!attempt) {
+      return;
+    }
+
+    const password = pendingPassword;
+
+    if (!password) {
+      // The password is held in memory only, so a refresh loses it. It is asked
+      // for again here rather than written anywhere to survive a reload.
+      setOtpErrors({ email: 'Enter the password you chose to finish registration.', mobile: '' });
+      document.getElementById('home-registration-otp-password')?.focus();
+      return;
+    }
+
+    // Every channel that is not already proven needs a well-formed code, and the
+    // applicant is told which box is at fault before anything is sent.
+    const nextErrors: { email?: string; mobile?: string } = {};
+    let firstInvalidChannel: RegistrationChannel | null = null;
+
+    if (!emailOtpVerified && !isValidOtp(emailOtp)) {
+      nextErrors.email = `Enter the ${OTP_LENGTH}-digit code sent to ${attempt.maskedEmail}.`;
+      firstInvalidChannel = firstInvalidChannel ?? 'email';
+    }
+
+    if (!mobileOtpVerified && !isValidOtp(mobileOtp)) {
+      nextErrors.mobile = `Enter the ${OTP_LENGTH}-digit code sent to ${attempt.maskedMobile}.`;
+      firstInvalidChannel = firstInvalidChannel ?? 'mobile';
+    }
+
+    setOtpErrors(nextErrors);
+    setOtpNotice('');
+
+    if (firstInvalidChannel) {
+      const firstBoxId = firstInvalidChannel === 'email' ? 'home-registration-email-otp' : 'home-registration-mobile-otp';
+      const firstBox = document.getElementById(`${firstBoxId}-0`);
+      firstBox?.scrollIntoView({ block: 'center' });
+      firstBox?.focus();
+      return;
+    }
+
+    setIsVerifyingOtp(true);
+
+    try {
+      if (!emailOtpVerified) {
+        const failure = await verifyOtpChannel(attempt, 'email', emailOtp.trim());
+
+        if (failure) {
+          setOtpErrors((current) => ({ ...current, email: failure }));
+          return;
+        }
+      }
+
+      if (!mobileOtpVerified) {
+        const failure = await verifyOtpChannel(attempt, 'mobile', mobileOtp.trim());
+
+        if (failure) {
+          setOtpErrors((current) => ({ ...current, mobile: failure }));
+          return;
+        }
+      }
+
+      setIsVerifyingOtp(false);
+      setIsCompletingRegistration(true);
+      setOtpNotice('Both codes accepted. Creating your account…');
+
+      const result = await completeRegistration(attempt.attemptId, password);
+
+      if (!result.ok) {
+        setOtpNotice('');
+
+        if (result.code === 'NOT_VERIFIED') {
+          // The server is the authority on which proof is missing. Trusting it
+          // over the local flags is what stops a tampered flag from completing
+          // this form.
+          setEmailOtpVerified(Boolean((result as { emailVerified?: boolean }).emailVerified));
+          setMobileOtpVerified(Boolean((result as { mobileVerified?: boolean }).mobileVerified));
+        }
+
+        setOtpErrors({ email: result.message, mobile: '' });
+        return;
+      }
+
+      setOtpNotice('Registration successful. Taking you to Login…');
+
+      // Straight to the login page, as a completed registration should. Not to
+      // the dashboard: there is no session yet, because nothing has been signed
+      // in, and the applicant is expected to prove they know the password they
+      // just chose.
+      window.setTimeout(() => navigate(ROUTES.applicant.login, { replace: true }), 900);
+    } finally {
+      setIsVerifyingOtp(false);
+      setIsCompletingRegistration(false);
     }
   }
 
@@ -622,13 +917,39 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
     }
   }
 
+  /**
+   * One-click Demo Admin entry. The browser asks the deployed
+   * `demo-admin-session` Edge Function for a session on the read-only account -
+   * no credential is collected here, so nothing secret reaches the card. On
+   * failure only the one generic message is shown.
+   */
+  async function handleOpenDemoAdmin() {
+    setStatus('');
+    setStatusTone('info');
+    setDemoAdminError('');
+    setIsDemoSubmitting(true);
+
+    try {
+      const result = await signInDemo(true);
+
+      if (!result.ok) {
+        setDemoAdminError('Unable to open Demo Admin. Please try again.');
+        return;
+      }
+
+      navigate(ROUTES.admin.dashboard);
+    } finally {
+      setIsDemoSubmitting(false);
+    }
+  }
+
   return (
     <div
       id="home-login"
       className={cardClassName}
       data-purpose="home-login-card"
     >
-      <div className="flex items-center justify-between gap-3 border-b border-slate-200 pb-1.5 mb-2 lg:shrink-0">
+      <div className="flex items-center justify-between gap-3 border-b border-slate-200 pb-1 mb-1.5 lg:shrink-0">
         <h3
           ref={headingRef}
           id="home-authentication-card-heading"
@@ -657,18 +978,20 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
       ) : null}
 
       {isRegistration ? (
-        <form
-          className="grid gap-2 md:grid-cols-2 lg:min-h-0 lg:overflow-visible"
-          aria-labelledby="home-authentication-card-heading"
-          noValidate
-          onSubmit={handleRegistrationSubmit}
-        >
-          <p className="rounded border border-amber-300 bg-amber-50 px-2 py-1.5 text-[10px] leading-snug text-amber-900 md:col-span-2">
-            Your account is secured by Supabase Auth. Email confirmation is required when enabled by the project administrator.
-          </p>
+          <form
+            className="grid gap-2 md:grid-cols-2 lg:min-h-0 lg:overflow-visible"
+            aria-labelledby="home-authentication-card-heading"
+            noValidate
+            onSubmit={pendingAttempt ? handleOtpSubmit : handleRegistrationSubmit}
+          >
+            <p className="rounded border border-amber-300 bg-amber-50 px-2 py-1.5 text-[10px] leading-snug text-amber-900 md:col-span-2">
+              Your account is secured by Supabase Auth. We will send a verification code to your email address
+              and a second code to your mobile number. Both must be entered here before the account is
+              created, so there is no confirmation link to click and no email to open after registering.
+            </p>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1" htmlFor="home-registration-name">
+            <label className="block text-xs font-semibold text-slate-700 mb-0.5" htmlFor="home-registration-name">
               Applicant Name
             </label>
             <input
@@ -680,6 +1003,7 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
               placeholder="Enter full applicant name"
               autoComplete="name"
               required
+              disabled={Boolean(pendingAttempt)}
               aria-invalid={Boolean(registrationErrors.applicantName)}
               aria-describedby={registrationErrors.applicantName ? 'home-registration-name-error' : undefined}
               onChange={(event) => updateRegistrationField('applicantName', event.target.value)}
@@ -693,7 +1017,7 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1" htmlFor="home-registration-username">
+            <label className="block text-xs font-semibold text-slate-700 mb-0.5" htmlFor="home-registration-username">
               Username
             </label>
             <input
@@ -707,6 +1031,7 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
               autoCapitalize="none"
               spellCheck={false}
               required
+              disabled={Boolean(pendingAttempt)}
               aria-invalid={Boolean(registrationErrors.username) || showUsernameGuidance}
               aria-describedby={describeIds(
                 showUsernameGuidance ? 'home-registration-username-help' : undefined,
@@ -727,8 +1052,10 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
             ) : null}
           </div>
 
+          {pendingAttempt ? null : (
+            <>
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1" htmlFor="home-registration-password">
+            <label className="block text-xs font-semibold text-slate-700 mb-0.5" htmlFor="home-registration-password">
               Password
             </label>
             <div className="relative">
@@ -792,7 +1119,7 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1" htmlFor="home-registration-confirm-password">
+            <label className="block text-xs font-semibold text-slate-700 mb-0.5" htmlFor="home-registration-confirm-password">
               Confirm Password
             </label>
             <div className="relative">
@@ -826,9 +1153,11 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
               </p>
             ) : null}
           </div>
+            </>
+          )}
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1" htmlFor="home-registration-email">
+            <label className="block text-xs font-semibold text-slate-700 mb-0.5" htmlFor="home-registration-email">
               Email ID <span className="font-normal text-slate-500">(Required)</span>
             </label>
             <input
@@ -840,6 +1169,7 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
               placeholder="name@example.com"
               autoComplete="email"
               inputMode="email"
+              disabled={Boolean(pendingAttempt)}
               aria-invalid={Boolean(registrationErrors.email)}
               aria-describedby={describeIds(
                 'home-registration-email-help',
@@ -861,8 +1191,8 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1" htmlFor="home-registration-mobile">
-              Mobile Number <span className="font-normal text-slate-500">(Optional)</span>
+            <label className="block text-xs font-semibold text-slate-700 mb-0.5" htmlFor="home-registration-mobile">
+              Mobile Number <span className="font-normal text-slate-500">(Required)</span>
             </label>
             <input
               ref={mobileRef}
@@ -874,6 +1204,8 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
               autoComplete="tel"
               inputMode="tel"
               maxLength={18}
+              required
+              disabled={Boolean(pendingAttempt)}
               aria-invalid={Boolean(registrationErrors.mobile)}
               aria-describedby={describeIds(
                 'home-registration-mobile-help',
@@ -883,9 +1215,8 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
               className={getInputClass(Boolean(registrationErrors.mobile))}
             />
             <p className="mt-1 text-[11px] leading-relaxed text-slate-500" id="home-registration-mobile-help">
-              {registrationValues.mobile
-                ? 'This number is stored in your Supabase user metadata. OTP verification is not configured.'
-                : 'Optional. Mobile verification is not configured in this authentication phase.'}
+              We will send a verification code to this number by SMS and will not create your account until
+              it is entered. Enter a 10-digit number, or the full number with its country code.
             </p>
             {registrationErrors.mobile ? (
               <p className="mt-1 text-[11px] font-medium text-red-700" id="home-registration-mobile-error">
@@ -894,6 +1225,7 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
             ) : null}
           </div>
 
+          {pendingAttempt ? null : (
           <div className="grid gap-3 md:col-span-2 md:grid-cols-2">
             <CaptchaFields
               code={captchaCode}
@@ -906,6 +1238,7 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
               onRefresh={refreshCaptcha}
             />
           </div>
+          )}
 
           {status ? (
             <p className={`${getStatusClass(statusTone)} md:col-span-2`} role={statusTone === 'error' ? 'alert' : 'status'}>
@@ -913,19 +1246,158 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
             </p>
           ) : null}
 
-          <Button className="w-full justify-center rounded md:col-span-2" disabled={isSubmitting} size="md" type="submit">
-            {isSubmitting ? 'Creating account…' : 'Register'}
-          </Button>
-        </form>
+            {pendingAttempt ? (
+              <div className="space-y-3 rounded border border-blue-200 bg-blue-50 p-2.5 md:col-span-2">
+                <p className="text-[11px] leading-relaxed text-slate-700">
+                  Enter both codes here. Your account is created as soon as the email and the mobile
+                  code are accepted, and you will go straight to the login page.
+                </p>
+
+                {pendingPassword ? null : (
+                  <div>
+                    <label className="mb-0.5 block text-xs font-semibold text-slate-700" htmlFor="home-registration-otp-password">
+                      Password
+                    </label>
+                    <input
+                      id="home-registration-otp-password"
+                      name="otpPassword"
+                      type="password"
+                      value={pendingPassword}
+                      autoComplete="current-password"
+                      aria-describedby="home-registration-otp-password-help"
+                      onChange={(event) => setPendingPassword(event.target.value)}
+                      className={getInputClass(false)}
+                    />
+                    <p className="mt-1 text-[11px] leading-relaxed text-slate-500" id="home-registration-otp-password-help">
+                      Re-enter the password you chose, to finish creating the account.
+                    </p>
+                  </div>
+                )}
+
+                <div>
+                  <OtpInput
+                    id="home-registration-email-otp"
+                    label={`Email code sent to ${pendingAttempt.maskedEmail}`}
+                    value={emailOtp}
+                    onChange={(value) => {
+                      setEmailOtp(value);
+                      clearOtpError('email');
+                    }}
+                    length={OTP_LENGTH}
+                    invalid={Boolean(otpErrors.email)}
+                    disabled={isOtpBusy}
+                    autoFocus
+                    describedBy={otpErrors.email ? 'home-registration-email-otp-error' : undefined}
+                  />
+                  {otpErrors.email ? (
+                    <p className="mt-1 text-[11px] font-medium text-red-700" id="home-registration-email-otp-error">
+                      {otpErrors.email}
+                    </p>
+                  ) : null}
+                  {emailOtpVerified ? (
+                    <p className="mt-1 text-[11px] font-semibold text-emerald-700">Email code accepted</p>
+                  ) : null}
+                  <div className="mt-1 flex items-center justify-end">
+                    <Button
+                      className="rounded"
+                      size="sm"
+                      variant="outline"
+                      disabled={isOtpBusy || resendSecondsLeft > 0}
+                      onClick={() => handleResendOtp('email')}
+                    >
+                      Resend email code
+                    </Button>
+                  </div>
+                </div>
+
+                <div>
+                  <OtpInput
+                    id="home-registration-mobile-otp"
+                    label={`Mobile code sent to ${pendingAttempt.maskedMobile}`}
+                    value={mobileOtp}
+                    onChange={(value) => {
+                      setMobileOtp(value);
+                      clearOtpError('mobile');
+                    }}
+                    length={OTP_LENGTH}
+                    invalid={Boolean(otpErrors.mobile)}
+                    disabled={isOtpBusy}
+                    describedBy={otpErrors.mobile ? 'home-registration-mobile-otp-error' : undefined}
+                  />
+                  {otpErrors.mobile ? (
+                    <p className="mt-1 text-[11px] font-medium text-red-700" id="home-registration-mobile-otp-error">
+                      {otpErrors.mobile}
+                    </p>
+                  ) : null}
+                  {mobileOtpVerified ? (
+                    <p className="mt-1 text-[11px] font-semibold text-emerald-700">Mobile code accepted</p>
+                  ) : null}
+                  <div className="mt-1 flex items-center justify-end">
+                    <Button
+                      className="rounded"
+                      size="sm"
+                      variant="outline"
+                      disabled={isOtpBusy || resendSecondsLeft > 0}
+                      onClick={() => handleResendOtp('mobile')}
+                    >
+                      Resend mobile code
+                    </Button>
+                  </div>
+                </div>
+
+                {resendSecondsLeft > 0 ? (
+                  <p className="text-[11px] leading-relaxed text-slate-500" role="status">
+                    You can request a new code in {resendSecondsLeft} seconds.
+                  </p>
+                ) : null}
+
+                {otpNotice ? (
+                  <p className={getStatusClass('info')} role="status">
+                    {otpNotice}
+                  </p>
+                ) : null}
+
+                <p className="text-[11px] leading-relaxed text-slate-500">
+                  Each code expires shortly and can only be used once. Your account is created only after
+                  both are accepted.
+                </p>
+
+                <button
+                  type="button"
+                  className="w-full rounded text-[11px] font-semibold text-gov-blue underline underline-offset-2 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                  onClick={handleRegistrationRestart}
+                >
+                  Start registration again
+                </button>
+              </div>
+            ) : null}
+
+            <Button
+              className="w-full justify-center rounded md:col-span-2"
+              disabled={isSubmitting || isOtpBusy}
+              size="md"
+              type="submit"
+            >
+              {pendingAttempt
+                ? isCompletingRegistration
+                  ? 'Creating your account…'
+                  : isVerifyingOtp
+                    ? 'Checking codes…'
+                    : 'Verify Codes & Create Account'
+                : isSubmitting
+                  ? 'Sending verification codes…'
+                  : 'Register'}
+            </Button>
+          </form>
       ) : (
         <form
-          className="space-y-2 lg:min-h-0 lg:overflow-visible"
+          className="space-y-1 lg:min-h-0 lg:overflow-visible"
           aria-labelledby="home-authentication-card-heading"
           noValidate
           onSubmit={handleLoginSubmit}
         >
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1" htmlFor="home-login-username">
+            <label className="block text-xs font-semibold text-slate-700 mb-0.5" htmlFor="home-login-username">
               {usernameLabel}
             </label>
             <input
@@ -951,7 +1423,7 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1" htmlFor="home-login-password">
+            <label className="block text-xs font-semibold text-slate-700 mb-0.5" htmlFor="home-login-password">
               Password
             </label>
             <input
@@ -1002,8 +1474,12 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
           ) : null}
 
           <div className="flex flex-wrap items-center justify-between gap-1 text-[11px]">
+            {/* min-h-7 rather than min-h-9: these are inline text links, and
+                the old 36px box around 11px text left the row 36px tall - more
+                dead space than the links themselves. 28px still clears the
+                WCAG 2.2 24x24 minimum target. */}
             <button
-              className="min-h-11 px-1.5 font-semibold text-gov-blue underline underline-offset-2 hover:text-gov-saffron"
+              className="min-h-7 px-1.5 font-semibold text-gov-blue underline underline-offset-2 hover:text-gov-saffron"
               type="button"
               disabled={isSubmitting}
               onClick={handleForgotPassword}
@@ -1011,7 +1487,7 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
               Forgot Password
             </button>
             <button
-              className="min-h-11 px-1.5 font-semibold text-gov-blue underline underline-offset-2 hover:text-gov-saffron"
+              className="min-h-7 px-1.5 font-semibold text-gov-blue underline underline-offset-2 hover:text-gov-saffron"
               type="button"
               onClick={() => setStatus('Username recovery is not available. Use your email address to sign in.')}
             >
@@ -1021,41 +1497,79 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
         </form>
       )}
 
-      <div className={`${isRegistration ? 'mt-2 pt-2' : 'mt-1 pt-1'} border-t border-slate-200 lg:shrink-0`}>
+      {/* mt-0 pt-0.5 on the login card: the form's own space-y-1 already
+          supplies 4px above the divider, and the old mt-1 pt-1 stacked another
+          8px on top of it, which is what left the visible gap between the
+          forgot-password links and this section. Registration keeps the
+          roomier spacing because it is a long scrolling form. */}
+      <div className={`${isRegistration ? 'mt-2 pt-2' : 'mt-0 pt-0.5'} border-t border-slate-200 lg:shrink-0`}>
         {isRegistration ? (
-          <div className={isRegistration ? 'space-y-1.5' : 'space-y-2'}>
-
+          <div className="space-y-1.5">
             <p className="text-center text-[11px] font-medium text-slate-600">Already have an account?</p>
-            <div className="grid gap-0 sm:grid-cols-2">
-              <Button
-                className="w-full justify-center rounded"
-                onClick={() => switchMode('applicant')}
-                size="md"
-                type="button"
-              >
-                Applicant Login
-              </Button>
-              <Button
-                className="w-full justify-center rounded"
-                onClick={() => switchMode('admin')}
-                size="md"
-                type="button"
-                variant="outline"
-              >
-                Admin Login
-              </Button>
-            </div>
+            <Button
+              className="w-full justify-center rounded"
+              onClick={() => switchMode('applicant')}
+              size="md"
+              type="button"
+            >
+              Applicant Login
+            </Button>
           </div>
         ) : (
-          <Button
-            className="w-full justify-center rounded"
-            onClick={() => switchMode(isAdmin ? 'applicant' : 'admin')}
-            size="md"
-            type="button"
-            variant="outline"
-          >
-            {isAdmin ? 'Applicant Login' : 'Admin Login'}
-          </Button>
+          /*
+           * Demo Admin lives here, inside the same card and directly below the
+           * applicant controls, in the slot the "Admin Login" button used to
+           * occupy. It is a section of this page, not a second page: no route
+           * change, no separate layout, and the real applicant form above is
+           * untouched. The button still signs in through demoAdminAuth.ts.
+           */
+          <>
+            {/*
+              The "Demo Admin / Read-Only" heading row was removed on request -
+              it was the only two-line element in this section and the
+              "Read-Only Evaluation Access" label below already says the same
+              thing, so the section is now one line shorter. The button, the
+              description and the read-only footnote are all unchanged, and
+              demoAdminAuth.ts is untouched.
+            */}
+
+            {/* Same type treatment as the "Applicant Login Here" h3 above:
+                text-sm font-bold text-gov-blue-dark, no uppercase, no amber.
+                h4 keeps the document outline correct under that h3. */}
+            <h4 className="text-sm font-bold text-gov-blue-dark">
+              Read-Only Evaluation Access
+            </h4>
+
+            <p className="mt-0.5 text-[12px] leading-snug text-slate-600">
+              Explore submitted applications and supporting documents in a read-only demo environment.
+            </p>
+
+            <div className="mt-1.5">
+              <Button
+                className="w-full justify-center rounded"
+                disabled={isDemoSubmitting}
+                onClick={handleOpenDemoAdmin}
+                size="md"
+                type="button"
+                variant="accent"
+              >
+                {isDemoSubmitting ? 'Opening Demo Admin…' : 'View Demo Admin'}
+              </Button>
+            </div>
+
+            <p className="mt-1 text-center text-[10px] font-bold uppercase tracking-wider text-slate-500">
+              Read-only access • No changes to applicant records
+            </p>
+
+            {demoAdminError ? (
+              <p
+                className="mt-1.5 rounded border border-red-300 bg-red-50 px-2 py-1.5 text-[11px] font-medium leading-relaxed text-red-800"
+                role="alert"
+              >
+                {demoAdminError}
+              </p>
+            ) : null}
+          </>
         )}
       </div>
     </div>

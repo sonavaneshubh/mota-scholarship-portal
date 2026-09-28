@@ -18,6 +18,9 @@ export function AdminHeader({ user, unreadNotifications, onMenuClick, onLogout, 
   const location = useLocation();
   const [profileOpen, setProfileOpen] = useState(false);
   const title = getAdminPageTitle(location.pathname, location.search);
+  // The Demo Admin has no notification feed and no write actions, so the bell
+  // would be a dead control that implies a queue behind it.
+  const isReadOnlyDemo = user.role === 'Demo Admin';
 
   function handleLogout() {
     setProfileOpen(false);
@@ -42,10 +45,16 @@ export function AdminHeader({ user, unreadNotifications, onMenuClick, onLogout, 
         </div>
 
         <div className="flex items-center gap-2 sm:gap-4">
-          <NavLink aria-label="View admin notifications" className="relative flex h-10 w-10 items-center justify-center rounded-md text-slate-600 hover:bg-slate-100 hover:text-gov-blue" to={ROUTES.admin.notifications}>
-            <AdminIcon className="h-5 w-5" name="notifications" />
-            {unreadNotifications > 0 ? <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-gov-saffron px-1 text-[9px] font-bold text-white">{unreadNotifications > 9 ? '9+' : unreadNotifications}</span> : null}
-          </NavLink>
+          {isReadOnlyDemo ? (
+            <span className="hidden items-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-wider text-amber-800 sm:inline-flex">
+              <AdminIcon className="h-3.5 w-3.5" name="lock" /> Read-only demo
+            </span>
+          ) : (
+            <NavLink aria-label="View admin notifications" className="relative flex h-10 w-10 items-center justify-center rounded-md text-slate-600 hover:bg-slate-100 hover:text-gov-blue" to={ROUTES.admin.notifications}>
+              <AdminIcon className="h-5 w-5" name="notifications" />
+              {unreadNotifications > 0 ? <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-gov-saffron px-1 text-[9px] font-bold text-white">{unreadNotifications > 9 ? '9+' : unreadNotifications}</span> : null}
+            </NavLink>
+          )}
 
           <div className="relative">
             <button

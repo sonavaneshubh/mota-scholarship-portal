@@ -44,10 +44,34 @@ export function HeroBanner() {
         style={{ backgroundImage: 'radial-gradient(#ffffff 1px, transparent 1px)', backgroundSize: '16px 16px' }}
       />
 
+      {/*
+        items-start, not items-center, and this is the fix for the hero content
+        appearing to sit too low.
+
+        The login card is 454px tall and the marketing column is only 331px, so
+        items-center was centring the shorter text block inside the card's
+        height and leaving 62px of empty dark blue above the badge - the badge
+        measured y=315 when the hero's content box started at y=253. Aligning
+        both columns to the top removes that dead band, puts the badge at the
+        hero's top padding, and lines the card's "Applicant Login Here" heading
+        up with the badge instead of hanging 62px below it.
+
+        The hero's total height is unchanged either way, because the card is the
+        taller of the two and sets the row: 454px + 48px padding = 502px.
+      */}
       <div
-        className={`max-w-7xl mx-auto relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 ${isRegistration ? 'lg:items-start' : 'lg:items-center'}`}
+        className="max-w-7xl mx-auto relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 lg:items-start"
       >
-        <div className={`${isRegistration ? 'lg:col-span-6' : 'lg:col-span-7'} space-y-4`}>
+        {/* lg:mt-4 nudges the text column 16px below the top of the row.
+
+            This is a deliberate midpoint between the two things that were
+            wrong before. With items-center the text floated 62px down inside
+            the taller card, which read as "sitting too low". Flush against the
+            top (items-start, mt-0) that overshot and left the two columns
+            looking mechanically aligned. 16px is enough to break the hard edge
+            and read as optical alignment, while the card's 411px against the
+            text's 311px keeps the difference subtle rather than glaring. */}
+        <div className={`${isRegistration ? 'lg:col-span-6' : 'lg:col-span-7'} space-y-3 lg:mt-4`}>
           <div className="inline-flex items-center gap-2 px-2.5 py-1 bg-white/10 backdrop-blur rounded-full text-[10px] sm:text-xs text-amber-300 border border-amber-400/40">
             <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
               <path

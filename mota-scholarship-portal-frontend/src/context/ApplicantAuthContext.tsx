@@ -10,10 +10,8 @@ import {
   resetPassword as requestPasswordReset,
   signIn as signInWithSupabase,
   signOut as signOutFromSupabase,
-  signUp as signUpWithSupabase,
   updatePassword as updateSupabasePassword,
 } from '../services/auth/authService';
-import type { SignUpInput } from '../services/auth/authService';
 import { ApplicantAuthContext } from './ApplicantAuthContextValue';
 
 export const APPLICANT_SESSION_KEY = 'mota-applicant-session';
@@ -220,31 +218,6 @@ export function ApplicantAuthProvider({ children }: { children: ReactNode }) {
   }, [clearAuthState]);
 
   const resetPassword = useCallback((email: string) => requestPasswordReset(email), []);
-  const signUp = useCallback(
-    async (input: SignUpInput) => {
-      const result = await signUpWithSupabase(input);
-
-      if (!result.success) {
-        if (result.session) {
-          await signOutFromSupabase();
-          clearAuthState();
-        }
-        return result;
-      }
-
-      if (result.session && result.user) {
-        setSession(result.session);
-        setAuthUser(result.user);
-        setProfile(result.profile);
-        setProfileError(null);
-        setLoading(false);
-      }
-
-      return result;
-    },
-    [clearAuthState],
-  );
-
   const updatePassword = useCallback((password: string) => updateSupabasePassword(password), []);
 
   const user = useMemo(() => (authUser ? toApplicantProfile(authUser, profile) : null), [authUser, profile]);
@@ -259,7 +232,6 @@ export function ApplicantAuthProvider({ children }: { children: ReactNode }) {
       loading,
       isAuthenticated: Boolean(session && authUser),
       signIn,
-      signUp,
       signOut,
       resetPassword,
       updatePassword,
@@ -273,7 +245,6 @@ export function ApplicantAuthProvider({ children }: { children: ReactNode }) {
       session,
       signIn,
       signOut,
-      signUp,
       updatePassword,
       user,
     ],

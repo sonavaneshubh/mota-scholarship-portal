@@ -11,6 +11,28 @@ type AdminViewport = 'mobile' | 'tablet' | 'desktop';
 const SIDEBAR_COLLAPSED_KEY = 'mota-admin-sidebar-collapsed';
 const SIDEBAR_WIDTH = '18rem';
 
+/**
+ * The Demo Admin's whole route surface. Anything else - reports, notifications,
+ * admin users, schemes, settings - is prototype-only, so a Demo Admin session is
+ * redirected to the dashboard instead of rendering it.
+ */
+function isDemoAdminRoute(pathname: string, search: string) {
+  const isApplications = pathname === ROUTES.admin.applications || pathname.startsWith(`${ROUTES.admin.applications}/`);
+
+  if (pathname === ROUTES.admin.dashboard && search === '') {
+    return true;
+  }
+
+  if (isApplications) {
+    // A status filter is still a read over the same real rows, but a Demo Admin
+    // only ever sees submitted applications, so the decision-state filters would
+    // only ever render "nothing here".
+    return search === '';
+  }
+
+  return pathname === ROUTES.admin.documentVerification;
+}
+
 function resolveViewport(width: number): AdminViewport {
   if (width < 768) {
     return 'mobile';
@@ -36,6 +58,7 @@ export function AdminLayout() {
   const { session, signOut } = useAdminAuth();
   const location = useLocation();
   const navigate = useNavigate();
+  const isDemoAdmin = session?.mode === 'demo';
 
   const [viewport, setViewport] = useState<AdminViewport>(() => resolveViewport(window.innerWidth));
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -99,6 +122,13 @@ export function AdminLayout() {
     return <Navigate replace state={{ from: location }} to={ROUTES.admin.login} />;
   }
 
+  // Hiding a menu item is not access control, so the prototype-only routes are
+  // closed to a Demo Admin session as well. A pasted URL must not be a way
+  // around the read-only scope.
+  if (isDemoAdmin && !isDemoAdminRoute(location.pathname, location.search)) {
+    return <Navigate replace to={ROUTES.admin.dashboard} />;
+  }
+
   function handleLogout() {
     signOut();
     navigate(ROUTES.admin.login, { replace: true });
@@ -116,12 +146,15 @@ export function AdminLayout() {
     toggleCollapsed();
   }
 
-  const unreadNotifications = ADMIN_NOTIFICATIONS.filter((notification) => !notification.read).length;
+  // The Demo Admin has no notification feed at all, so a mock unread count in its
+  // sidebar badge would be a number about nothing.
+  const unreadNotifications = isDemoAdmin ? 0 : ADMIN_NOTIFICATIONS.filter((notification) => !notification.read).length;
 
   return (
     <div className="min-h-screen bg-gov-slate-bg text-slate-800">
       <div className="flex min-h-screen">
         <AdminSidebar
+          isDemoAdmin={isDemoAdmin}
           isMobile={isMobile}
           open={isMobile ? drawerOpen : !collapsed}
           unreadNotifications={unreadNotifications}

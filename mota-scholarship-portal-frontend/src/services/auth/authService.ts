@@ -4,14 +4,6 @@ import { missingSupabaseEnvVars, supabase, DEMO_MODE, supabaseConfigNotice } fro
 import { diagnostic, diagnosticError } from '../../lib/diagnostics';
 import type { AuthProfile, UserRole } from '../../types';
 
-export interface SignUpInput {
-  email: string;
-  password: string;
-  fullName: string;
-  username?: string;
-  mobile?: string;
-}
-
 export interface AuthResult {
   success: boolean;
   error: string | null;
@@ -22,10 +14,6 @@ export interface SignInResult extends AuthResult {
   session: Session | null;
   profile: AuthProfile | null;
   role: UserRole | null;
-}
-
-export interface SignUpResult extends SignInResult {
-  requiresEmailConfirmation: boolean;
 }
 
 interface ProfileResult {
@@ -138,7 +126,12 @@ function getErrorMessage(error: { message?: string; code?: string } | null | und
   }
 
   if (message.includes('email not confirmed')) {
-    return 'Confirm your email before signing in.';
+    // Registration now confirms the address with a code entered on the portal, so
+    // no new confirmation email is ever sent and there is no link to go and look
+    // for. This can only be reached by an account created under the old flow, so
+    // the honest instruction is to ask the administrator rather than to wait for
+    // an email that will not arrive.
+    return 'This account still needs to be verified. Please contact the portal administrator.';
   }
 
   if (message.includes('email address') && message.includes('invalid')) {
@@ -176,13 +169,6 @@ function failedSignIn(error: string): SignInResult {
     session: null,
     profile: null,
     role: null,
-  };
-}
-
-function failedSignUp(error: string): SignUpResult {
-  return {
-    ...failedSignIn(error),
-    requiresEmailConfirmation: false,
   };
 }
 
@@ -357,100 +343,6 @@ export async function getProfile(userId: string): Promise<ProfileResult> {
       profile: null,
       error: getExceptionMessage(error, "We couldn't connect to the authentication service. Please try again."),
     };
-  }
-}
-
-export async function signUp(input: SignUpInput): Promise<SignUpResult> {
-  if (DEMO_MODE) {
-    const existing = DEMO_USERS.find((u) => u.email === input.email.trim());
-    if (existing) {
-      return failedSignUp('An account with this email already exists.');
-    }
-    const newDemoUser = {
-      email: input.email.trim(),
-      password: input.password,
-      fullName: input.fullName.trim(),
-      mobile: input.mobile?.trim() || '',
-      state: '',
-      district: '',
-      category: '',
-      course: '',
-      institution: '',
-    };
-    const { mockUser, mockSession, mockProfile } = createMockUser(newDemoUser);
-    return {
-      success: true,
-      error: null,
-      user: mockUser,
-      session: mockSession,
-      profile: mockProfile,
-      role: 'applicant',
-      requiresEmailConfirmation: false,
-    };
-  }
-
-  if (!supabase) {
-    return failedSignUp(notConfiguredMessage);
-  }
-
-  try {
-    const metadata: Record<string, string> = { full_name: input.fullName.trim() };
-
-    if (input.username?.trim()) {
-      metadata.username = input.username.trim();
-    }
-
-    if (input.mobile?.trim()) {
-      metadata.mobile = input.mobile.trim();
-    }
-
-    const redirectTo = getBrowserUrl(ROUTES.applicant.login);
-    const { data, error } = await supabase.auth.signUp({
-      email: input.email.trim(),
-      password: input.password,
-      options: {
-        data: metadata,
-        ...(redirectTo ? { emailRedirectTo: redirectTo } : {}),
-      },
-    });
-
-    if (error) {
-      return failedSignUp(getErrorMessage(error, 'Registration could not be completed. Please try again.'));
-    }
-
-    if (!data.user || !data.session) {
-      return {
-        success: true,
-        error: null,
-        user: data.user,
-        session: null,
-        profile: null,
-        role: null,
-        requiresEmailConfirmation: true,
-      };
-    }
-
-    const profileResult = await getProfile(data.user.id);
-
-    if (profileResult.error || !profileResult.profile) {
-      return {
-        ...failedSignUp(profileResult.error ?? 'Your profile could not be loaded. Ask an administrator to verify your account.'),
-        user: data.user,
-        session: data.session,
-      };
-    }
-
-    return {
-      success: true,
-      error: null,
-      user: data.user,
-      session: data.session,
-      profile: profileResult.profile,
-      role: profileResult.profile.role,
-      requiresEmailConfirmation: false,
-    };
-  } catch (error) {
-    return failedSignUp(getExceptionMessage(error, 'Registration could not be completed. Please try again.'));
   }
 }
 

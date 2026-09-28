@@ -1,4 +1,4 @@
-export type AdminRole = 'Super Admin' | 'Admin' | 'Verifier' | 'Reviewer';
+export type AdminRole = 'Super Admin' | 'Admin' | 'Verifier' | 'Reviewer' | 'Demo Admin';
 
 export type AdminUserStatus = 'Active' | 'Inactive';
 
@@ -27,16 +27,37 @@ export interface AdminUser {
   initials: string;
 }
 
+/**
+ * `prototype` is the pre-existing offline admin shell, signed in with the
+ * hardcoded development credentials. It reaches screens that are not connected
+ * to live data, and nothing on the applicant -> submitted application -> admin
+ * path.
+ *
+ * `demo` is the Demo Admin: a real Supabase account holding the read-only
+ * `demo_admin` role. The distinction is kept in the session rather than inferred,
+ * so a page never has to guess whether it is showing live rows.
+ */
+export type AdminSessionMode = 'prototype' | 'demo';
+
 export interface AdminSession {
   user: AdminUser;
   signedInAt: string;
   remember: boolean;
+  /** Absent on sessions stored before the Demo Admin existed; treated as 'prototype'. */
+  mode?: AdminSessionMode;
 }
 
 export interface AdminAuthResult {
   ok: boolean;
   user?: AdminUser;
   message?: string;
+  /**
+   * Set on a failed one-click Demo sign-in. True when the failure is a
+   * deployment problem (the broker is not deployed or not configured) and the
+   * manual credential form is therefore still worth offering; false when the
+   * cause is a misconfigured account, which typing cannot fix.
+   */
+  canRetryWithCredentials?: boolean;
 }
 
 export interface AdminDocument {
@@ -48,6 +69,12 @@ export interface AdminDocument {
   uploadedAt: string;
   updatedAt: string;
   required: boolean;
+  /**
+   * Path inside the private applicant storage bucket. Kept so a read-only viewer
+   * can mint a short-lived signed URL for the real file instead of faking a
+   * preview. Never a public URL, and never the applicant auth id on its own.
+   */
+  storagePath?: string | null;
   rejectionReason?: string;
 }
 
@@ -68,6 +95,12 @@ export interface AdminApplication {
   previousResult: string;
   schemeId: string;
   schemeName: string;
+  /** Human-facing scheme identifier from `schemes.scheme_code`. */
+  schemeCode?: string;
+  schemeStatus?: string;
+  schemeAcademicYear?: string;
+  /** Whether the scheme supports renewal, from `schemes.renewal_available`. */
+  renewalAvailable?: boolean;
   applicationDate: string;
   status: AdminApplicationStatus;
   amount: number;
@@ -75,6 +108,16 @@ export interface AdminApplication {
   documents: AdminDocument[];
   rejectionReason?: string;
   lastActivity: string;
+  /**
+   * ISO timestamp of the submit itself. Distinct from `applicationDate`, which
+   * the list uses as a bare date for sorting and display.
+   */
+  submittedAt?: string;
+  declarationAccepted?: boolean;
+  eligibilityResult?: unknown;
+  /** `applications.scheme_answers` verbatim: the scheme-specific form answers. */
+  schemeAnswers?: Record<string, unknown> | null;
+  draftSavedAt?: string;
 }
 
 export interface AdminApplicant {

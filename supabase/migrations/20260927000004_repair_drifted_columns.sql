@@ -115,11 +115,12 @@ begin
     -- Concatenation, not a `%` placeholder: in PL/pgSQL a bare `%` starts a format
     -- specifier, so text like "% row(s)" is parsed as format type `r` and silently
     -- mangles the sentence. `||` leaves nothing to misparse.
-    raise exception
-      'scheme_eligibility has ' || v_unresolved::text ||
-      ' unresolved row(s) with no academic_year, so the not null constraint was not applied. '
-      'Each one references a scheme that is missing or has a null academic_year. '
-      'Fix or remove those rows, then re-run this migration.';
+    raise exception using
+      message =
+        'scheme_eligibility has ' || v_unresolved::text ||
+        ' unresolved row(s) with no academic_year, so the not null constraint was not applied. '
+        'Each one references a scheme that is missing or has a null academic_year. '
+        'Fix or remove those rows, then re-run this migration.';
   end if;
 
   alter table public.scheme_eligibility alter column academic_year set not null;
@@ -134,11 +135,12 @@ begin
    where academic_year is null;
 
   if v_unresolved > 0 then
-    raise exception
-      'scheme_benefits has ' || v_unresolved::text ||
-      ' unresolved row(s) with no academic_year, so the not null constraint was not applied. '
-      'Each one references a scheme that is missing or has a null academic_year. '
-      'Fix or remove those rows, then re-run this migration.';
+    raise exception using
+      message =
+        'scheme_benefits has ' || v_unresolved::text ||
+        ' unresolved row(s) with no academic_year, so the not null constraint was not applied. '
+        'Each one references a scheme that is missing or has a null academic_year. '
+        'Fix or remove those rows, then re-run this migration.';
   end if;
 
   alter table public.scheme_benefits alter column academic_year set not null;
@@ -241,15 +243,16 @@ begin
       or document_id is null;
 
   if v_orphan > 0 then
-    raise exception
-      'application_documents has ' || v_orphan::text ||
-      ' row(s) with no scheme_document_id or document_id, and neither can be derived from any '
-      'other table, so the not null constraints were not applied. The foreign keys are in place '
-      'and accept these nulls, so the table is usable; only the not null guarantees are missing. '
-      'These rows predate the columns. '
-      'Inspect with "select * from public.application_documents", then either delete them '
-      '(applicants re-attach their documents) or populate the two columns by hand, then '
-      're-run this migration. Nothing has been deleted.';
+    raise exception using
+      message =
+        'application_documents has ' || v_orphan::text ||
+        ' row(s) with no scheme_document_id or document_id, and neither can be derived from any '
+        'other table, so the not null constraints were not applied. The foreign keys are in place '
+        'and accept these nulls, so the table is usable; only the not null guarantees are missing. '
+        'These rows predate the columns. '
+        'Inspect with "select * from public.application_documents", then either delete them '
+        '(applicants re-attach their documents) or populate the two columns by hand, then '
+        're-run this migration. Nothing has been deleted.';
   end if;
 
   alter table public.application_documents alter column scheme_document_id set not null;

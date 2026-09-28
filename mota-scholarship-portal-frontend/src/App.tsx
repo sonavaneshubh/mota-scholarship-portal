@@ -6,7 +6,6 @@ import { ApplicantLayout } from './components/applicant/ApplicantLayout';
 import { SiteLayout } from './components/layout/SiteLayout';
 import { ROUTES } from './lib/constants';
 import { AboutMota } from './pages/AboutMota';
-import { AdminLogin } from './pages/AdminLogin';
 import { ApplicantApplicationPage } from './pages/ApplicantApplicationPage';
 import { ApplicantApplicationsPage } from './pages/ApplicantApplicationsPage';
 import { ApplicantDashboard } from './pages/ApplicantDashboard';
@@ -39,7 +38,6 @@ export default function App() {
       <AdminAuthProvider>
         <ApplicantAuthProvider>
           <Routes>
-            <Route path={ROUTES.admin.login} element={<AdminLogin />} />
             <Route element={<AdminLayout />}>
               <Route path={ROUTES.admin.dashboard} element={<AdminDashboard />} />
               <Route path={ROUTES.admin.applications} element={<Applications />} />
@@ -61,6 +59,7 @@ export default function App() {
               <Route path={ROUTES.helpGrievance} element={<HelpGrievance />} />
               <Route path={ROUTES.applicant.login} element={<Home />} />
               <Route path={ROUTES.applicant.register} element={<Home />} />
+              <Route path={ROUTES.admin.login} element={<Home />} />
               <Route path={ROUTES.resetPassword} element={<ResetPasswordPage />} />
               <Route path="*" element={<Navigate replace to={ROUTES.home} />} />
             </Route>

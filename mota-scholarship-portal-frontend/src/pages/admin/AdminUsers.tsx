@@ -5,6 +5,7 @@ import type { AdminRole, AdminUser, AdminUserStatus } from '../../types/admin';
 import { AdminDialog } from '../../components/admin/AdminDialog';
 import { AdminIcon } from '../../components/admin/AdminIcon';
 import { AdminPageHeader } from '../../components/admin/AdminPageHeader';
+import { PrototypeDataNotice } from '../../components/admin/PrototypeDataNotice';
 import { StatusBadge } from '../../components/admin/StatusBadge';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
@@ -106,10 +107,12 @@ export function AdminUsers() {
     <div className="space-y-6">
       <AdminPageHeader
         action={<Button size="md" variant="primary" onClick={openAdd}><AdminIcon className="h-4 w-4" name="plus" /> Add admin</Button>}
-        description="Manage administrator access, roles and account status. Changes in this prototype are stored in the current browser session only."
+        description="Manage administrator access, roles and account status. These accounts are illustrative sample data, and changes here are stored in the current browser session only."
         eyebrow="Access management"
         title="Admin users"
       />
+
+      <PrototypeDataNotice page="admin users" />
 
       {notice ? <div aria-live="polite" className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">{notice}</div> : null}
 
