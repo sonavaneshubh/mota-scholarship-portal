@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "types": ["vite/client"],
+    "strict": true,
+    "noEmit": false,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "outDir": ".eligibility-test-build",
+    "rootDir": "src"
+  },
+  "files": [
+    "src/lib/schemeEligibilityView.ts",
+    "src/lib/applicationFormRules.ts",
+    "src/lib/applicationFormView.ts",
+    "src/lib/applicationStage.ts",
+    "src/services/eligibility.ts"
+  ]
+}

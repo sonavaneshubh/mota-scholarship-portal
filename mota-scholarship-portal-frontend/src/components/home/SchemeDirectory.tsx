@@ -1,9 +1,11 @@
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useEligibleSchemes } from '../../hooks/useEligibleSchemes';
+import { ROUTES } from '../../lib/constants';
 import { SchemeCard } from './SchemeCard';
 
 export function SchemeDirectory() {
-  const { schemes, loading, error } = useEligibleSchemes();
+  const { schemes, loading, error, signedIn } = useEligibleSchemes();
   const [filter, setFilter] = useState<string>('all');
 
   // Filters are derived from the schemes that actually exist, so a category
@@ -97,14 +99,39 @@ export function SchemeDirectory() {
 
         {!loading && !error && visibleSchemes.length === 0 ? (
           <div className="rounded-lg border border-dashed border-slate-300 bg-white p-10 text-center">
-            <h3 className="text-base font-bold text-gov-blue-dark">
-              {schemes.length === 0 ? 'No schemes are published yet' : 'No schemes in this category'}
-            </h3>
-            <p className="mt-2 text-sm text-slate-600">
-              {schemes.length === 0
-                ? 'Schemes appear here once they are published and verified.'
-                : 'Choose a different category to see the published schemes.'}
-            </p>
+            {schemes.length === 0 && !signedIn ? (
+              <>
+                {/* The scheme catalogue is readable only by a signed-in account, so
+                    an empty list here means "you are not signed in", not "nothing is
+                    published". Saying the latter on a scholarship portal is worse than
+                    saying nothing. */}
+                <h3 className="text-base font-bold text-gov-blue-dark">
+                  Sign in to see the published scholarship schemes
+                </h3>
+                <p className="mt-2 text-sm text-slate-600">
+                  The scheme directory — eligibility, benefits, required documents and
+                  deadlines — is available to registered applicants. Create an account or
+                  sign in to browse it.
+                </p>
+                <Link
+                  to={ROUTES.applicant.login}
+                  className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-full bg-gov-blue px-5 py-2 text-sm font-semibold text-white transition hover:bg-gov-blue-dark focus-visible:ring-2 focus-visible:ring-gov-saffron focus-visible:ring-offset-2"
+                >
+                  Sign in or register
+                </Link>
+              </>
+            ) : (
+              <>
+                <h3 className="text-base font-bold text-gov-blue-dark">
+                  {schemes.length === 0 ? 'No schemes are published yet' : 'No schemes in this category'}
+                </h3>
+                <p className="mt-2 text-sm text-slate-600">
+                  {schemes.length === 0
+                    ? 'Schemes appear here once they are published and verified.'
+                    : 'Choose a different category to see the published schemes.'}
+                </p>
+              </>
+            )}
           </div>
         ) : null}
 

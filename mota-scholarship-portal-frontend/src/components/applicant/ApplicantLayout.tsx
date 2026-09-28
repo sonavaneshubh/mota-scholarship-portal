@@ -112,7 +112,11 @@ export function ApplicantLayout() {
     };
   }, [sidebarOpen]);
 
-  if (!session) {
+  if (loading) {
+    return null;
+  }
+
+  if (!session || !user || role !== 'applicant') {
     return (
       <Navigate
         replace
@@ -127,14 +131,6 @@ export function ApplicantLayout() {
         to={ROUTES.homeLogin}
       />
     );
-  }
-
-  if (loading) {
-    return null;
-  }
-
-  if (!session || !user || role !== 'applicant') {
-    return <Navigate replace state={{ from: location }} to={ROUTES.applicant.login} />;
   }
 
   // There is no notifications table yet, so the badge stays at zero rather than

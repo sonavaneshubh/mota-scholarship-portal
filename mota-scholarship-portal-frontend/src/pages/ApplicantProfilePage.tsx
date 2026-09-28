@@ -38,6 +38,7 @@ import {
   saveCurrentCourseSection,
   saveQualificationsSection,
   saveHostelSection,
+  type PendingLocalField,
 } from '../services/profileService';
 import { loadProfileMasterData } from '../services/profileMasterService';
 import {
@@ -122,12 +123,15 @@ const SECTIONS: Array<{ id: ProfileSectionId; label: string; heading: string; bl
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 
 /**
- * Write-only fields the service accepted but could not store on the profile,
- * because the database writer rejected them. They stay required, so the section
- * is not actually complete and must not be presented as a plain success.
+ * Fields the service accepted but could not store on the profile, because the
+ * database writer rejected them. They stay required, so the section is not
+ * actually complete and must not be presented as a plain success.
+ *
+ * Only the bank account number can land here today: `set_applicant_aadhaar` works
+ * against the live project, while `set_bank_account` cannot store anything until
+ * `app.secret_hash_salt` is set on the database.
  */
-const DEGRADED_LABELS: Record<'aadhaar' | 'account', string> = {
-  aadhaar: 'Aadhaar number',
+const DEGRADED_LABELS: Record<PendingLocalField, string> = {
   account: 'Bank account number',
 };
 
@@ -146,7 +150,7 @@ export function ApplicantProfilePage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<SaveState>('idle');
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [degradedFields, setDegradedFields] = useState<readonly ('aadhaar' | 'account')[]>([]);
+  const [degradedFields, setDegradedFields] = useState<readonly PendingLocalField[]>([]);
   const [continueTarget, setContinueTarget] = useState<ContinueTarget>(() =>
     resolveContinueTarget(null),
   );
@@ -272,7 +276,7 @@ export function ApplicantProfilePage() {
       let result: {
         ok: boolean;
         error?: string;
-        pendingLocally?: readonly ('aadhaar' | 'account')[];
+        pendingLocally?: readonly PendingLocalField[];
       } = { ok: true };
 
       switch (section) {

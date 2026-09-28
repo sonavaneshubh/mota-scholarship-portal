@@ -13,6 +13,7 @@
  */
 
 import type { SchemeDocument } from '../../lib/supabase';
+import { stripInternalProvenance } from '../../lib/schemeEligibilityView';
 
 interface SchemeDocumentsChecklistProps {
   documents: SchemeDocument[];
@@ -53,22 +54,38 @@ function fileHint(document: SchemeDocument): string | null {
  * document on the year of study, so for every other row this returns null.
  */
 function applicationStageHint(document: SchemeDocument): string | null {
+  const parts: string[] = [];
+
   if (document.is_required_fresh && !document.is_required_renewal) {
-    return 'Fresh applications only';
+    parts.push('fresh applications only');
+  } else if (!document.is_required_fresh && document.is_required_renewal) {
+    parts.push('renewal applications only');
+  } else if (document.is_required_fresh === false && document.is_required_renewal === false) {
+    // ARG45's Income Certificate. It is kept in the table because the MoTA FAQ
+    // asks for it, and saying so matters more than hiding the row — but the
+    // applicant has to be able to see that neither a fresh nor a renewal
+    // application needs it, or they will upload it and expect it to be checked.
+    parts.push('not required for a fresh or a renewal application');
   }
-  if (!document.is_required_fresh && document.is_required_renewal) {
-    return 'Renewal applications only';
-  }
+
   if (typeof document.required_from_course_year === 'number') {
     const from = document.required_from_course_year;
-    return from <= 1 ? 'Required every year' : `Second year and above`;
+    if (from <= 1) {
+      parts.push('required every year');
+    } else if (from === 2) {
+      parts.push('required from the second year of the course onwards');
+    } else {
+      parts.push(`required from year ${from} of the course onwards`);
+    }
   }
-  return null;
+
+  return parts.length > 0 ? parts.join(' · ') : null;
 }
 
 function DocumentRow({ document }: { document: SchemeDocument }) {
   const hint = fileHint(document);
   const stageHint = applicationStageHint(document);
+  const description = stripInternalProvenance(document.description);
 
   return (
     <li className="flex gap-3 py-2.5">
@@ -96,8 +113,8 @@ function DocumentRow({ document }: { document: SchemeDocument }) {
             </span>
           ) : null}
         </div>
-        {document.description ? (
-          <p className="mt-0.5 text-xs leading-snug text-slate-600">{document.description}</p>
+        {description ? (
+          <p className="mt-0.5 text-xs leading-snug text-slate-600">{description}</p>
         ) : null}
         {hint ? <p className="mt-0.5 text-[11px] text-slate-500">{hint}</p> : null}
       </div>
@@ -138,7 +155,11 @@ export function SchemeDocumentsChecklist({ documents }: SchemeDocumentsChecklist
       {optional.length > 0 ? (
         <section>
           <p className="mb-1 text-[11px] font-bold uppercase tracking-wider text-slate-500">
-            If applicable ({optional.length})
+            Only if it applies to you ({optional.length})
+          </p>
+          <p className="mb-1.5 text-[11px] leading-snug text-slate-500">
+            These are not required for every applicant. Read the note under each one before
+            deciding to skip it.
           </p>
           <ul className="divide-y divide-slate-100">
             {optional.map((document) => (

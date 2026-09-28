@@ -1,14 +1,18 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useApplicantApplications } from '../hooks/useApplicantRecords';
 import { fetchSchemeDetail } from '../services/schemes';
 import type { EligibilityEvaluation, SchemeDetailResponse } from '../lib/supabase';
 import {
-  buildApplicantProfile,
-  describeList,
+  buildApplicantProfileFromProfileData,
   evaluateEligibility,
-  formatInr,
 } from '../services/eligibility';
+import { ensureApplicantProfile, loadProfile } from '../services/profileService';
+import {
+  applicantRules,
+  buildEligibilityRows,
+  type RuleEntry,
+} from '../lib/schemeEligibilityView';
 import { createOrResumeApplication } from '../services/applicantRecords';
 import { applicationRouteHandle } from '../lib/applicationHandle';
 import { useApplicantAuth } from '../context/useApplicantAuth';
@@ -31,81 +35,6 @@ import { applicantApplicationPath, INFO_NOT_AVAILABLE, ROUTES } from '../lib/con
  */
 const ELIGIBILITY_UNAVAILABLE = 'Detailed eligibility criteria will be updated.';
 
-/**
- * Shown when `scheme_eligibility` has no value for a field.
- *
- * This deliberately does not claim the scheme has no limit. A NULL in
- * `maximum_family_income` or `minimum_percentage` cannot be told apart from a
- * guideline that explicitly waives the limit, because both are stored as NULL
- * in the one column. Saying "No limit specified" therefore turned a missing
- * record into a claim about the scheme. Where a scheme really does state that
- * it has no limit, that sentence is in `other_rules` and is printed verbatim in
- * the Additional conditions block below.
- */
-const NOT_SPECIFIED = 'Not specified in available scheme data';
-
-/** Keys in `other_rules` that are provenance, not conditions to satisfy. */
-const OTHER_RULE_META_KEYS = new Set(['source_ref']);
-
-interface OtherRuleEntry {
-  key: string;
-  label: string;
-  values: string[];
-}
-
-/** Turns a `other_rules` value into one or more displayable lines. */
-function flattenRuleValue(value: unknown): string[] {
-  if (value === null || value === undefined || value === '') {
-    return [];
-  }
-  if (Array.isArray(value)) {
-    return value.flatMap(flattenRuleValue);
-  }
-  if (typeof value === 'object') {
-    return Object.entries(value as Record<string, unknown>)
-      .filter(([, v]) => v !== null && v !== undefined && v !== '')
-      .map(([k, v]) => `${k.replace(/_/g, ' ')}: ${Array.isArray(v) ? v.join(', ') : String(v)}`);
-  }
-  if (typeof value === 'boolean') {
-    return [value ? 'Yes' : 'No'];
-  }
-  return [String(value)];
-}
-
-/**
- * Builds the labelled list rendered under "Additional conditions".
- *
- * Handles both shapes `other_rules` has held: the structured object written by
- * 20260927000120_official_scheme_data_eligibility.sql, and the plain sentence
- * of prose the column was seeded with before that migration, so an un-migrated
- * project still shows its text instead of an empty block.
- */
-function buildOtherRuleEntries(
-  otherRules: Record<string, unknown> | string | null | undefined
-): OtherRuleEntry[] {
-  if (otherRules === null || otherRules === undefined) {
-    return [];
-  }
-
-  if (typeof otherRules === 'string') {
-    const text = otherRules.trim();
-    return text ? [{ key: 'rules', label: 'Rule', values: [text] }] : [];
-  }
-
-  if (typeof otherRules !== 'object' || Array.isArray(otherRules)) {
-    return [];
-  }
-
-  return Object.entries(otherRules)
-    .filter(([key]) => !OTHER_RULE_META_KEYS.has(key))
-    .map(([key, value]) => ({
-      key,
-      label: key.replace(/_/g, ' '),
-      values: flattenRuleValue(value),
-    }))
-    .filter((entry) => entry.values.length > 0);
-}
-
 /** Scheme window dates. Kept local rather than imported from the records
  * service, which formats for a different purpose. An unparseable or absent
  * date becomes the shared placeholder instead of "Invalid Date". */
@@ -114,6 +43,26 @@ function formatSchemeDate(value: string | null): string | null {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return null;
   return parsed.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+/** One labelled rule with its lines, used for the two rule sections below. */
+function RuleBlock({ entries }: { entries: RuleEntry[] }) {
+  return (
+    <dl className="space-y-3">
+      {entries.map((entry) => (
+        <div key={entry.key}>
+          <dt className="text-[11px] font-bold uppercase tracking-wide text-slate-600">
+            {entry.label}
+          </dt>
+          <dd className="mt-0.5 text-[13px] leading-relaxed text-slate-700">
+            {entry.lines.map((line, index) => (
+              <p key={index}>{line}</p>
+            ))}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
 }
 
 export function ApplicantSchemeDetailPage() {
@@ -126,19 +75,26 @@ export function ApplicantSchemeDetailPage() {
   const [schemeData, setSchemeData] = useState<SchemeDetailResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [eligibilityEval, setEligibilityEval] = useState<EligibilityEvaluation | null>(null);
+  const [profileNotice, setProfileNotice] = useState<string | null>(null);
   const [applying, setApplying] = useState(false);
   const [applyError, setApplyError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('overview');
 
   useEffect(() => {
+    let active = true;
+
     async function loadScheme() {
       if (!id) return;
 
       setLoading(true);
       setError(null);
+      setEligibilityEval(null);
+      setProfileNotice(null);
 
       try {
         const data = await fetchSchemeDetail(id);
+        if (!active) return;
+
         if (!data) {
           setError('Scheme not found or not available');
           return;
@@ -146,33 +102,61 @@ export function ApplicantSchemeDetailPage() {
 
         setSchemeData(data);
 
-        // Evaluate eligibility if user is logged in
-        if (user && data.eligibility) {
-          const applicantProfile = buildApplicantProfile({
-            category: user.category,
-            annual_income: null,
-            course: user.course,
-            gender: null,
-            date_of_birth: null,
-            state: user.state,
-            district: user.district,
-            previous_percentage: null,
-            admission_mode: null,
-            institution_type: null,
-            is_hosteller: null,
-          });
-
-          setEligibilityEval(evaluateEligibility(data.eligibility, applicantProfile));
+        // Signed out: the criteria still render, there is just nothing to check
+        // them against. Not an error state.
+        if (!user) {
+          return;
         }
+
+        // Read the applicant's own profile tables rather than auth metadata.
+        //
+        // The previous version passed `user.category`, `user.course`,
+        // `user.state` and `user.district` â€” values the signup form happened to
+        // copy into `user_metadata` â€” and hardcoded null for income, date of
+        // birth, gender and previous percentage. Every applicant therefore saw
+        // "Age not provided in profile" and "Annual family income not provided"
+        // on the schemes that check those, no matter how complete their profile
+        // was, and the income-limited schemes could never resolve to anything but
+        // NEEDS_REVIEW.
+        //
+        // ensureApplicantProfile() is the same anchor call ApplicantProfilePage
+        // makes, so an applicant who has never opened their profile still gets a
+        // row to read from rather than a failed query.
+        const anchor = await ensureApplicantProfile(user.id);
+        if (!active) return;
+
+        if (!anchor.ok || !anchor.data) {
+          setProfileNotice(
+            'Sign in and complete your profile to see how this scheme compares against your details.',
+          );
+          return;
+        }
+
+        const loaded = await loadProfile(anchor.data.id);
+        if (!active) return;
+
+        if (!loaded.ok || !loaded.data) {
+          setProfileNotice(
+            'Your profile could not be loaded, so this scheme could not be checked against it.',
+          );
+          return;
+        }
+
+        const applicant = buildApplicantProfileFromProfileData(loaded.data);
+        setEligibilityEval(evaluateEligibility(data.eligibility, applicant, data.criteria));
       } catch (err) {
         console.error('Failed to load scheme:', err);
-        setError('Failed to load scheme details');
+        if (active) setError('Failed to load scheme details');
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     }
 
-    loadScheme();
+    void loadScheme();
+
+    return () => {
+      active = false;
+    };
   }, [id, user]);
 
   if (loading) {
@@ -284,21 +268,32 @@ export function ApplicantSchemeDetailPage() {
   const eligibilityStatus = getEligibilityStatus();
 
   /**
-   * `other_rules` is jsonb. Since
-   * 20260927000120_official_scheme_data_eligibility.sql it holds a structured
-   * object of official rule names, so it is rendered as a labelled list rather
-   * than concatenated into one sentence. `source_ref` is lifted out and shown
-   * separately, because it is provenance rather than a condition an applicant
-   * has to satisfy.
+   * The scheme's own rules, split by what they do.
+   *
+   * `other_rules` used to be rendered as one flat list called "Additional
+   * conditions" with a single key filtered out. Everything else went through
+   * verbatim, so the block contained "open conflict: Report 7.3: the MoTA FAQ asks
+   * for Family Income and BPL certificates...", "not specified officialy:
+   * Minimum percentage, Minimum age" and "removed unsupported rule: The previous DB
+   * value ... was fabricated", alongside the real conditions. Nothing in that
+   * paragraph helps an applicant decide whether to apply, and the mention of
+   * family income on the fellowship actively contradicts its own rule that there
+   * is no income criterion.
+   *
+   * applicantRules() keeps every key in the database and returns only the three
+   * buckets an applicant should read. The internal bucket â€” source references,
+   * open conflicts, the record of what was removed and why â€” stays available for
+   * the importer and for review, and is never rendered.
    */
-  const otherRules = schemeData.eligibility?.other_rules ?? null;
-  const otherRulesSource =
-    otherRules && typeof otherRules === 'object' && !Array.isArray(otherRules)
-      ? typeof otherRules.source_ref === 'string'
-        ? otherRules.source_ref
-        : null
-      : null;
-  const otherRuleEntries = buildOtherRuleEntries(otherRules);
+  const rules = applicantRules(schemeData.eligibility?.other_rules ?? null);
+
+  const eligibilityRows = schemeData.eligibility
+    ? buildEligibilityRows({
+        eligibility: schemeData.eligibility,
+        criteria: schemeData.criteria,
+        otherRules: schemeData.eligibility.other_rules,
+      })
+    : [];
 
   const keyFacts = [
     { label: 'Academic year', value: scheme.academic_year },
@@ -355,175 +350,183 @@ export function ApplicantSchemeDetailPage() {
   );
 
   const eligibilityContent = (
-    <div className="space-y-5">
-      {eligibilityEval ? (
-        <div className="space-y-3">
-          {eligibilityEval.matched.length > 0 ? (
-            <div className="rounded border border-emerald-200 bg-emerald-50 p-3">
-              <p className="mb-2 text-xs font-semibold text-emerald-700">Requirements met</p>
-              <ul className="space-y-1 text-xs text-emerald-800">
-                {eligibilityEval.matched.map((item, index) => (
-                  <li key={index}>{item}</li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
+    <div className="space-y-6">
+      {/*
+        Section 1 - the scheme's criteria, in the order an applicant needs them:
+        who may apply, what they must have, where they may study. Read from the
+        live `scheme_eligibility` columns plus the `scheme_criteria` rows that
+        cannot fit in a scalar column.
 
-          {eligibilityEval.missing.length > 0 ? (
-            <div className="rounded border border-amber-200 bg-amber-50 p-3">
-              <p className="mb-2 text-xs font-semibold text-amber-700">Still to confirm</p>
-              <ul className="space-y-1 text-xs text-amber-800">
-                {eligibilityEval.missing.map((item, index) => (
-                  <li key={index}>{item}</li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
-
-          <p className="rounded border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
-            <span className="font-semibold">Note:</span> This is a preliminary assessment based on your
-            profile. Final eligibility is subject to document verification and authorised review.
-          </p>
-        </div>
-      ) : null}
-
-      {schemeData.criteria.length > 0 ? (
-        <div>
+        Rows the guideline is silent about are left out entirely rather than
+        filled with "not specified", except for Age. Padding every row with the
+        same sentence is what made this table unreadable, and a NULL in
+        `maximum_family_income` cannot be told apart from a guideline that
+        waives the limit, so a placeholder there would be a claim about the
+        scheme. Age is the exception because it is the question applicants ask
+        first, and NOT_SPECIFIED_TEXT states the honest answer without asserting
+        that the scheme has no limit.
+      */}
+      {eligibilityRows.length > 0 ? (
+        <section>
           <h2 className="mb-2 text-lg font-bold text-gov-blue-dark">Eligibility criteria</h2>
-          <SchemeCriteriaList criteria={schemeData.criteria} />
-        </div>
-      ) : null}
-
-      {schemeData.eligibility ? (
-        <div>
-          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-lg font-bold text-gov-blue-dark">Checked against your profile</h2>
-            <Badge tone={eligibilityStatus.tone}>{eligibilityStatus.label}</Badge>
-          </div>
-
-          {/*
-            Every label below reads a column that exists on `scheme_eligibility`.
-            The disability, attendance, admission and cap rows that used to be here
-            had no column behind them, so they always rendered nothing; they are
-            gone rather than left pointing at fields that are not in the table.
-            Qualifying examination and Institution now read the real
-            `qualifying_examination` and `institution_requirement` columns added by
-            20260927000110_official_scheme_data_ddl.sql, so they state the official
-            value when there is one and NOT_SPECIFIED when the guideline is silent.
-          */}
-          <dl className="grid gap-4 rounded border border-slate-200 px-4 py-4 sm:grid-cols-2">
-            <div className="sm:col-span-2">
-              <dt className="text-xs text-slate-500">Eligible categories</dt>
-              <dd className="mt-1 text-sm font-semibold text-slate-800">
-                {describeList(schemeData.eligibility.eligible_categories) || NOT_SPECIFIED}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs text-slate-500">Family income limit</dt>
-              <dd className="mt-1 text-sm font-semibold text-slate-800">
-                {typeof schemeData.eligibility.maximum_family_income === 'number'
-                  ? formatInr(schemeData.eligibility.maximum_family_income)
-                  : NOT_SPECIFIED}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs text-slate-500">Age limit</dt>
-              <dd className="mt-1 text-sm font-semibold text-slate-800">
-                {typeof schemeData.eligibility.minimum_age === 'number' ||
-                typeof schemeData.eligibility.maximum_age === 'number'
-                  ? `${schemeData.eligibility.minimum_age ?? 'No min'} - ${
-                      schemeData.eligibility.maximum_age ?? 'No max'
-                    } years`
-                  : NOT_SPECIFIED}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs text-slate-500">Minimum percentage</dt>
-              <dd className="mt-1 text-sm font-semibold text-slate-800">
-                {typeof schemeData.eligibility.minimum_percentage === 'number'
-                  ? `${schemeData.eligibility.minimum_percentage}%`
-                  : NOT_SPECIFIED}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs text-slate-500">Gender</dt>
-              <dd className="mt-1 text-sm font-semibold text-slate-800">
-                {describeList(schemeData.eligibility.eligible_gender) || NOT_SPECIFIED}
-              </dd>
-            </div>
-            <div className="sm:col-span-2">
-              <dt className="text-xs text-slate-500">Qualifying examination</dt>
-              <dd className="mt-1 text-sm font-semibold text-slate-800">
-                {describeList(schemeData.eligibility.qualifying_examination) || NOT_SPECIFIED}
-              </dd>
-            </div>
-            <div className="sm:col-span-2">
-              <dt className="text-xs text-slate-500">Course</dt>
-              <dd className="mt-1 text-sm font-semibold text-slate-800">
-                {describeList(schemeData.eligibility.eligible_course_levels) ??
-                  describeList(schemeData.eligibility.eligible_course_types) ??
-                  NOT_SPECIFIED}
-              </dd>
-            </div>
-            {schemeData.eligibility.eligible_course_levels &&
-            schemeData.eligibility.eligible_course_types ? (
-              <div className="sm:col-span-2">
-                <dt className="text-xs text-slate-500">Course type</dt>
-                <dd className="mt-1 text-sm font-semibold text-slate-800">
-                  {describeList(schemeData.eligibility.eligible_course_types) || NOT_SPECIFIED}
+          <dl className="grid gap-x-6 gap-y-3 rounded border border-slate-200 bg-slate-50 px-4 py-4 sm:grid-cols-2">
+            {eligibilityRows.map((row) => (
+              <div className="min-w-0" key={row.label}>
+                <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                  {row.label}
+                </dt>
+                <dd
+                  className={`mt-0.5 break-words text-[13px] ${
+                    row.kind === 'not-stated' ? 'italic text-slate-500' : 'font-semibold text-slate-800'
+                  }`}
+                >
+                  {row.value}
                 </dd>
               </div>
-            ) : null}
-            <div className="sm:col-span-2">
-              <dt className="text-xs text-slate-500">Institution</dt>
-              <dd className="mt-1 text-sm font-semibold text-slate-800">
-                {schemeData.eligibility.institution_requirement &&
-                schemeData.eligibility.institution_requirement.length > 0 ? (
-                  <ul className="list-inside list-disc space-y-0.5 font-normal text-slate-700">
-                    {schemeData.eligibility.institution_requirement.map((item) => (
-                      <li key={item}>{item}</li>
-                    ))}
-                  </ul>
-                ) : (
-                  NOT_SPECIFIED
-                )}
-              </dd>
-            </div>
-            <div className="sm:col-span-2">
-              <dt className="text-xs text-slate-500">State / domicile</dt>
-              <dd className="mt-1 text-sm font-semibold text-slate-800">
-                {describeList(schemeData.eligibility.eligible_states) || NOT_SPECIFIED}
-              </dd>
-            </div>
+            ))}
           </dl>
+        </section>
+      ) : null}
 
-          {otherRuleEntries.length > 0 ? (
-            <div className="mt-4 rounded border border-amber-200 bg-amber-50 p-3 text-sm leading-relaxed text-amber-950">
-              <span className="font-bold">Additional conditions:</span>
-              <dl className="mt-1.5 space-y-1.5">
-                {otherRuleEntries.map(({ key, label, values }) => (
-                  <div key={key}>
-                    <dt className="text-[11px] font-bold uppercase tracking-wide text-amber-800">
-                      {label}
-                    </dt>
-                    <dd className="text-[13px]">
-                      {values.map((value, index) => (
-                        <p key={index}>{value}</p>
-                      ))}
-                    </dd>
-                  </div>
-                ))}
-              </dl>
-            </div>
-          ) : null}
+      {/*
+        Section 2 - rules that decide whether the applicant qualifies. These are
+        the ones that disqualify, so they are stated plainly rather than being
+        softened into "additional conditions".
+      */}
+      {rules.eligibility.length > 0 ? (
+        <section>
+          <h2 className="mb-2 text-lg font-bold text-gov-blue-dark">Eligibility conditions</h2>
+          <RuleBlock entries={rules.eligibility} />
+        </section>
+      ) : null}
 
-          {otherRulesSource ? (
-            <p className="mt-2 text-[11px] italic leading-snug text-slate-400">
-              Source: {otherRulesSource}
-            </p>
-          ) : null}
+      {/*
+        Section 3 - requirements that apply to a subset of applicants only.
+        Kept out of the list above on purpose: "Divyangjan applicants must produce
+        a Disability Certificate" read as a universal requirement tells every
+        other applicant they have missed something. The fellowship's priority
+        rule and the pre/post-matric year rules are the same shape.
+      */}
+      {rules.conditional.length > 0 ? (
+        <section>
+          <h2 className="mb-2 text-lg font-bold text-gov-blue-dark">
+            Conditional requirements
+            <span className="ml-2 text-xs font-medium text-slate-500">
+              only if one of these applies to you
+            </span>
+          </h2>
+          <RuleBlock entries={rules.conditional} />
+        </section>
+      ) : null}
+
+      {/*
+        Section 4 - true of the scheme, but not a gate. The fellowship's HRA note
+        is the clearest case: "The fellowship is not conditioned on hostel status,
+        but HRA is" is a rule about an allowance, and under Eligibility criteria
+        it read as though not living in a hostel disqualified the candidate.
+      */}
+      {rules.informational.length > 0 ? (
+        <section>
+          <h2 className="mb-2 text-lg font-bold text-gov-blue-dark">Good to know</h2>
+          <RuleBlock entries={rules.informational} />
+        </section>
+      ) : null}
+
+      {/* Quotas and course groupings, from `scheme_criteria`. `maximum_age` is
+          excluded because it is already the Age row above; showing it here as
+          three more cards repeated the same number twice. */}
+      {schemeData.criteria.length > 0 ? (
+        <section>
+          <h2 className="mb-2 text-lg font-bold text-gov-blue-dark">
+            {schemeData.criteria.some((c) => c.criteria_type === 'course_group')
+              ? 'Courses, reservations and course groups'
+              : 'Reservations and awards'}
+          </h2>
+          <SchemeCriteriaList criteria={schemeData.criteria} excludeTypes={['maximum_age']} />
+        </section>
+      ) : null}
+
+      {/* Section 5 - the applicant's own position. */}
+      <section>
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-lg font-bold text-gov-blue-dark">Checked against your profile</h2>
+          <Badge tone={eligibilityStatus.tone}>{eligibilityStatus.label}</Badge>
         </div>
-      ) : (
+
+        {profileNotice ? (
+          <p className="rounded border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
+            {profileNotice}
+          </p>
+        ) : null}
+
+        {eligibilityEval ? (
+          <div className="space-y-3">
+            {eligibilityEval.result === 'NOT_ELIGIBLE' ? (
+              <div className="rounded border border-red-200 bg-red-50 p-3">
+                <p className="mb-2 text-xs font-semibold text-red-700">
+                  Does not meet these requirements
+                </p>
+                <ul className="space-y-1 text-xs text-red-800">
+                  {eligibilityEval.missing.map((item, index) => (
+                    <li key={index}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
+            {eligibilityEval.matched.length > 0 ? (
+              <div className="rounded border border-emerald-200 bg-emerald-50 p-3">
+                <p className="mb-2 text-xs font-semibold text-emerald-700">Requirements met</p>
+                <ul className="space-y-1 text-xs text-emerald-800">
+                  {eligibilityEval.matched.map((item, index) => (
+                    <li key={index}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
+            {eligibilityEval.result === 'NEEDS_REVIEW' ? (
+              <div className="rounded border border-amber-200 bg-amber-50 p-3">
+                <p className="mb-2 text-xs font-semibold text-amber-700">
+                  Add these to your profile to finish this check
+                </p>
+                <ul className="space-y-1 text-xs text-amber-800">
+                  {eligibilityEval.missing.map((item, index) => (
+                    <li key={index}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
+            {/*
+              Requirements satisfied by a certificate or a committee, not by a
+              number. Reported so the applicant knows what to upload. These are
+              not counted against them: they are true of the scheme whatever their
+              profile says, so treating them as outstanding is what previously
+              made NEEDS_REVIEW the only reachable result on every scheme.
+            */}
+            {eligibilityEval.toConfirm.length > 0 ? (
+              <div className="rounded border border-slate-200 bg-white p-3">
+                <p className="mb-2 text-xs font-semibold text-slate-700">
+                  Confirmed from your documents during review
+                </p>
+                <ul className="space-y-1 text-xs text-slate-600">
+                  {eligibilityEval.toConfirm.map((item, index) => (
+                    <li key={index}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
+            <p className="rounded border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+              <span className="font-semibold">Note:</span> This is a preliminary assessment based on your
+              profile. Final eligibility is subject to document verification and authorised review.
+            </p>
+          </div>
+        ) : null}
+      </section>
+
+      {schemeData.eligibility ? null : (
         <p className="text-sm text-slate-600">{ELIGIBILITY_UNAVAILABLE}</p>
       )}
     </div>
@@ -566,7 +569,7 @@ export function ApplicantSchemeDetailPage() {
           </Button>
         }
         description={scheme.description || 'Official scheme information from verified sources.'}
-        eyebrow={`${scheme.scheme_categories?.name || 'Scheme'} · ${scheme.academic_year}`}
+        eyebrow={`${scheme.scheme_categories?.name || 'Scheme'} Â· ${scheme.academic_year}`}
         title={scheme.name}
       />
 
@@ -581,8 +584,8 @@ export function ApplicantSchemeDetailPage() {
             <Button disabled={applying} size="md" type="button" variant="primary" onClick={handleApplyNow}>
               {applying
                 ? existingApplication
-                  ? 'Opening your application…'
-                  : 'Creating your application…'
+                  ? 'Opening your applicationâ€¦'
+                  : 'Creating your applicationâ€¦'
                 : existingApplication
                   ? 'Continue application'
                   : 'Apply Now'}

@@ -43,8 +43,19 @@ const PROFILE_TABLE = 'applicant_profiles';
  * so both are checked. A missing relation means "the backend has not shipped
  * this yet", which is different from a permission problem and should not be
  * shown to the applicant as an error.
+ *
+ * 42883 (undefined_function) is deliberately NOT in this set, even though it
+ * used to be. It does not mean a table is missing: it means something the query
+ * depends on resolved to no function. On this project that is exactly what the
+ * broken `applicant_profile_completeness()` / `refresh_applicant_completeness()`
+ * pair raises (their bodies call `jsonb_object_length`, which does not resolve
+ * on the deployed database). Classifying that as "not deployed" turned a real
+ * database fault into the applicant-facing sentence "Applying is not available
+ * yet. Please try again later." — a message that is both wrong and unactionable,
+ * and which hid the failure from anyone reading the UI. A fault that is not a
+ * missing relation has to surface as a fault.
  */
-const MISSING_SCHEMA_CODES = new Set(['42P01', '42703', '42883']);
+const MISSING_SCHEMA_CODES = new Set(['42P01', '42703']);
 
 function isMissingRelation(error: { code?: string | null; message: string }): boolean {
   if (error.code && MISSING_SCHEMA_CODES.has(error.code)) return true;
@@ -366,20 +377,28 @@ export type CreateApplicationOutcome =
  * Duplicate prevention is three-layer, and the order reflects how much each can
  * actually be trusted right now:
  *
- *   1. A SELECT for (applicant_id, scheme_id). Fast path, and not trusted alone.
+ *   1. A SELECT for (applicant_id, scheme_id). Fast path, not trusted alone.
  *   2. A unique constraint on (applicant_id, scheme_id) in the table, added by
- *      20260927000002_create_applications.sql. This is the layer that truly
- *      settles a race — but that migration is NOT applied to the live project
- *      (an anonymous read of `applications` returns 200 [] rather than a
- *      permission error, so the migration's `revoke ... from anon` never ran).
- *      Until it is applied there is no constraint, so layer 3 does the work.
- *   3. A re-read after the INSERT, keeping only the earliest row for the pair and
- *      removing any others. This is what makes "Apply twice, get one application"
- *      true *today* rather than only once the migration is deployed: both callers
- *      converge on the same earliest row even if both inserts succeeded.
+ *      20260927000002_create_applications.sql. This is the layer that settles a
+ *      race. It is verified live as deployed: a second INSERT for the same
+ *      (applicant_id, scheme_id) returns 409 / SQLSTATE 23505
+ *      "duplicate key value violates unique constraint
+ *      applications_applicant_id_scheme_id_key". The same migration's
+ *      set_application_reference() trigger is also live — it mints the
+ *      MOTA-2026-XXXXXXXX reference on the row that INSERT creates.
+ *   3. A re-read after the INSERT that keeps only the canonical row and offers
+ *      the rest for cleanup. This cannot fire while the constraint holds, so it
+ *      is now a repair path for rows that predate the constraint rather than a
+ *      live race-closer, and it is retained because deleting an applicant's own
+ *      surplus draft is not something this function should leave lying around.
  *
- * `created` tells the caller which happened, so the UI can say "application
- * created" versus "opening your existing application" without a second query.
+ * The earlier version of this comment asserted that 20260927000002 was NOT
+ * applied to the live project, on the grounds that "an anonymous read of
+ * `applications` returns 200 []". That inference was wrong: `applications` is
+ * `revoke all … from anon`, and what returns 200 [] anonymously is `schemes`,
+ * whose policies are `to authenticated` and therefore yield zero rows rather
+ * than a permission error. The wrong premise is why the code below grew a
+ * re-read-and-delete step justified as a race-closer it never actually was.
  *
  * `created` tells the caller which happened, so the UI can say "application
  * created" versus "opening your existing application" without a second query.
@@ -421,14 +440,10 @@ export async function createOrResumeApplication(schemeId: string): Promise<Creat
     /**
      * Every application for this (applicant, scheme), oldest first.
      *
-     * This deliberately uses a list rather than `.maybeSingle()`. The maybeSingle
-     * assumption is exactly the one that cannot be relied on yet: the unique
-     * constraint on (applicant_id, scheme_id) is added by
-     * 20260927000002_create_applications.sql and that migration is not applied to
-     * the live project. A second call to maybeSingle() against a table that
-     * already holds a duplicate returns an error rather than a row, so the
-     * "already applied, just resume it" path would start failing for precisely the
-     * applicants who already have two.
+     * A list rather than `.maybeSingle()`, so a pre-existing duplicate resolves to
+     * a row the caller can reconcile rather than to an error. With the unique
+     * constraint live this returns at most one row; the list shape is kept so the
+     * cleanup step has something to work with if it ever sees more.
      */
     const selectAllForScheme = async (): Promise<Application[]> => {
       const { data, error } = await client
@@ -468,10 +483,10 @@ export async function createOrResumeApplication(schemeId: string): Promise<Creat
       .single();
 
     if (insertError) {
+      // Lost the race against a concurrent click. This is the constraint doing
+      // its job: the loser's INSERT is rejected with 23505, and the winner's row
+      // is the application, so the loser resumes it instead of creating a second.
       if (insertError.code === UNIQUE_VIOLATION) {
-        // Lost the race against a concurrent click — this only happens once
-        // 20260927000002 has been applied. The winner's row is the application;
-        // return it instead of creating a second one.
         const after = await selectAllForScheme();
         if (after.length > 0) {
           const canonical = pickCanonicalApplication(after);
@@ -508,31 +523,29 @@ export async function createOrResumeApplication(schemeId: string): Promise<Creat
 
     const created = inserted as Application;
 
-    // A missing reference means the BEFORE INSERT trigger is not deployed, i.e.
-    // 20260927000002_create_applications.sql has not been run against this
-    // project. This deliberately does NOT fail the call. The row is real and the
-    // applicant can work on it via its uuid; failing here would be worse, because
-    // the applicant would never be able to apply at all. Log it loudly so the gap
-    // gets fixed.
+    // A missing reference would mean the BEFORE INSERT trigger is not deployed.
+    // The trigger is live — it mints the MOTA-2026-XXXXXXXX reference in the same
+    // transaction that inserts the row — so this is a guard, not an expected path.
+    // It deliberately does NOT fail the call: the row is real and the applicant
+    // can work on it via its uuid, and refusing to hand back a valid application
+    // would be worse than a missing label. Logged loudly so the gap gets fixed.
     if (!created.application_number) {
       console.error(
-        'Application was created without an application_number. The set_application_reference() trigger is missing — apply supabase/migrations/20260927000002_create_applications.sql to this Supabase project.',
+        'Application was created without an application_number. The set_application_reference() trigger is missing — check supabase/migrations/20260927000002_create_applications.sql against this Supabase project.',
         { applicationId: created.id, schemeId },
       );
     }
 
-    // Close the race the SELECT could not: without the unique constraint, two
-    // clicks can both insert, and both applicants are then sent to *different*
-    // applications for the same scheme. Re-reading and keeping only the earliest
-    // row means both callers converge on one application, and the loser's row is
-    // removed. Best-effort by design — if the delete is not permitted the caller
-    // still gets the canonical row, which is the part the applicant sees.
+    // A SELECT cannot see a row another transaction has not committed, so with the
+    // unique constraint in place this converges on a single row. Kept as a
+    // reconciliation step for any duplicate that predates the constraint: it
+    // never deletes a non-draft row (see removeDuplicateApplications).
     const afterInsert = await selectAllForScheme();
     if (afterInsert.length > 1) {
       const canonical = pickCanonicalApplication(afterInsert);
       const surplus = afterInsert.filter((row) => row.id !== canonical.id);
       console.warn(
-        `Concurrent Apply created ${afterInsert.length} applications for one scheme. Converging on ${canonical.id} and offering ${surplus.length} for cleanup. Apply 20260927000002 to prevent this.`,
+        `Found ${afterInsert.length} applications for one (applicant, scheme) pair. Converging on ${canonical.id} and offering ${surplus.length} for cleanup.`,
         { schemeId, kept: canonical.id, surplus: surplus.map((row) => ({ id: row.id, status: row.status })) },
       );
       await removeDuplicateApplications(surplus);
@@ -581,15 +594,14 @@ function pickCanonicalApplication(rows: Application[]): Application {
 /**
  * Deletes surplus application rows, best-effort, and only ever drafts.
  *
- * The draft-only rule is the important part. This cleanup exists because the
- * unique constraint on (applicant_id, scheme_id) is not deployed, so two clicks
- * can both insert. It is a repair for that gap, not a general-purpose prune, and
- * it must not be able to delete an application an officer is reviewing: a
- * submitted row is a record of an act the applicant took, and destroying it
- * because a stray draft happened to sit beside it would be unrecoverable data
- * loss on a scholarship portal. `applications` has ten possible statuses and only
- * one of them is `draft`, so requiring an exact match is a tight gate — anything
- * unrecognised is preserved.
+ * The draft-only rule is the important part. This cleanup exists for rows that
+ * predate the unique constraint, so two clicks could both insert. It is a repair
+ * for that gap, not a general-purpose prune, and it must not be able to delete an
+ * application an officer is reviewing: a submitted row is a record of an act the
+ * applicant took, and destroying it because a stray draft happened to sit beside
+ * it would be unrecoverable data loss on a scholarship portal. `applications` has
+ * ten possible statuses and only one of them is `draft`, so requiring an exact
+ * match is a tight gate — anything unrecognised is preserved.
  *
  * Rows that are not drafts are left in place and reported instead, since a
  * non-draft duplicate is a data question for a human, not something the Apply

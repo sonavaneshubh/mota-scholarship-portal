@@ -17,6 +17,12 @@
 
 import type { SchemeBenefit } from '../../lib/supabase';
 import { formatMoney } from '../../services/eligibility';
+import { stripInternalProvenance } from '../../lib/schemeEligibilityView';
+import {
+  describeBenefitBasis,
+  humaniseBenefitFrequency,
+  humaniseBenefitType,
+} from '../../lib/benefitView';
 import { Badge } from '../ui/Badge';
 
 interface SchemeBenefitsTableProps {
@@ -44,49 +50,20 @@ function groupBenefits(benefits: SchemeBenefit[]): BenefitGroup[] {
   return Array.from(groups, ([benefitType, rows]) => ({ benefitType, rows }));
 }
 
-function humanise(value: string): string {
-  const text = value.replace(/_/g, ' ').trim();
-  return text.charAt(0).toUpperCase() + text.slice(1);
-}
-
-/** Spoken form of a `frequency` value, e.g. 'monthly' -> 'Monthly'. */
-function humaniseFrequency(value: string): string {
-  return humanise(value);
-}
-
 /**
- * What a NULL amount means, in words, taken from `amount_basis`. Returns null
- * when there is no amount and no basis to explain it, so the row can fall back
- * to the generic message.
+ * The text shown under an amount, with provenance removed.
+ *
+ * This used to pull the trailing "Source: ..." clause out and print it again
+ * directly underneath, in grey italics, under every one of the 30-plus benefit
+ * rows across the five schemes. An applicant reading "Rs. 5,000 per annum per
+ * student... Source: national-fellowship-scholarship.pdf Part-B p.19 §2.5" learns
+ * the file name and the page, and nothing about the benefit.
+ *
+ * stripInternalProvenance() drops the citation and any other sentence that is a
+ * note about the data, not just the one starting with "Source:".
  */
-function describeBasis(basis: string | null | undefined): string | null {
-  switch (basis) {
-    case 'actual':
-      return 'Actual cost, as claimed and verified. No fixed amount is stated in the guideline.';
-    case 'state_fixed':
-      return 'Decided by the State Level Fee Fixation Committee. No single central amount is stated.';
-    case 'percentage':
-      return 'A percentage of another official figure, not a fixed amount. The percentage is given in the conditions below.';
-    case 'pro_rated':
-      return 'Pro-rated to the number of months remaining in the financial year.';
-    default:
-      return null;
-  }
-}
-
-/**
- * Pulls the trailing "Source: ..." sentence out of `conditions` so it can be
- * styled as provenance rather than as part of the rule itself.
- */
-function splitSource(conditions: string): { body: string; source: string | null } {
-  const match = conditions.match(/\s*Source:\s*([^]*?)\s*$/);
-  if (!match) {
-    return { body: conditions.trim(), source: null };
-  }
-  return {
-    body: conditions.slice(0, match.index).trim(),
-    source: match[1].trim(),
-  };
+function conditionBody(conditions: string | null | undefined): string | null {
+  return stripInternalProvenance(conditions);
 }
 
 export function SchemeBenefitsTable({ benefits }: SchemeBenefitsTableProps) {
@@ -103,7 +80,12 @@ export function SchemeBenefitsTable({ benefits }: SchemeBenefitsTableProps) {
   return (
     <div className="space-y-5">
       {groups.map((group) => {
-        const heading = group.rows.find((row) => row.description)?.description ?? humanise(group.benefitType);
+        // The first row's description names the group. A description that was
+        // entirely a citation leaves nothing to name it with, so the humanised
+        // benefit_type is used instead.
+        const heading =
+          group.rows.map((row) => stripInternalProvenance(row.description)).find(Boolean) ??
+          humaniseBenefitType(group.benefitType);
 
         return (
           <section key={group.benefitType}>
@@ -111,23 +93,22 @@ export function SchemeBenefitsTable({ benefits }: SchemeBenefitsTableProps) {
               <h3 className="text-sm font-bold text-gov-blue-dark">{heading}</h3>
               {group.benefitType !== heading ? (
                 <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                  {humanise(group.benefitType)}
+                  {humaniseBenefitType(group.benefitType)}
                 </span>
               ) : null}
             </div>
 
             <ul className="space-y-2">
               {group.rows.map((row) => {
-                const { body, source } = row.conditions
-                  ? splitSource(row.conditions)
-                  : { body: '', source: null };
-                const basisNote = describeBasis(row.amount_basis);
+                const body = conditionBody(row.conditions);
+                const basisNote = describeBenefitBasis(row.amount_basis);
+                const description = stripInternalProvenance(row.description);
 
                 return (
                   <li className="rounded border border-slate-200 bg-slate-50 px-3 py-2.5" key={row.id}>
                     {row.frequency || row.currency ? (
                       <p className="mb-1 flex flex-wrap items-center gap-1.5">
-                        {row.frequency ? <Badge tone="blue">{humaniseFrequency(row.frequency)}</Badge> : null}
+                        {row.frequency ? <Badge tone="blue">{humaniseBenefitFrequency(row.frequency)}</Badge> : null}
                         {row.currency ? <Badge tone="slate">{row.currency}</Badge> : null}
                       </p>
                     ) : null}
@@ -142,12 +123,12 @@ export function SchemeBenefitsTable({ benefits }: SchemeBenefitsTableProps) {
                       </p>
                     )}
 
-                    {body ? (
-                      <p className="mt-1.5 text-[12px] leading-snug text-slate-600">{body}</p>
+                    {description ? (
+                      <p className="mt-1.5 text-[12px] leading-snug text-slate-600">{description}</p>
                     ) : null}
 
-                    {source ? (
-                      <p className="mt-1.5 text-[11px] italic leading-snug text-slate-400">Source: {source}</p>
+                    {body ? (
+                      <p className="mt-1.5 text-[12px] leading-snug text-slate-600">{body}</p>
                     ) : null}
                   </li>
                 );

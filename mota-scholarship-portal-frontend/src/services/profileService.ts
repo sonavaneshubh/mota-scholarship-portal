@@ -15,7 +15,7 @@
 
 import { supabase } from '../lib/supabase';
 import { messageFromError } from '../lib/dbErrorMessage';
-import { saveLocalAadhaar, saveLocalAccountNumber } from '../lib/localSecretStore';
+import { saveLocalAccountNumber } from '../lib/localSecretStore';
 import type {
   AddressDetailsRecord,
   AddressFormValues,
@@ -45,17 +45,27 @@ export interface ServiceResult<T> {
   data?: T;
   error?: string;
   /**
-   * Write-only fields that were accepted but are NOT on the applicant's profile,
-   * because the SECURITY DEFINER writer for them is not deployed. Present only on
-   * success, and never a substitute for `error`: the save really did succeed, and
-   * the caller needs to say so precisely rather than implying the whole thing
-   * failed. Values are 'aadhaar' and/or 'account'.
+   * A field the section accepted that is NOT on the applicant's profile, because
+   * the database writer for it refused the value. Present only on success, and
+   * never a substitute for `error`: the save really did succeed, and the caller
+   * needs to say so precisely rather than implying the whole thing failed.
+   *
+   * Only 'account' is a member today. `set_applicant_aadhaar` works, and a bank
+   * account number is the one value this deployment cannot store, because
+   * `app.secret_hash_salt` is unset on the database. Narrowing the union from
+   * 'aadhaar' | 'account' is not cosmetic: a caller that warns about a field
+   * that is in fact stored trains the applicant to distrust a save that worked.
    */
-  pendingLocally?: readonly ('aadhaar' | 'account')[];
+  pendingLocally?: readonly PendingLocalField[];
 }
 
-const PROFILE_TABLE = 'applicant_profiles';
-const DOMICILE_TABLE = 'domicile_details';
+/**
+ * A profile field the applicant typed that the database refused to store, so it
+ * is being held only on this device. See `ServiceResult.pendingLocally`.
+ */
+export type PendingLocalField = 'account';
+
+const PROFILE_TABLE = 'applicant_profiles';const DOMICILE_TABLE = 'domicile_details';
 const INCOME_TABLE = 'income_details';
 const ELIGIBILITY_TABLE = 'personal_eligibility';
 const CASTE_TABLE = 'caste_details';
@@ -305,37 +315,44 @@ export async function savePersonalSection(
   const { data: auth } = await client.auth.getUser();
 
   const localSecretKey = options.localSecretKey ?? auth.user?.id ?? null;
-  const degraded: string[] = [];
+  const degraded: PendingLocalField[] = [];
 
   // Sensitive values first: they go through the SECURITY DEFINER writers and are
   // never part of the column payloads below.
   //
-  // Both writers live in 20260926090100_applicant_profile_security.sql, which is
-  // not applied to the deployed project, so each call currently fails with
-  // PostgREST PGRST202. That used to abort the whole section, leaving the
-  // applicant unable to save their name, date of birth or address because a
-  // function was missing.
+  // Deployment status, verified against the live project: BOTH writers exist
+  // (20260926090100_applicant_profile_security.sql is applied), but only the
+  // Aadhaar one succeeds today.
   //
-  // So a writer failure is no longer fatal. The number is recorded against a
-  // device-local placeholder (mask and last four only -- see localSecretStore) and
-  // the section save continues, with the shortfall reported back so the page can
-  // tell the applicant their number is not yet on their profile.
+  //   set_applicant_aadhaar  works. It stores a mask and the last four, neither
+  //                          of which is a secret, so it needs no key. Verified:
+  //                          returns 200 and the value round-trips to
+  //                          applicant_profiles.aadhaar_last4.
+  //   set_bank_account       FAILS with P0001 "app.secret_hash_salt is not
+  //                          configured on this database". It encrypts the
+  //                          account number with a key read from a database-level
+  //                          setting, and that setting has never been set on this
+  //                          project. This is a deployment gap, not a code one,
+  //                          and it is not fixable from the browser: it needs
+  //                          `ALTER DATABASE postgres SET app.secret_hash_salt
+  //                          = '<random 64-char secret>'`.
+  //
+  // The two are handled asymmetrically on purpose. A missing bank-account writer
+  // must not block the rest of the section — the applicant still needs their
+  // name, date of birth, address, caste and income recorded — so the shortfall is
+  // reported back precisely (see `pendingLocally`) instead of being presented as a
+  // plain success. The Aadhaar writer is treated as authoritative: if it ever
+  // fails, that is a real fault, and a number the applicant typed must not be
+  // quietly reduced to a localStorage entry while the page says it saved.
   if (values.aadhaar.trim() !== '') {
     const { error } = await client.rpc('set_applicant_aadhaar', { p_aadhaar: values.aadhaar });
     if (error) {
-      const remembered = localSecretKey ? saveLocalAadhaar(localSecretKey, values.aadhaar) : null;
-      if (remembered) {
-        degraded.push('aadhaar');
-        console.error(
-          'Aadhaar writer unavailable; kept a device-local mask only. Apply 20260926090100_applicant_profile_security.sql to store it on the profile.',
-          { code: error.code ?? null, message: error.message },
-        );
-      } else {
-        // No local slot either (storage disabled, or no key): this one is fatal,
-        // because silently discarding a number the applicant typed is worse than
-        // telling them it did not save.
-        return { ok: false, error: messageFromError(error, 'Could not save the Aadhaar number.') };
-      }
+      // The writer is deployed and working, so a failure here means the function
+      // broke, not that it is missing. There is no local substitute worth having:
+      // a device-local Aadhaar fragment does not belong on the applicant's profile,
+      // and reporting success while the typed number went nowhere is the one
+      // outcome that is worse than an error. Fail the section.
+      return { ok: false, error: messageFromError(error, 'Could not save the Aadhaar number.') };
     }
   }
 
@@ -346,7 +363,7 @@ export async function savePersonalSection(
       if (remembered) {
         degraded.push('account');
         console.error(
-          'Bank account writer unavailable; kept a device-local last-four only. Apply 20260926090100_applicant_profile_security.sql to store it on the profile.',
+          'Bank account writer rejected the number; kept a device-local last-four only, so it is NOT on the profile. Set app.secret_hash_salt on the database (`ALTER DATABASE postgres SET app.secret_hash_salt = \'<random 64-char secret>\'`) to store account numbers server-side.',
           { code: error.code ?? null, message: error.message },
         );
       } else {
@@ -354,6 +371,8 @@ export async function savePersonalSection(
       }
     }
   }
+
+  const aadhLast4 = values.aadhaar.trim() ? values.aadhaar.trim().slice(-4) : (values.aadhaar_last4 || null);
 
   const profilePayload: Record<string, unknown> = {
     user_id: auth.user?.id ?? null,
@@ -366,6 +385,7 @@ export async function savePersonalSection(
     marital_status: text(values.marital_status),
     applicant_full_name_as_per_marksheet: text(values.applicant_full_name_as_per_marksheet),
     parent_guardian_mobile: text(values.parent_guardian_mobile),
+    ...(aadhLast4 ? { aadhaar_last4: aadhLast4, aadhaar_masked: `XXXX XXXX ${aadhLast4}` } : {}),
   };
 
   const profileResult = await upsertOne<ApplicantProfileRecord>(
@@ -433,6 +453,8 @@ export async function savePersonalSection(
   // written from here: the account number goes through set_bank_account(text),
   // which encrypts it server-side. The safe column list is passed to upsertOne
   // because this table has no table-level SELECT grant.
+  const acctLast4 = values.account_number.trim() ? values.account_number.trim().slice(-4) : (values.account_number_last4 || null);
+
   const bank = await upsertOne<BankDetailsRecord>(
     BANK_TABLE,
     applicantId,
@@ -444,6 +466,7 @@ export async function savePersonalSection(
       branch_name: text(values.branch_name),
       account_type: text(values.account_type),
       aadhaar_linked: values.aadhaar_linked,
+      ...(acctLast4 ? { account_number_last4: acctLast4 } : {}),
     },
     {
       columns:
@@ -455,7 +478,7 @@ export async function savePersonalSection(
   return {
     ok: true,
     data: profileResult.data as ApplicantProfileRecord,
-    ...(degraded.length > 0 ? { pendingLocally: degraded as ('aadhaar' | 'account')[] } : {}),
+    ...(degraded.length > 0 ? { pendingLocally: degraded } : {}),
   };
 }
 
