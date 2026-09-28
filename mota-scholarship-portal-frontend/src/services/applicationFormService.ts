@@ -342,6 +342,27 @@ export async function saveApplicationDraft(
  * moved on (submitted, withdrawn, …) is not re-submitted by a stale tab, and the
  * update only lands if the row is still exactly where the applicant left it.
  */
+/**
+ * The submission guard raising `Missing required document(s): ...`.
+ *
+ * Postgres reports a `raise exception` from a trigger as a generic `P0001`, so
+ * the code alone is not enough to tell this apart from any other raised error.
+ * The message is what identifies it, which is why the text is matched rather than
+ * trusted blindly below.
+ */
+function isMissingDocumentException(error: { code?: string; message?: string }): boolean {
+  return error.code === 'P0001' && /missing required document/i.test(error.message ?? '');
+}
+
+/**
+ * 42501 with a row-level-security complaint: the applicant's own profile anchor
+ * is missing, so the policy that scopes writes to their profile matched nothing.
+ */
+function isRowLevelSecurityViolation(error: { code?: string; message?: string }): boolean {
+  const message = error.message ?? '';
+  return error.code === '42501' && /row-level security/i.test(message);
+}
+
 export async function submitApplication(
   applicationId: string,
   answers: SchemeAnswers,
@@ -384,6 +405,29 @@ export async function submitApplication(
         cause: error,
       };
     }
+
+    // P0001 is a raised database exception, and the only one the submit path
+    // expects is the guard naming what is still missing. Surfacing it is the
+    // difference between "you still need a document" and a bare "please try
+    // again" that the applicant can do nothing about.
+    if (isMissingDocumentException(error)) {
+      console.error('Submit blocked by guard_application_submission', { applicationId, error });
+      return {
+        ok: false,
+        message: error.message.replace(/^Missing required document\(s\):\s*/i, 'Still required: '),
+        cause: error,
+      };
+    }
+
+    if (isRowLevelSecurityViolation(error)) {
+      return {
+        ok: false,
+        message:
+          'Your application profile is not set up, so the database rejected the save. Signing out and in again usually fixes this.',
+        cause: error,
+      };
+    }
+
     console.error('Failed to submit application', { applicationId, error });
     return { ok: false, message: 'Your application could not be submitted. Please try again.', cause: error };
   }

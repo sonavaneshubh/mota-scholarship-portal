@@ -19,11 +19,14 @@ function createCaptcha() {
 }
 
 export function AdminLogin() {
-  const { isAuthenticated, signIn } = useAdminAuth();
+  const { isAuthenticated, signIn, signInDemo } = useAdminAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
+  const [demoEmail, setDemoEmail] = useState('');
+  const [demoPassword, setDemoPassword] = useState('');
+  const [showCredentials, setShowCredentials] = useState(false);
   const [captcha, setCaptcha] = useState('');
   const [captchaCode, setCaptchaCode] = useState(createCaptcha);
   const [remember, setRemember] = useState(true);
@@ -92,15 +95,58 @@ export function AdminLogin() {
     navigate(destination, { replace: true });
   }
 
-  async function handleDemoLogin() {
+  /**
+   * Where a successful Demo Admin sign-in should land: back to the page that sent
+   * them here, unless that was the login screen itself.
+   */
+  function demoDestination() {
+    const from = (location.state as { from?: { pathname?: string; search?: string } } | null)?.from;
+    return from?.pathname && from.pathname !== ROUTES.admin.login
+      ? `${from.pathname}${from.search ?? ''}`
+      : ROUTES.admin.dashboard;
+  }
+
+  /**
+   * The one-click path. No credential is collected: the server-side broker holds
+   * the read-only account's password and returns a session for it. If the broker
+   * is not deployed on this project, the manual form is offered rather than
+   * leaving a visitor with a button that does nothing.
+   */
+  async function handleViewDemo() {
     setNotice('');
     setAuthError('');
-    setIdentifier(ADMIN_DEMO_IDENTIFIER);
-    setPassword(ADMIN_DEMO_PASSWORD);
-    setCaptcha(captchaCode);
     setLoading(true);
+    const result = await signInDemo(remember);
+    setLoading(false);
 
-    const result = await signIn(ADMIN_DEMO_IDENTIFIER, ADMIN_DEMO_PASSWORD, remember);
+    if (!result.ok) {
+      setAuthError(result.message ?? 'Unable to open Demo Admin. Please try again.');
+
+      if (result.canRetryWithCredentials) {
+        setShowCredentials(true);
+      }
+
+      return;
+    }
+
+    navigate(demoDestination(), { replace: true });
+  }
+
+  async function handleDemoLogin(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setNotice('');
+    setAuthError('');
+
+    if (!demoEmail.trim() || !demoPassword) {
+      setAuthError('Enter the Demo Admin email and password.');
+      return;
+    }
+
+    setLoading(true);
+    // 'demo' mode signs in against Supabase Auth and then requires the read-only
+    // demo_admin role. It is not the prototype admin shell and it is not applicant
+    // authentication.
+    const result = await signIn(demoEmail, demoPassword, remember, 'demo');
     setLoading(false);
 
     if (!result.ok) {
@@ -108,11 +154,7 @@ export function AdminLogin() {
       return;
     }
 
-    const from = (location.state as { from?: { pathname?: string; search?: string } } | null)?.from;
-    const destination = from?.pathname && from.pathname !== ROUTES.admin.login
-      ? `${from.pathname}${from.search ?? ''}`
-      : ROUTES.admin.dashboard;
-    navigate(destination, { replace: true });
+    navigate(demoDestination(), { replace: true });
   }
 
   return (
@@ -201,35 +243,119 @@ export function AdminLogin() {
                   {loading ? <><span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" /> Signing in…</> : <>Sign in to admin portal <AdminIcon className="h-4 w-4" name="arrow-right" /></>}
                 </Button>
 
-                <div className="relative my-4 flex items-center justify-center">
-                  <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-200" /></div>
-                  <span className="relative bg-white px-3 text-[11px] font-bold uppercase tracking-wider text-slate-400">or</span>
-                </div>
-
-                <div className="rounded-xl border border-amber-300/80 bg-gradient-to-br from-amber-50 to-orange-50/40 p-4 text-center shadow-xs">
-                  <div className="flex items-center justify-center gap-1.5 text-xs font-bold uppercase tracking-wider text-amber-900">
-                    <AdminIcon className="h-4 w-4 text-amber-600" name="user" />
-                    <span>Demo Admin Quick Access</span>
-                  </div>
-                  <p className="mt-1 text-xs text-amber-800/90 leading-relaxed">
-                    Instantly sign in as Super Admin to inspect all applications, document verifications, schemes, and user data.
-                  </p>
-                  <Button
-                    className="mt-3 w-full justify-center bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-slate-900 font-bold border-amber-600 shadow-sm transition-all"
-                    disabled={loading}
-                    size="lg"
-                    type="button"
-                    onClick={handleDemoLogin}
-                  >
-                    {loading ? <><span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-900/40 border-t-slate-900" /> Accessing Demo Admin…</> : <>Login as Demo Admin (View All Data) <AdminIcon className="h-4 w-4" name="arrow-right" /></>}
-                  </Button>
-                </div>
               </form>
 
+              <div className="relative my-5 flex items-center justify-center">
+                <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-200" /></div>
+                <span className="relative bg-white px-3 text-[11px] font-bold uppercase tracking-wider text-slate-400">or</span>
+              </div>
+
+              {/*
+                The Demo Admin is a separate entry, deliberately below the normal
+                form and visually distinct from it. The button takes no credential:
+                the session is brokered server-side, so no password is typed, shown,
+                stored by the browser, or present in the bundle. The account behind
+                it is the same read-only `demo_admin` role either way, and
+                `signIn(..., 'demo')` still enforces that role on the far side of
+                the manual form below.
+              */}
+              <div className="rounded-xl border-2 border-amber-400 bg-gradient-to-br from-amber-50 to-orange-50/40 p-5 shadow-xs">
+                <div className="flex items-center justify-center gap-2 text-sm font-bold uppercase tracking-wider text-amber-900">
+                  <AdminIcon className="h-4 w-4 text-amber-600" name="eye" />
+                  <span>Demo Admin</span>
+                </div>
+                <p className="mt-2 text-xs leading-relaxed text-amber-900/90">
+                  Demo mode — view real applicant and application data submitted through the portal.
+                  This mode is for demonstration purposes and does not represent production
+                  administrator access.
+                </p>
+
+                <Button
+                  className="mt-4 w-full justify-center border-amber-600 bg-amber-500 font-bold text-slate-900 shadow-sm transition-all hover:bg-amber-600 active:bg-amber-700"
+                  disabled={loading}
+                  onClick={handleViewDemo}
+                  size="lg"
+                  type="button"
+                  variant="primary"
+                >
+                  {loading
+                    ? <><span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-900/40 border-t-slate-900" /> Opening Demo Admin…</>
+                    : <><span>View Demo Admin</span><AdminIcon className="h-4 w-4" name="arrow-right" /></>}
+                </Button>
+                <p className="mt-1.5 text-center text-[11px] font-semibold uppercase tracking-wider text-amber-800">
+                  Read-only evaluation access
+                </p>
+
+                <p className="mt-3 text-[11px] leading-relaxed text-amber-800/80">
+                  No password is asked for or stored. This opens a read-only account that can view submitted
+                  applications, their applicants, schemes and documents, and cannot modify, approve, reject or
+                  delete anything.
+                </p>
+
+                {/*
+                  Only rendered when the one-click path fails, or when a visitor asks
+                  for it. An edge-function deployment problem is the common reason,
+                  and this keeps the demonstration usable on a project where the
+                  function has not been deployed yet.
+                */}
+                {showCredentials ? (
+                  <form className="mt-4 border-t border-amber-300/70 pt-4" noValidate onSubmit={handleDemoLogin}>
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-amber-900">
+                      Sign in manually instead
+                    </p>
+                    <p className="mt-1 text-[11px] leading-relaxed text-amber-800/90">
+                      Used when the one-click Demo Admin service is not deployed on this project. The role check
+                      still applies, so an account that is not a Demo Admin is refused.
+                    </p>
+                    <div className="mt-3 space-y-3">
+                      <div>
+                        <label className="block text-xs font-bold uppercase tracking-wider text-amber-900" htmlFor="demo-admin-email">Demo Admin email</label>
+                        <input
+                          autoComplete="username"
+                          className="mt-1.5 min-h-11 w-full rounded-md border border-amber-300 bg-white px-3 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-amber-500 focus:ring-2 focus:ring-amber-100"
+                          id="demo-admin-email"
+                          placeholder="demo.admin@example.com"
+                          type="email"
+                          value={demoEmail}
+                          onChange={(event) => setDemoEmail(event.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold uppercase tracking-wider text-amber-900" htmlFor="demo-admin-password">Password</label>
+                        <input
+                          autoComplete="current-password"
+                          className="mt-1.5 min-h-11 w-full rounded-md border border-amber-300 bg-white px-3 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-amber-500 focus:ring-2 focus:ring-amber-100"
+                          id="demo-admin-password"
+                          placeholder="Demo Admin password"
+                          type={showPassword ? 'text' : 'password'}
+                          value={demoPassword}
+                          onChange={(event) => setDemoPassword(event.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <Button className="mt-3 w-full justify-center" disabled={loading} size="md" type="submit" variant="outline">
+                      {loading ? 'Signing in…' : 'Sign in as Demo Admin'}
+                    </Button>
+                  </form>
+                ) : (
+                  <button
+                    className="mt-2 text-[11px] font-semibold text-amber-800 underline underline-offset-2 hover:text-amber-950"
+                    type="button"
+                    onClick={() => setShowCredentials(true)}
+                  >
+                    Sign in with a Demo Admin email and password instead
+                  </button>
+                )}
+              </div>
+
               <div className="mt-6 border-t border-slate-100 pt-4 text-xs text-slate-500">
-                <p className="font-semibold text-slate-700">Development access</p>
-                <p className="mt-1">Demo ID: <code className="rounded bg-slate-100 px-1 py-0.5">{ADMIN_DEMO_IDENTIFIER}</code></p>
-                <p className="mt-1">Demo password: <code className="rounded bg-slate-100 px-1 py-0.5">{ADMIN_DEMO_PASSWORD}</code></p>
+                <p className="font-semibold text-slate-700">Prototype shell access (not connected to live data)</p>
+                <p className="mt-1">ID: <code className="rounded bg-slate-100 px-1 py-0.5">{ADMIN_DEMO_IDENTIFIER}</code></p>
+                <p className="mt-1">Password: <code className="rounded bg-slate-100 px-1 py-0.5">{ADMIN_DEMO_PASSWORD}</code></p>
+                <p className="mt-2 leading-relaxed">
+                  This shell reaches the unconnected prototype screens only. Real submitted application data
+                  is on the Applications screen, which the Demo Admin above reads from the database.
+                </p>
               </div>
             </div>
           </section>

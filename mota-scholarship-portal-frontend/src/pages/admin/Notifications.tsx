@@ -5,6 +5,7 @@ import type { AdminNotification } from '../../types/admin';
 import { AdminIcon } from '../../components/admin/AdminIcon';
 import type { AdminIconName } from '../../components/admin/AdminIcon';
 import { AdminPageHeader } from '../../components/admin/AdminPageHeader';
+import { PrototypeDataNotice } from '../../components/admin/PrototypeDataNotice';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 
@@ -43,6 +44,8 @@ export function Notifications() {
         eyebrow="Attention centre"
         title="Notifications"
       />
+
+      <PrototypeDataNotice page="notifications" />
 
       {notice ? <div aria-live="polite" className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">{notice}</div> : null}
 

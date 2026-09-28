@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { CATEGORY_APPLICATION_DATA, COLLEGE_APPLICATION_DATA, DASHBOARD_STATS, MONTHLY_APPLICATION_DATA, SCHOLARSHIP_DISTRIBUTION_DATA } from '../../data/adminMockData';
 import { AdminIcon } from '../../components/admin/AdminIcon';
 import { AdminPageHeader } from '../../components/admin/AdminPageHeader';
+import { PrototypeDataNotice } from '../../components/admin/PrototypeDataNotice';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 
@@ -31,6 +32,8 @@ export function Reports() {
         eyebrow="Insights and exports"
         title="Reports & analytics"
       />
+
+      <PrototypeDataNotice page="reports & analytics" />
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Report summary">
         <Card className="p-4" accentClass=""><p className="text-xs font-semibold text-slate-500">Applications received</p><p className="mt-2 text-2xl font-bold text-slate-900">{formatNumber(DASHBOARD_STATS.totalApplications)}</p><p className="mt-1 text-xs text-slate-500">All recorded submissions</p></Card>

@@ -10,6 +10,14 @@ export interface AdminNavItem {
   end?: boolean;
   badge?: 'notifications';
   available?: false;
+  /**
+   * Whether this page is inside the Demo Admin's scope. Only flagged pages are
+   * shown to a Demo Admin session, and they are the ones that read real Supabase
+   * data through the read-only views. Anything unflagged is either
+   * prototype-only (it would show invented data) or offers a write action the
+   * Demo Admin must never reach.
+   */
+  demoReadOnly?: boolean;
 }
 
 export interface AdminNavGroup {
@@ -31,6 +39,7 @@ export const ADMIN_NAVIGATION: AdminNavEntry[] = [
     to: ROUTES.admin.dashboard,
     icon: 'dashboard',
     end: true,
+    demoReadOnly: true,
   },
   {
     id: 'scholarship-management',
@@ -50,6 +59,7 @@ export const ADMIN_NAVIGATION: AdminNavEntry[] = [
         pageTitle: 'Applications',
         to: applicationsPath,
         icon: 'applications',
+        demoReadOnly: true,
       },
       {
         id: 'pending-applications',
@@ -80,6 +90,7 @@ export const ADMIN_NAVIGATION: AdminNavEntry[] = [
     pageTitle: 'Document verification',
     to: ROUTES.admin.documentVerification,
     icon: 'documents',
+    demoReadOnly: true,
   },
   {
     id: 'reports',
@@ -107,6 +118,26 @@ export const ADMIN_NAVIGATION: AdminNavEntry[] = [
 
 export function isNavGroup(entry: AdminNavEntry): entry is AdminNavGroup {
   return 'items' in entry;
+}
+
+/**
+ * Navigation for the current kind of admin session. The prototype admin keeps
+ * the whole menu; a Demo Admin session sees only the pages that read real data
+ * read-only, and a group with no such page is dropped rather than left as an
+ * empty collapsible header.
+ */
+export function getAdminNavigation(isDemoAdmin: boolean): AdminNavEntry[] {
+  if (!isDemoAdmin) {
+    return ADMIN_NAVIGATION;
+  }
+
+  return ADMIN_NAVIGATION.flatMap<AdminNavEntry>((entry) => {
+    if (isNavGroup(entry)) {
+      const items = entry.items.filter((item) => item.demoReadOnly);
+      return items.length > 0 ? [{ ...entry, items }] : [];
+    }
+    return entry.demoReadOnly ? [entry] : [];
+  });
 }
 
 function splitTarget(to: string) {
