@@ -12,6 +12,7 @@ import { matchExistingDocument } from './applicationFormRules';
 import type { SchemeDocument } from './supabase';
 import type { ApplicantDocumentRecord } from '../types/profile';
 import type { ApplicantDocumentStatus } from '../types';
+import type { OcrLinkColumns } from './documentOcr';
 
 /* -------------------------------------------------------------------------- */
 /* Verification status                                                         */
@@ -71,8 +72,15 @@ export function daysUntil(value: string | null | undefined): number | null {
 /* Document requirement checklist                                               */
 /* -------------------------------------------------------------------------- */
 
-export interface DocumentRequirementLink {
-  id: string;
+/**
+ * The attachment row as the checklist needs it.
+ *
+ * Carries the reading columns as well as the link itself, because the status of
+ * the check belongs to this row and the document card renders both from it. The
+ * shape is the one `applicationFormService` selects, rather than a second
+ * definition of the same table that could drift from it.
+ */
+export interface DocumentRequirementLink extends OcrLinkColumns {
   application_id: string;
   scheme_document_id: string;
   document_id: string;

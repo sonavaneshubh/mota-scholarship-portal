@@ -52,6 +52,8 @@ interface ApplicationStageOneProps {
   onAttach: (requirementId: string, documentId: string) => void;
   onDetach: (linkId: string) => void;
   onUpload: (requirement: SchemeDocument, file: File) => void;
+  onRetryOcr: (linkId: string) => void;
+  retryingOcrId: string | null;
   onSaveDraft: () => void;
   onSaveAndContinue: () => void;
 }
@@ -71,6 +73,8 @@ export function ApplicationStageOne({
   onAttach,
   onDetach,
   onUpload,
+  onRetryOcr,
+  retryingOcrId,
   onSaveDraft,
   onSaveAndContinue,
 }: ApplicationStageOneProps) {
@@ -110,6 +114,8 @@ export function ApplicationStageOne({
             onAttach={onAttach}
             onDetach={onDetach}
             onUpload={onUpload}
+            onRetryOcr={onRetryOcr}
+            retryingOcrId={retryingOcrId}
             requirements={requirements}
           />
         </div>
