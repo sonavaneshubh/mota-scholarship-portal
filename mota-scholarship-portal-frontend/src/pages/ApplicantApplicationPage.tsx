@@ -3,9 +3,7 @@ import { useParams } from 'react-router-dom';
 import { useApplicantAuth } from '../context/useApplicantAuth';
 import { ApplicantPageHeader } from '../components/applicant/ApplicantPageHeader';
 import { ApplicationStatusBadge } from '../components/applicant/StatusBadge';
-import { ApplicationTimeline } from '../components/applicant/ApplicationTimeline';
-import { DocumentVerificationPanel } from '../components/applicant/DocumentVerificationPanel';
-import { DocumentStatusBadge } from '../components/applicant/StatusBadge';
+import { DeleteDraftApplicationButton } from '../components/applicant/DeleteDraftApplicationButton';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
@@ -28,7 +26,6 @@ import {
 import {
   buildDocumentRequirements,
   daysUntil,
-  documentStatusFromRecord,
   type DocumentRequirementLink,
   type DocumentRequirementView,
 } from '../lib/applicationFormView';
@@ -869,6 +866,13 @@ export function ApplicantApplicationPage() {
               <Button size="md" to={ROUTES.applicant.applications} variant="outline">
                 Back to applications
               </Button>
+              <DeleteDraftApplicationButton
+                applicationId={application.id}
+                onDeleted={reloadApplications}
+                referenceNumber={rawReference || null}
+                schemeName={schemeName}
+                status={application.status}
+              />
             </div>
           }
           description="Answer whether this is a renewal application and attach the documents it needs. Your full application form comes next."
@@ -943,6 +947,14 @@ export function ApplicantApplicationPage() {
             <Button size="md" to={ROUTES.applicant.applications} variant="outline">
               Back to applications
             </Button>
+
+            <DeleteDraftApplicationButton
+              applicationId={application.id}
+              onDeleted={reloadApplications}
+              referenceNumber={rawReference || null}
+              schemeName={schemeName}
+              status={application.status}
+            />
           </div>
         }
         description="Everything you are submitting, read back. Check it, tick the declaration, then submit. Changes are made in Additional Information or My Profile."
@@ -1254,73 +1266,26 @@ export function ApplicantApplicationPage() {
 
         {!isDraft ? (
           <p className="mt-3 text-[12px] text-slate-600">
-            This application has already been submitted, so it is read-only. The status and verification details are
-            shown below.
+            This application has already been submitted, so the answers and documents below are read-only. Its
+            current status is shown in the card above and in My Applications.
           </p>
         ) : null}
       </Card>
 
-      {/* Once submitted, the pre-existing status view takes over. */}
-      {!isDraft ? (
-        <>
-          <ApplicationTimeline
-            application={{
-              id: application.id,
-              schemeId: application.scheme_id,
-              schemeName: scheme?.scheme.name ?? '—',
-              submittedAt: application.submitted_at ? new Date(application.submitted_at).toLocaleDateString('en-IN') : '—',
-              updatedAt: new Date(application.updated_at).toLocaleDateString('en-IN'),
-              status: listedStatus,
-              statusLabel: listedStatus.replace(/_/g, ' '),
-              nextStep: 'Your application is with the department for verification.',
-              referenceNumber: reference,
-              amountLabel: '—',
-              documentsComplete: mandatoryDone,
-              documentsTotal: mandatoryTotal,
-            }}
-          />
+      {/* The status timeline, the "AI-assisted processing" panel and the profile
+          document library that used to sit here have been removed. They repeated
+          what the applicant already has a page for: the timeline is covered by the
+          status in My Applications, and the document library by My Documents,
+          which is where a document can actually be corrected. On the form itself
+          they competed with the seven sections and the submit button for the same
+          attention, and the library box listed every document on the profile
+          rather than the ones this application needs, so it answered a question
+          the applicant did not have while filling the form in.
 
-          {mandatoryTotal > 0 ? (
-            <DocumentVerificationPanel
-              documentCount={mandatoryTotal}
-              needsCorrection={listedStatus === 'deficiency-raised' || listedStatus === 'resubmission-required'}
-            />
-          ) : null}
-
-          <Card className="print-flat p-5">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-gov-saffron-dark">Documents on your profile</p>
-            <h2 className="mt-1 text-lg font-bold text-gov-blue-dark">Your document library</h2>
-            {form.documents.length === 0 ? (
-              <p className="mt-4 rounded border border-dashed border-slate-300 px-3 py-6 text-center text-sm text-slate-600">
-                You have not uploaded any document yet.
-              </p>
-            ) : (
-              <ul className="mt-4 divide-y divide-slate-100">
-                {form.documents.map((document) => {
-                  const documentStatus = documentStatusFromRecord(document);
-                  return (
-                  <li className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0" key={document.id}>
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-slate-800">
-                        {document.file_name ?? document.document_name ?? document.document_type ?? 'Document'}
-                      </p>
-                      <p className="mt-1 text-xs text-slate-500">
-                        {document.mime_type ?? 'file'} ·{' '}
-                        {(document.verification_status ?? 'pending').replace(/_/g, ' ')}
-                      </p>
-                    </div>
-                    <DocumentStatusBadge status={documentStatus} />
-                  </li>
-                  );
-                })}
-              </ul>
-            )}
-            <Button className="mt-4" size="sm" to={ROUTES.applicant.documents} variant="outline">
-              Manage documents
-            </Button>
-          </Card>
-        </>
-      ) : null}
+          Deficiency is still legible here through the status badge in the
+          reference card above, which reads "Deficiency raised" or "Resubmission
+          required" and is driven by the same applications.status value the
+          verification panel used to read. */}
 
       <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm leading-relaxed text-slate-700">
         <p className="font-bold text-gov-blue-dark">Decision boundary</p>
