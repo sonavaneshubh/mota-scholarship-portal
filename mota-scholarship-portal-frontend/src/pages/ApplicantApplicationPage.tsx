@@ -210,6 +210,10 @@ const STAGE_TWO_OCR_LABEL: Record<DocumentCheckState, string> = {
   complete: '✓ Processed — matches your profile',
   'needs-review': '⚠ Processed — information needs review',
   failed: '⚠ Could not read this document',
+  'in-flight': 'Γƒ│ AI is processing this documentΓÇª',
+  complete: 'Γ£ô Processed ΓÇö matches your profile',
+  'needs-review': 'ΓÜá Processed ΓÇö information needs review',
+  failed: 'ΓÜá Could not read this document',
 };
 
 const STAGE_TWO_OCR_TONE: Record<DocumentCheckState, string> = {
@@ -480,6 +484,7 @@ export function ApplicantApplicationPage() {
 
   // Reads the server's view of any document still being checked, and folds it
   // into the links held above. Idle — no timers, no requests — once nothing is
+  // into the links held above. Idle ΓÇö no timers, no requests ΓÇö once nothing is
   // in flight, so a finished application costs nothing.
   useDocumentOcrPolling(form.links, mergeOcrState);
 
@@ -1369,6 +1374,8 @@ export function ApplicantApplicationPage() {
           rather than the ones this application needs — so it was a lot of content
           that answered a question the applicant did not have while filling the
           form in.
+          rather than the ones this application needs, so it answered a question
+          the applicant did not have while filling the form in.
 
           Deficiency is still legible here through the status badge in the
           reference card above, which reads "Deficiency raised" or "Resubmission
