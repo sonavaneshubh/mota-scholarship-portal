@@ -1,7 +1,7 @@
 import type { AnchorHTMLAttributes, ButtonHTMLAttributes, ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 
-export type ButtonVariant = 'primary' | 'outline' | 'accent' | 'success' | 'ghost' | 'emerald';
+export type ButtonVariant = 'primary' | 'outline' | 'accent' | 'success' | 'ghost' | 'emerald' | 'danger';
 export type ButtonSize = 'sm' | 'md' | 'lg';
 
 interface BaseProps {
@@ -35,6 +35,9 @@ const variantClasses: Record<ButtonVariant, string> = {
   ghost:
     'bg-white/10 hover:bg-white/20 text-white font-semibold border border-white/30 backdrop-blur transition',
   emerald: 'bg-emerald-800/80 hover:bg-emerald-800 text-emerald-100 border border-emerald-600 transition',
+  // For a confirmed destructive action only — never a row-level one, so it is
+  // always the thing a dialog made the applicant choose on purpose.
+  danger: 'bg-red-700 hover:bg-red-800 text-white border border-red-800 transition',
 };
 
 const sizeClasses: Record<ButtonSize, string> = {

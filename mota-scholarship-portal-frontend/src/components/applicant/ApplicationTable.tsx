@@ -6,9 +6,21 @@ import { Button } from '../ui/Button';
 interface ApplicationTableProps {
   applications: ApplicantApplication[];
   caption: string;
+  /** Omitted entirely when the page offers no delete action, so the column and
+   *  its buttons disappear together rather than rendering an empty header. */
+  onDeleteDraft?: (application: ApplicantApplication) => void;
+  deletingId?: string | null;
 }
 
-export function ApplicationTable({ applications, caption }: ApplicationTableProps) {
+export function ApplicationTable({ applications, caption, onDeleteDraft, deletingId }: ApplicationTableProps) {
+  // Only a draft can be deleted. Every other status — submitted included — is
+  // either someone else's record of an act or an officer's working state, and
+  // the database refuses the delete regardless of what this renders. Keeping the
+  // button off those rows means the affordance matches what the server will
+  // actually do, instead of offering a control that fails when pressed.
+  const canDelete = (application: ApplicantApplication) =>
+    Boolean(onDeleteDraft) && application.id !== null && application.status === 'draft';
+
   return (
     <div className="min-w-0">
       <div className="overflow-x-auto">
@@ -41,15 +53,29 @@ export function ApplicationTable({ applications, caption }: ApplicationTableProp
                 <td className="whitespace-nowrap px-4 py-3 text-slate-600">{application.updatedAt}</td>
                 <td className="px-4 py-3"><ApplicationStatusBadge status={application.status} label={application.statusLabel} /></td>
                 <td className="whitespace-nowrap px-4 py-3 text-slate-600">{application.documentsComplete}/{application.documentsTotal}</td>
-                <td className="px-4 py-3 text-right">
-                  {application.id ? (
-                    <Button size="sm" to={applicantApplicationPath(application.id)} variant="outline">View details</Button>
-                  ) : (
-                    /* No id means the row could not be read, so there is nothing
-                       valid to link to. Rendering a link anyway would navigate to
-                       a URL that can only ever render "Application not found". */
-                    <span className="text-xs text-slate-400">Unavailable</span>
-                  )}
+                <td className="px-4 py-3">
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    {application.id ? (
+                      <Button size="sm" to={applicantApplicationPath(application.id)} variant="outline">View details</Button>
+                    ) : (
+                      /* No id means the row could not be read, so there is nothing
+                         valid to link to. Rendering a link anyway would navigate to
+                         a URL that can only ever render "Application not found". */
+                      <span className="text-xs text-slate-400">Unavailable</span>
+                    )}
+                    {canDelete(application) && onDeleteDraft ? (
+                      <Button
+                        disabled={deletingId === application.id}
+                        onClick={() => onDeleteDraft(application)}
+                        size="sm"
+                        type="button"
+                        variant="outline"
+                        className="text-red-700 hover:bg-red-50 hover:border-red-300"
+                      >
+                        {deletingId === application.id ? 'Deleting…' : 'Delete'}
+                      </Button>
+                    ) : null}
+                  </div>
                 </td>
               </tr>
             ))}
@@ -73,13 +99,27 @@ export function ApplicationTable({ applications, caption }: ApplicationTableProp
               <div><dt className="text-slate-500">Documents</dt><dd className="mt-1 font-semibold text-slate-800">{application.documentsComplete}/{application.documentsTotal} complete</dd></div>
               <div><dt className="text-slate-500">Reference</dt><dd className="mt-1 break-all font-semibold text-slate-800">{application.referenceNumber}</dd></div>
             </dl>
-            {application.id ? (
-              <Button className="w-full" size="sm" to={applicantApplicationPath(application.id)} variant="outline">View details</Button>
-            ) : (
-              <span className="block w-full rounded border border-dashed border-slate-300 px-3 py-1.5 text-center text-xs text-slate-400">
-                Details unavailable
-              </span>
-            )}
+            <div className="space-y-2">
+              {application.id ? (
+                <Button className="w-full" size="sm" to={applicantApplicationPath(application.id)} variant="outline">View details</Button>
+              ) : (
+                <span className="block w-full rounded border border-dashed border-slate-300 px-3 py-1.5 text-center text-xs text-slate-400">
+                  Details unavailable
+                </span>
+              )}
+              {canDelete(application) && onDeleteDraft ? (
+                <Button
+                  className="w-full text-red-700"
+                  disabled={deletingId === application.id}
+                  onClick={() => onDeleteDraft(application)}
+                  size="sm"
+                  type="button"
+                  variant="outline"
+                >
+                  {deletingId === application.id ? 'Deleting…' : 'Delete draft'}
+                </Button>
+              ) : null}
+            </div>
           </article>
         ))}
       </div>
