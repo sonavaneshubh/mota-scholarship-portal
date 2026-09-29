@@ -22,6 +22,8 @@ import type { SchemeDocument } from '../../lib/supabase';
 import type { ApplicantDocumentRecord } from '../../types/profile';
 import type { DocumentRequirementView } from '../../lib/applicationFormView';
 import { createViewUrl, validateDocumentFile } from '../../services/documentService';
+import { summariseDocumentOcr } from '../../lib/documentOcr';
+import { DocumentOcrPanel } from './DocumentOcrPanel';
 
 /* -------------------------------------------------------------------------- */
 /* Stage 1 — the document checklist                                            */
@@ -33,6 +35,8 @@ interface ChecklistProps {
   onAttach: (requirementId: string, documentId: string) => void;
   onDetach: (linkId: string) => void;
   onUpload: (requirement: SchemeDocument, file: File) => void;
+  onRetryOcr: (linkId: string) => void;
+  retryingOcrId: string | null;
   disabled: boolean;
 }
 
@@ -42,18 +46,21 @@ function documentStatus(requirement: SchemeDocument, view: DocumentRequirementVi
   return { label: requirement.is_mandatory ? 'Required' : 'Optional', tone: 'slate' };
 }
 
-function DocumentRow({ view, documents, onAttach, onDetach, onUpload, disabled }: {
+function DocumentRow({ view, documents, onAttach, onDetach, onUpload, onRetryOcr, retryingOcrId, disabled }: {
   view: DocumentRequirementView;
   documents: ApplicantDocumentRecord[];
   onAttach: ChecklistProps['onAttach'];
   onDetach: ChecklistProps['onDetach'];
   onUpload: ChecklistProps['onUpload'];
+  onRetryOcr: ChecklistProps['onRetryOcr'];
+  retryingOcrId: ChecklistProps['retryingOcrId'];
   disabled: boolean;
 }) {
   const { requirement, link, attached, reusable, uploadError, busy } = view;
   const inputRef = useRef<HTMLInputElement>(null);
   const [viewError, setViewError] = useState<string | null>(null);
   const status = documentStatus(requirement, view);
+  const ocr = summariseDocumentOcr(link);
 
   const handleFile = (file: File | undefined) => {
     if (!file) return;
@@ -157,6 +164,14 @@ function DocumentRow({ view, documents, onAttach, onDetach, onUpload, disabled }
         ) : null}
       </div>
 
+      {link ? (
+        <DocumentOcrPanel
+          onRetry={ocr.canRetry ? () => onRetryOcr(link.id) : undefined}
+          retrying={retryingOcrId === link.id}
+          summary={ocr}
+        />
+      ) : null}
+
       <input
         accept=".pdf,.jpg,.jpeg,.png"
         className="sr-only"
@@ -184,6 +199,8 @@ export function RequiredDocumentsSection({
   onAttach,
   onDetach,
   onUpload,
+  onRetryOcr,
+  retryingOcrId,
   disabled,
 }: ChecklistProps) {
   if (requirements.length === 0) {
@@ -204,7 +221,9 @@ export function RequiredDocumentsSection({
             key={view.requirement.id}
             onAttach={onAttach}
             onDetach={onDetach}
+            onRetryOcr={onRetryOcr}
             onUpload={onUpload}
+            retryingOcrId={retryingOcrId}
             view={view}
           />
         ))}

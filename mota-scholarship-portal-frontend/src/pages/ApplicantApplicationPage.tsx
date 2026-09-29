@@ -39,6 +39,9 @@ import {
   type ApplicationFormLoad,
 } from '../services/applicationFormService';
 import { createViewUrl, uploadDocument } from '../services/documentService';
+import { requestDocumentOcr } from '../services/ocrService';
+import { useDocumentOcrPolling } from '../hooks/useDocumentOcrPolling';
+import { summariseDocumentOcr, type DocumentCheckState, type OcrLinkColumns } from '../lib/documentOcr';
 import { toUiApplicationStatus } from '../services/applicantRecords';
 import { useApplicantApplications } from '../hooks/useApplicantRecords';
 import {
@@ -195,6 +198,29 @@ function answerText(question: SchemeQuestion, answers: SchemeAnswers): string {
 }
 
 /**
+ * Stage 2 says only whether the check ran and what it concluded, because this is
+ * the last look before submitting rather than the place to study the reading. The
+ * detail lives on the document card in Stage 1.
+ *
+ * A NEEDS_REVIEW result is phrased as a prompt to look, never as a rejection.
+ */
+const STAGE_TWO_OCR_LABEL: Record<DocumentCheckState, string> = {
+  'not-started': 'AI check not started',
+  'in-flight': 'Γƒ│ AI is processing this documentΓÇª',
+  complete: 'Γ£ô Processed ΓÇö matches your profile',
+  'needs-review': 'ΓÜá Processed ΓÇö information needs review',
+  failed: 'ΓÜá Could not read this document',
+};
+
+const STAGE_TWO_OCR_TONE: Record<DocumentCheckState, string> = {
+  'not-started': 'text-slate-400',
+  'in-flight': 'text-blue-700',
+  complete: 'text-emerald-700',
+  'needs-review': 'text-amber-700',
+  failed: 'text-red-700',
+};
+
+/**
  * One document requirement, read back, with a way to open what was attached.
  *
  * The view row opens the stored file through the same short-lived signed URL the
@@ -205,7 +231,8 @@ function answerText(question: SchemeQuestion, answers: SchemeAnswers): string {
  */
 function DocumentReviewRow({ item }: { item: DocumentRequirementView }) {
   const [viewError, setViewError] = useState<string | null>(null);
-  const { requirement, attached } = item;
+  const { requirement, attached, link } = item;
+  const ocr = summariseDocumentOcr(link);
 
   const openAttached = async () => {
     if (!attached) return;
@@ -230,6 +257,11 @@ function DocumentReviewRow({ item }: { item: DocumentRequirementView }) {
         {attached ? (
           <p className="mt-0.5 break-all text-[11px] text-slate-500">
             {attached.file_name ?? attached.document_name ?? 'Attached'}
+          </p>
+        ) : null}
+        {link && ocr.state !== 'not-started' ? (
+          <p className={`mt-1 text-[11px] font-semibold ${STAGE_TWO_OCR_TONE[ocr.state]}`}>
+            {STAGE_TWO_OCR_LABEL[ocr.state]}
           </p>
         ) : null}
         {viewError ? <p className="mt-1 text-[11px] font-semibold text-red-700">{viewError}</p> : null}
@@ -404,6 +436,36 @@ export function ApplicantApplicationPage() {
   const [submitArmed, setSubmitArmed] = useState(false);
   const [busyRequirementId, setBusyRequirementId] = useState<string | null>(null);
   const [uploadErrors, setUploadErrors] = useState<Record<string, string>>({});
+  const [retryingOcrId, setRetryingOcrId] = useState<string | null>(null);
+
+  /**
+   * Folds a re-read of the reading columns back into the links already held.
+   *
+   * Only the columns this poll owns are replaced, and only on rows that are
+   * actually in the poll result, so a link the server did not return keeps
+   * everything else it carries.
+   */
+  const mergeOcrState = useCallback((rows: OcrLinkColumns[]) => {
+    if (rows.length === 0) return;
+    const byId = new Map(rows.map((row) => [row.id, row]));
+    setForm((previous) => {
+      let changed = false;
+      const links = previous.links.map((link) => {
+        const fresh = byId.get(link.id);
+        if (!fresh) return link;
+        if (
+          link.ocr_status === fresh.ocr_status &&
+          link.ai_confidence === fresh.ai_confidence &&
+          link.ocr_processed_at === fresh.ocr_processed_at
+        ) {
+          return link;
+        }
+        changed = true;
+        return { ...link, ...fresh };
+      });
+      return changed ? { ...previous, links } : previous;
+    });
+  }, []);
 
   /**
    * Which application the editable state was seeded from, tracked in a ref
@@ -415,6 +477,21 @@ export function ApplicantApplicationPage() {
   const seededIdRef = useRef<string | null>(null);
 
   const handle = applicationId ?? '';
+
+  // Reads the server's view of any document still being checked, and folds it
+  // into the links held above. Idle ΓÇö no timers, no requests ΓÇö once nothing is
+  // in flight, so a finished application costs nothing.
+  useDocumentOcrPolling(form.links, mergeOcrState);
+
+  const handleRetryOcr = useCallback(async (linkId: string) => {
+    setRetryingOcrId(linkId);
+    const result = await requestDocumentOcr(linkId);
+    setRetryingOcrId(null);
+
+    if (!result.ok) {
+      setActionError('The document check could not be started. Please try again in a moment.');
+    }
+  }, []);
 
   const loadForm = useCallback(async () => {
     setLoad({ status: 'loading' });
@@ -691,6 +768,14 @@ export function ApplicantApplicationPage() {
         result.link,
       ],
     }));
+
+    // Ask the server to read the document that has just been attached. Not
+    // awaited, and the result is deliberately not surfaced: the link is already
+    // written, so a failure here is about a reading service, not about the
+    // applicant's upload, and reporting it would put an error on a form they
+    // completed correctly for something they cannot act on. What the reviewer
+    // sees is the ocr_status on the row.
+    void requestDocumentOcr(result.link.id);
   };
 
   const handleDetach = async (linkId: string) => {
@@ -901,6 +986,8 @@ export function ApplicantApplicationPage() {
           onAnswer={setAnswer}
           onAttach={(requirementId, documentId) => void handleAttach(requirementId, documentId)}
           onDetach={(linkId) => void handleDetach(linkId)}
+          onRetryOcr={(linkId) => void handleRetryOcr(linkId)}
+          retryingOcrId={retryingOcrId}
           onSaveAndContinue={() => void handleSaveAndContinue()}
           onSaveDraft={() => void handleSaveDraft()}
           onUpload={(requirement, file) => void handleUpload(requirement, file)}
