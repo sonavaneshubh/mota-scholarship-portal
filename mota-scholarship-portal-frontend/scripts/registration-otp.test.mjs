@@ -1,4 +1,11 @@
-// Tests for the Email OTP + Mobile OTP registration flow.
+// Tests for the Email OTP + optional Mobile OTP registration flow.
+//
+// The email is the one proof registration always requires. The mobile number is
+// optional: leave it blank and the account is created on the email code alone.
+// Give one, and it is verified exactly as before. Much of what follows is about
+// the seam between those two cases -- that the blank field is genuinely allowed
+// on both sides of the wire, and that making it allowed has not quietly made a
+// *given* number optional to verify.
 //
 //   node scripts/registration-otp.test.mjs
 //
@@ -130,6 +137,13 @@ check('limits', 'the attempt lifetime is the same in both copies',
 check('limits', 'the assumed dialling code is the same in both copies',
   client.DEFAULT_COUNTRY_CODE === server.DEFAULT_COUNTRY_CODE,
   `${client.DEFAULT_COUNTRY_CODE} vs ${server.DEFAULT_COUNTRY_CODE}`);
+// The one flag that decides whether a mobile number is demanded at all. If the
+// browser says it is required and the server says it is not, an applicant with a
+// blank field either cannot register or is asked for a code the server will not
+// accept. They are edited together, so they are checked together.
+check('limits', 'both copies agree on whether a mobile number is required',
+  client.MOBILE_REQUIRED === server.MOBILE_REQUIRED,
+  `${client.MOBILE_REQUIRED} vs ${server.MOBILE_REQUIRED}`);
 check('limits', 'the minimum password length is the same in both copies',
   client.PASSWORD_MIN_LENGTH === server.PASSWORD_MIN_LENGTH,
   `${client.PASSWORD_MIN_LENGTH} vs ${server.PASSWORD_MIN_LENGTH}`);
@@ -234,8 +248,17 @@ check('rules', 'the start endpoint asks the shared module for its validation',
 check('rules', 'an omitted username is rejected, not treated as optional',
   /if\s*\(\s*!isValidUsername\(/.test(startCode),
   'the field is required on the form and must be required here');
-check('rules', 'the mobile number is required, not optional',
-  /if\s*\(\s*!mobileE164\s*\)/.test(startCode));
+// A blank mobile field is accepted, but a filled one that is not a usable number
+// is still refused. Both halves matter: dropping the second would let a
+// half-typed number be silently discarded and register the applicant against a
+// number they did not intend to give.
+check('rules', 'a mobile number is only required when the portal says so',
+  /if\s*\(\s*MOBILE_REQUIRED\s*&&\s*!mobileE164\s*\)/.test(startCode)
+    || (server.MOBILE_REQUIRED === false && !/if\s*\(\s*!mobileE164\s*\)/.test(startCode)),
+  'the blank-field refusal must follow the shared flag');
+check('rules', 'a mobile number that was typed but cannot be read is still rejected',
+  /if\s*\(\s*mobileGiven\s*&&\s*!mobileE164\s*\)/.test(startCode),
+  'an unusable number must not be quietly dropped');
 
 /* ------------------------------------------------------------- form behaviour */
 
@@ -253,11 +276,19 @@ const valid = {
 check('form', 'a complete, valid form has no errors', Object.keys(client.getRegistrationErrors(valid)).length === 0,
   JSON.stringify(client.getRegistrationErrors(valid)));
 
-check('form', 'a blank mobile number is now an error',
-  Boolean(client.getRegistrationErrors({ ...valid, mobile: '' }).mobile),
-  'mobile is required because it is what gets verified');
+// The mobile number is optional. The applicant is registered on the email proof
+// alone, so a blank field must not stop them.
+check('form', 'a blank mobile number is accepted, because the field is optional',
+  !client.getRegistrationErrors({ ...valid, mobile: '' }).mobile,
+  'the email proof is the only one always required');
 check('form', 'a mobile number of letters is an error',
-  Boolean(client.getRegistrationErrors({ ...valid, mobile: 'call me' }).mobile));
+  Boolean(client.getRegistrationErrors({ ...valid, mobile: 'call me' }).mobile),
+  'a typed number that cannot be read must not be silently discarded');
+check('form', 'a mobile number of the wrong length is an error',
+  Boolean(client.getRegistrationErrors({ ...valid, mobile: '12345' }).mobile));
+check('form', 'a form with no mobile number at all has no other errors',
+  Object.keys(client.getRegistrationErrors({ ...valid, mobile: '' })).length === 0,
+  JSON.stringify(client.getRegistrationErrors({ ...valid, mobile: '' })));
 check('form', 'a blank email is an error', Boolean(client.getRegistrationErrors({ ...valid, email: '' }).email));
 check('form', 'a blank username is an error', Boolean(client.getRegistrationErrors({ ...valid, username: '' }).username));
 check('form', 'a blank name is an error', Boolean(client.getRegistrationErrors({ ...valid, applicantName: '' }).applicantName));
@@ -337,10 +368,18 @@ const shared = readRepo('supabase/functions/_shared/registration.ts');
 
 check('enforcement', 'completion requires the email proof to be recorded',
   /!\s*attempt\.email_verified_at/.test(code(complete)));
-check('enforcement', 'completion requires the mobile proof to be recorded',
-  /!\s*attempt\.mobile_verified_at/.test(code(complete)));
-check('enforcement', 'both proofs are refused in one check, so neither alone is enough',
-  /!\s*attempt\.email_verified_at\s*\|\|\s*!\s*attempt\.mobile_verified_at/.test(code(complete)));
+// The mobile proof is required when there is a number, and cannot be skipped by
+// a request that simply leaves the number out: the requirement is read off the
+// attempt row, not off the body.
+check('enforcement', 'completion requires the mobile proof when a number is on the attempt',
+  /!\s*attempt\.email_verified_at\s*\|\|\s*\(\s*mobileRequired\s*&&\s*!\s*attempt\.mobile_verified_at\s*\)/.test(code(complete)));
+check('enforcement', 'whether a mobile is owed is read from the attempt row, not the request',
+  /hasMobile\(\s*attempt\.mobile_e164\s*\)/.test(code(complete))
+    && !/body\.mobile/.test(code(complete)),
+  'the request must not be able to declare its own mobile proof unnecessary');
+check('enforcement', 'the mobile channel is refused outright on an attempt with no number',
+  /channel\s*===\s*'mobile'\s*&&\s*!hasMobile\(/.test(code(verify)),
+  'a verify call with no number to check would otherwise reach GoTrue with null');
 check('enforcement', 'a missing proof is answered with NOT_VERIFIED and 403',
   /FAILURE\.NOT_VERIFIED,\s*403/.test(code(complete)));
 check('enforcement', 'the proof columns are read from the database, not from the request',
@@ -359,15 +398,17 @@ check('enforcement', 'the role is written once, by the trigger, not by this flow
 // in a message ("email OTP dispatch failed") is fine and useful; passing the
 // applicant's code is not. The code never exists as a named value in these
 // functions -- it is handed straight to verifyOtp -- so what is checked here is
-// that no log call names the variable holding it, and that no six-digit literal
-// has been pasted into one.
+// that no log call names the variable holding it, and that no code-length digit
+// literal has been pasted into one.
 const logCalls = (source) =>
   [...code(source).matchAll(/(logSafe|console\.\w+)\(([\s\S]*?)\)\s*;/g)].map((match) => `${match[1]}(${match[2]})`);
 
 check('enforcement', 'no one-time code is ever written to the attempt table',
   !/insert\([^)]*(otp|token|code)\s*:/i.test(code(start)) && !/\botp_token\b/.test(code(start + verify)));
 check('enforcement', 'no one-time code is ever logged',
-  logCalls(start + verify + complete).every((call) => !/\btoken\b/i.test(call) && !/\b\d{6}\b/.test(call)),
+  // The literal is built from the agreed length, so this keeps catching a pasted
+  // code if OTP_LENGTH is ever changed again.
+  logCalls(start + verify + complete).every((call) => !/\btoken\b/i.test(call) && !new RegExp(`\\b\\d{${server.OTP_LENGTH}}\\b`).test(call)),
   (logCalls(start + verify + complete).find((call) => /\btoken\b/i.test(call) || /\b\d{6}\b/.test(call)) ?? '').slice(0, 140));
 // A `code:` field is fine when it holds one of the flow's own failure codes. What
 // must never be logged is the value GoTrue sent.
@@ -452,9 +493,24 @@ check('removal', 'applicant sign-in is untouched',
   /export async function signIn/.test(authService) && /signIn:/.test(contextValue));
 check('removal', 'the new flow is what the registration form calls',
   /startRegistration/.test(loginCard) && /verifyOtp/.test(loginCard) && /completeRegistration/.test(loginCard));
-check('removal', 'both codes are entered on the registration page itself',
-  (code(loginCard).match(/<OtpInput/g) ?? []).length === 2,
-  'the registration card should render an email box and a mobile box');
+// The mobile box is still drawn by the registration card, but only when the
+// attempt owes a mobile proof. Rendered unconditionally, it would ask a
+// number-less applicant for a code the server never sent and cannot accept.
+check('removal', 'the registration card draws an email box and a conditional mobile box',
+  (code(loginCard).match(/<OtpInput/g) ?? []).length === 2
+    && /pendingAttempt\.mobileRequired\s*\?\s*\(/.test(code(loginCard)),
+  'the mobile box must be behind the server-sent mobileRequired flag');
+check('removal', 'the mobile field is not marked required on the form',
+  !/home-registration-mobile[\s\S]{0,400}?\brequired\b/.test(code(loginCard)),
+  'the attribute would block submission by the browser before any check runs');
+// Two places inside the OTP submit handler decide whether a mobile code is
+// needed: the inline validation, and the verify call. Both must be gated, or an
+// email-only registration stalls on a box that was never drawn.
+const otpSubmit = (code(loginCard).match(/async function handleOtpSubmit[\s\S]*?const result = await completeRegistration/) ?? [''])[0];
+
+check('removal', 'a mobile code is only asked for when one is owed',
+  (otpSubmit.match(/attempt\.mobileRequired\s*&&/g) ?? []).length >= 2,
+  'both the inline check and the verify call must be gated on mobileRequired');
 check('removal', 'the applicant is sent to the real login route afterwards',
   /ROUTES\.applicant\.login/.test(loginCard));
 check('removal', 'the browser sends no session or privileged key to the functions',
@@ -489,6 +545,29 @@ check('rls', 'the uniqueness rules cover email and mobile separately',
   /unique[\s\S]*?email/i.test(migration) && /unique[\s\S]*?mobile_e164/i.test(migration));
 check('rls', 'an expired attempt stops blocking the address and the number',
   /where\s+status\s*<>?\s*'expired'/i.test(migration));
+
+/* ------------------------------------------------ the mobile column is nullable */
+
+section('An attempt with no mobile number can be stored at all');
+
+const optionalMobile = readRepo('supabase/migrations/20260929160000_registration_attempts_optional_mobile.sql');
+
+// Without this the flow is correct in code and still fails at runtime: the
+// insert of a NULL number is rejected by the column's NOT NULL, and every
+// registration with the field left blank comes back as an opaque 500.
+check('schema', 'mobile_e164 is allowed to be null',
+  /alter\s+table\s+public\.registration_attempts\s+alter\s+column\s+mobile_e164\s+drop\s+not\s+null/i.test(optionalMobile),
+  'registration-start stores NULL for a number-less applicant');
+
+// The two constraints that mention the column must still hold for a number that
+// *was* given. A migration that quietly relaxed them would let an unparseable
+// number be persisted, which is what the E.164 check exists to prevent.
+check('schema', 'the E.164 check is left in place for numbers that are given',
+  !/drop\s+constraint[\s\S]*?mobile_e164_check/i.test(optionalMobile),
+  'the shape check still applies; a NULL satisfies it on its own');
+check('schema', 'the unique index on mobile is left in place',
+  !/drop\s+index[\s\S]*?registration_attempts_active_mobile_uniq/i.test(optionalMobile),
+  'two attempts for the same number must still collide');
 
 /* --------------------------------------------------------------------- done */
 

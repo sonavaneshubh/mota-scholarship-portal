@@ -1,12 +1,22 @@
 // =============================================================================
 // Shared helpers for the registration-* Edge Functions
 // =============================================================================
-// These three functions implement the Email OTP + Mobile OTP registration flow:
+// These three functions implement the Email OTP + optional Mobile OTP
+// registration flow:
 //
 //   registration-start     validate, reject duplicates, open an attempt, dispatch
-//                          the email and SMS codes
+//                          the email code, and the SMS code when a mobile number
+//                          was given
 //   registration-verify    consume a code server-side and record the proof
-//   registration-complete  re-check both proofs, then activate the account
+//   registration-complete  re-check the proofs this attempt needs, then activate
+//                          the account
+//
+// The email is the only proof registration always requires. The mobile number
+// is optional on the form: an applicant who leaves it blank is verified by the
+// email code alone, and `registration_attempts.mobile_e164` is NULL for them.
+// An applicant who does give a number still has to prove it, exactly as before.
+// "This attempt has a mobile number" is therefore read off the column's NULL
+// rather than off a flag that could disagree with it.
 //
 // Every OTP is generated, delivered and checked by Supabase Auth (GoTrue). This
 // module never sees a one-time code and never stores one. The only secret it
@@ -23,13 +33,34 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-/** The flow's agreed limits. Mirrored in the frontend config file. */
-export const OTP_LENGTH = 6;
+/**
+ * The flow's agreed limits. Mirrored in the frontend config file.
+ *
+ * `OTP_LENGTH` is the digit count Supabase Auth really issues here, confirmed
+ * against a delivered "Confirm signup" mail whose `{{ .Token }}` code was eight
+ * digits. It gates `isValidOtpToken` below, so a code of any other length is
+ * rejected before it reaches `auth.verifyOtp`.
+ */
+export const OTP_LENGTH = 8;
 export const RESEND_COOLDOWN_SECONDS = 45;
 export const MAX_RESENDS_PER_CHANNEL = 5;
 export const MAX_VERIFY_FAILURES_PER_CHANNEL = 5;
 export const ATTEMPT_TTL_MINUTES = 15;
 export const MAX_STARTS_PER_EMAIL_PER_HOUR = 5;
+
+/**
+ * Whether an applicant has to give a mobile number in order to register.
+ *
+ * `false`, and it is mirrored in the frontend config file so the form and the
+ * server cannot disagree about whether the field may be left blank. It is a
+ * constant rather than a setting because changing it changes who is allowed to
+ * hold an account, which is a decision to be made once, in review, rather than
+ * from a dashboard.
+ *
+ * Note what `false` does *not* mean: a number that is given is still verified.
+ * This flag decides whether a number is demanded, never whether one is checked.
+ */
+export const MOBILE_REQUIRED = false;
 
 export const PASSWORD_MIN_LENGTH = 10;
 
@@ -118,7 +149,7 @@ export const MESSAGES: Record<FailureCode, string> = {
   INVALID_OTP: 'That code is not correct. Please check it and try again.',
   OTP_EXPIRED: 'That code has expired. Please request a new one.',
   OTP_LOCKED: 'Too many incorrect attempts. Please request a new code.',
-  NOT_VERIFIED: 'Please verify both your email address and your mobile number before continuing.',
+  NOT_VERIFIED: 'Please verify your email address, and your mobile number too if you gave one, before continuing.',
   PROVIDER_UNAVAILABLE: 'We could not reach the verification service. Please try again shortly.',
   RATE_LIMITED: 'Too many requests. Please wait a moment and try again.',
   NOT_CONFIGURED: 'Registration is temporarily unavailable. Please contact the portal administrator.',
@@ -338,6 +369,36 @@ export function normalizeMobile(value: unknown): string {
   }
 
   return '';
+}
+
+/**
+ * Whether an attempt carries a mobile number.
+ *
+ * The single test every function uses to decide whether a mobile proof is
+ * outstanding, so the three of them cannot answer it three different ways. It
+ * reads the stored column rather than a separate flag, which means the answer is
+ * always the number that was actually persisted.
+ */
+export function hasMobile(mobileE164: unknown): boolean {
+  return typeof mobileE164 === 'string' && mobileE164.length > 0;
+}
+
+/**
+ * Reads the optional mobile field from a request body.
+ *
+ * A blank field and an unusable field have to be told apart, and a bare string
+ * cannot tell them: `normalizeMobile` returns an empty string for both. `given`
+ * says the applicant typed something, so an empty `e164` beside `given: true`
+ * is a rejection and beside `given: false` is a perfectly good registration.
+ */
+export function readOptionalMobile(value: unknown): { given: boolean; e164: string } {
+  const typed = typeof value === 'string' ? value.trim() : '';
+
+  if (!typed) {
+    return { given: false, e164: '' };
+  }
+
+  return { given: true, e164: normalizeMobile(typed) };
 }
 
 export function isValidPassword(password: unknown): boolean {

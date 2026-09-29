@@ -33,6 +33,7 @@
 import { supabase } from '../lib/supabase';
 import type { Application, SchemeDetailResponse } from '../lib/supabase';
 import { classifyHandle } from '../lib/applicationHandle';
+import type { OcrLinkColumns } from '../lib/documentOcr';
 import type { ProfileData } from '../types/profile';
 import { loadProfile } from './profileService';
 import { fetchSchemeDetail } from './schemes';
@@ -42,8 +43,21 @@ import type { AnswerValue, SchemeAnswers } from '../lib/applicationFormRules';
 const APPLICATIONS_TABLE = 'applications';
 const APPLICATION_DOCUMENTS_TABLE = 'application_documents';
 
-export interface ApplicationDocumentLink {
-  id: string;
+/**
+ * The attachment columns the application form reads.
+ *
+ * The reading columns are selected with the rest rather than fetched on demand,
+ * so a document that has already been read shows its result on page load instead
+ * of after a round trip. `isUndefinedColumn` is handled for the whole select: the
+ * form still works if this backend predates the reading columns, it just renders
+ * every attachment as not-yet-read.
+ */
+const LINK_COLUMNS =
+  'id, application_id, scheme_document_id, document_id, created_at, ' +
+  'ocr_status, ocr_error, ocr_provider, ocr_model, ocr_processed_at, ocr_attempts, ' +
+  'ai_extraction, ai_confidence';
+
+export interface ApplicationDocumentLink extends OcrLinkColumns {
   application_id: string;
   scheme_document_id: string;
   document_id: string;
@@ -199,7 +213,7 @@ export async function loadApplicationForm(handle: string): Promise<ApplicationFo
     loadProfile(applicantId),
     client
       .from(APPLICATION_DOCUMENTS_TABLE)
-      .select('id, application_id, scheme_document_id, document_id, created_at')
+      .select(LINK_COLUMNS)
       .eq('application_id', typed.id)
       .order('created_at', { ascending: true }),
     fetchSchemeDetail(typed.scheme_id).then(
@@ -242,7 +256,7 @@ export async function loadApplicationForm(handle: string): Promise<ApplicationFo
       application: typed,
       profile: profileData,
       scheme,
-      links: (linksResult.data ?? []) as ApplicationDocumentLink[],
+      links: (linksResult.data ?? []) as unknown as ApplicationDocumentLink[],
     },
   };
 }
@@ -450,6 +464,25 @@ export async function submitApplication(
  * the previous choice instead of creating a second link. The uniqueness rule
  * (application_id, scheme_document_id) is what makes that safe; the onConflict
  * clause just makes it a single round trip.
+ *
+ * The payload is exactly the three columns this owns, and that is deliberate
+ * rather than merely terse. PostgREST turns the upsert into ON CONFLICT DO UPDATE
+ * over the columns present, so anything omitted keeps its stored value:
+ *
+ *   * document_type is NOT NULL with no default, and is derived from the
+ *     requirement by set_application_document_owner() on both INSERT and UPDATE.
+ *   * the verification and audit columns must not appear here at all. The guard
+ *     added by 20260929120000 refuses an applicant write to status, remarks and
+ *     the human_verified_* / ai_* set, so adding `ai_extraction: null` to "reset"
+ *     a re-pointed document would fail the whole attach with 42501 rather than
+ *     clear anything. Clearing the machine state of a document that has just
+ *     been replaced has to happen where that state is writable — service_role,
+ *     or a database trigger — not from the applicant's session.
+ *
+ * The replacement also has to keep the same application_documents.id, which the
+ * upsert does: ON CONFLICT DO UPDATE writes the existing row rather than
+ * inserting a second one, and the caller relies on that id to detach the link
+ * again later.
  *
  * Returns the stored link rather than a bare ok, because the caller needs the
  * row id to be able to detach it again later without reloading the page.

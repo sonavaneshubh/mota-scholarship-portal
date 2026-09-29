@@ -632,6 +632,77 @@ async function removeDuplicateApplications(rows: Application[]): Promise<void> {
   }
 }
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export type DeleteDraftOutcome =
+  | { ok: true; deleted: boolean }
+  | { ok: false; message: string };
+
+/**
+ * Removes one of the applicant's own draft applications.
+ *
+ * The draft-only rule is enforced by the database, not here. This function's job
+ * is to *report* what the database did, which turns out to be the subtle part:
+ *
+ * A DELETE that RLS filters out is not an error. PostgREST returns 200 with an
+ * empty result, because a row the caller may not see is indistinguishable from a
+ * row that was not there. So a naive `const { error } = await delete(...)` reports
+ * success for a submitted application and the UI reloads to find it still sitting
+ * in the list, with no error and no explanation. The `.select('id')` is what makes
+ * the difference visible — it asks the database to hand back what it actually
+ * removed, so zero rows can be told apart from one, and `deleted: false` becomes a
+ * message the applicant can act on rather than a silent no-op.
+ *
+ * Re-checking the status before deleting instead would be a race: the row could
+ * be submitted between the check and the delete. One authoritative decision in one
+ * place is both simpler and correct.
+ *
+ * Requires 20260929153000_allow_applicant_draft_delete.sql. Without it this fails
+ * with a permission error, because the table grants no DELETE — the message says
+ * so rather than blaming the applicant.
+ *
+ * The document links are removed by `on delete cascade`; the uploaded files stay
+ * in the applicant's document library, so re-applying does not mean re-uploading.
+ */
+export async function deleteDraftApplication(applicationId: string): Promise<DeleteDraftOutcome> {
+  if (!supabase) {
+    return { ok: false, message: 'Applications are unavailable right now. Please try again later.' };
+  }
+
+  const id = applicationId.trim();
+  if (!UUID_PATTERN.test(id)) {
+    return { ok: false, message: 'That application could not be identified. Please reload the page.' };
+  }
+
+  const { data, error } = await supabase
+    .from(APPLICATIONS_TABLE)
+    .delete()
+    .eq('id', id)
+    .select('id');
+
+  if (error) {
+    // The message names tables, columns and constraint names, so it is logged for
+    // the developer and never shown to the applicant.
+    console.error('Failed to delete draft application', { applicationId: id, error });
+    const isPermissionDenied = error.code === '42501';
+    return {
+      ok: false,
+      message: isPermissionDenied
+        ? 'Deleting a draft is not available on this portal yet. Your application has not been changed.'
+        : 'That application could not be deleted. Please try again.',
+    };
+  }
+
+  const removed = (data ?? []).length > 0;
+  if (!removed) {
+    console.warn('Delete matched no row — the application is not a deletable draft, or is gone already', {
+      applicationId: id,
+    });
+  }
+
+  return { ok: true, deleted: removed };
+}
+
 /**
  * Note on where the application form gets its row.
  *

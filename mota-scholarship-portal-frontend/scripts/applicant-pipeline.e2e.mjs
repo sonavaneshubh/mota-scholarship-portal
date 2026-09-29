@@ -71,7 +71,7 @@ const frontendEnv =
 if (!frontendEnv?.VITE_SUPABASE_URL || !frontendEnv?.VITE_SUPABASE_PUBLISHABLE_KEY) {
   console.error(
     'Cannot run: mota-scholarship-portal-frontend/.env.local must define\n' +
-      '  VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY',
+    '  VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY',
   );
   process.exit(2);
 }
@@ -82,7 +82,7 @@ const SERVICE_ROLE = backendEnv.SUPABASE_SERVICE_ROLE_KEY;
 if (!SERVICE_ROLE) {
   console.error(
     'Cannot run: mota-scholarship-portal-backend/.env must define SUPABASE_SERVICE_ROLE_KEY.\n' +
-      'It is used only to confirm the throwaway test account. Never commit that file.',
+    'It is used only to confirm the throwaway test account. Never commit that file.',
   );
   process.exit(2);
 }
@@ -241,17 +241,90 @@ async function main() {
 
   group('2. Profile');
 
+  // ensureApplicantProfile() is idempotent by design, and so is this block. The
+  // signup/auth trigger already creates the anchor row, which means the POST the
+  // profile page makes is expected to collide with it. A 409 is therefore a
+  // normal outcome here, not a defect -- and it is the outcome a re-run gets
+  // too, because an account reused through E2E_EMAIL still has its anchor row.
+  //
+  // What is not acceptable is treating the collision as success and carrying on.
+  // Every section below is scoped by applicant_id, so an undefined value turns
+  // the rest of the run into a cascade of false failures against a schema that
+  // is behaving correctly. The row is therefore resolved, never assumed.
   const anchorInsert = await rest('applicant_profiles', {
     method: 'POST',
     token: T.token,
     body: { user_id: applicant.userId, profile_status: 'incomplete' },
     prefer: 'return=representation',
   });
-  const applicantId = anchorInsert.json?.[0]?.id;
+  const isConflict = anchorInsert.status === 409 || anchorInsert.json?.code === '23505';
+  let applicantId = anchorInsert.json?.[0]?.id ?? null;
+  let anchorOutcome = applicantId ? 'created by ensureApplicantProfile()' : null;
+  let readWithOwnToken = true;
+
+  if (!applicantId) {
+    // Whatever the POST answered, the row has to be found before the run can
+    // continue. The applicant's own session is asked first, and is scoped to
+    // this user so a row belonging to another account can never be mistaken for
+    // ours. A 409 on the insert is the expected path into this branch.
+    const existing = await rest(
+      `applicant_profiles?select=id,applicant_id,user_id&user_id=eq.${applicant.userId}`,
+      T,
+    );
+    readWithOwnToken = existing.status === 200;
+    applicantId = existing.json?.[0]?.id ?? null;
+    if (applicantId) {
+      anchorOutcome = isConflict
+        ? 'reused the existing registration-created row'
+        : `reused the row the insert left behind (insert ${anchorInsert.status})`;
+    }
+  }
+
+  if (!applicantId) {
+    // A harness fault rather than a finding about the application, so it is
+    // reached only to keep the run from proceeding on a missing uuid. Recorded
+    // as an advisory below so a service-role read cannot silently paper over an
+    // RLS regression on this table.
+    const asService = await call(
+      URL_BASE,
+      `rest/v1/applicant_profiles?select=id&user_id=eq.${applicant.userId}`,
+      { key: SERVICE_ROLE, token: SERVICE_ROLE },
+    );
+    readWithOwnToken = false;
+    applicantId = asService.json?.[0]?.id ?? null;
+    if (applicantId) anchorOutcome = 'reused the existing registration-created row (read as service_role)';
+  }
+
   check(
-    'ensureApplicantProfile() creates the anchor row',
-    anchorInsert.status === 201 && Boolean(applicantId),
-    `${anchorInsert.status} applicant_id=${anchorInsert.json?.[0]?.applicant_id ?? 'n/a'}`,
+    'ensureApplicantProfile() leaves/creates the anchor row',
+    Boolean(applicantId),
+    `${anchorInsert.status}${isConflict ? ' (conflict: signup already created it)' : ''} -> ${anchorOutcome ?? 'no anchor row'} applicant_id=${applicantId ?? 'unresolved'}`,
+  );
+
+  note(
+    'the applicant can read their own applicant_profiles row with their own session',
+    readWithOwnToken,
+    readWithOwnToken
+      ? ''
+      : 'the applicant-scoped read of applicant_profiles did not succeed, so the anchor row was resolved with the service role; an RLS regression on this table would be invisible to the rest of this run',
+  );
+
+  if (!applicantId) {
+    throw new Error(
+      `Cannot continue: no applicant_profiles row for ${applicant.userId} ` +
+      `(insert ${anchorInsert.status} ${anchorInsert.text?.slice(0, 200)}). ` +
+      'Every section below is scoped by applicant_id, so stopping here is the only honest outcome.',
+    );
+  }
+
+  const anchorById = await rest(
+    `applicant_profiles?select=id,user_id&user_id=eq.${applicant.userId}&id=eq.${applicantId}`,
+    T,
+  );
+  check(
+    'the anchor row is readable by its own primary key',
+    anchorById.status === 200 && anchorById.json?.length === 1,
+    `${anchorById.status} rows=${Array.isArray(anchorById.json) ? anchorById.json.length : '-'}`,
   );
 
   const anchorUpdate = await rest(`applicant_profiles?id=eq.${applicantId}`, {
@@ -535,13 +608,137 @@ async function main() {
   }
   check('every mandatory document is attached', uploadedIds.length === mandatory.length, `${uploadedIds.length}/${mandatory.length}`);
 
-  const relink = await rest('application_documents', {
-    method: 'POST',
-    token: T.token,
-    body: { application_id: applicationId, scheme_document_id: mandatory[0].id, document_id: uploadedIds[0] },
-    prefer: 'resolution=ignore-duplicates,return=representation',
-  });
-  check('attaching the same requirement twice does not duplicate the link', relink.status !== 201, `${relink.status}`);
+  // PostgREST infers the conflict target from the primary key when `on_conflict`
+  // is absent. This payload carries no `id`, so `resolution=merge-duplicates`
+  // alone degraded to a plain INSERT and application_documents_app_scheme_doc_uniq
+  // answered 23505 instead of replacing the row. Naming the target is what
+  // attachSchemeDocument() already does, so the test now asks the database the
+  // same question the app does rather than a subtly different one.
+  const upsertLink = (documentId) =>
+    rest(`application_documents?on_conflict=application_id,scheme_document_id`, {
+      method: 'POST',
+      token: T.token,
+      body: { application_id: applicationId, scheme_document_id: mandatory[0].id, document_id: documentId },
+      prefer: 'resolution=merge-duplicates,return=representation',
+    });
+
+  const requirementLinks = async () =>
+    (await rest(
+      `application_documents?select=id,document_id&application_id=eq.${applicationId}&scheme_document_id=eq.${mandatory[0].id}`,
+      T,
+    )).json ?? [];
+
+  // Re-picking the document already on the requirement has to converge on the
+  // same row rather than adding a second one.
+  const idempotent = await upsertLink(uploadedIds[0]);
+  const afterIdempotent = await requirementLinks();
+  check(
+    'attaching the same requirement twice does not duplicate the link',
+    (idempotent.status === 200 || idempotent.status === 201) && afterIdempotent.length === 1,
+    `${idempotent.status} rows=${afterIdempotent.length} ids=${afterIdempotent.map((row) => row.id).join(',') || '-'}`,
+  );
+
+  // The legitimate re-point: A -> B -> A on one row, in draft, which is the only
+  // window in which replacing a requirement's document is an applicant action at
+  // all. Both documents are restored so the submission assertions below are
+  // unaffected.
+  //
+  // This is also the positive control for the guard added by 20260929120000.
+  // That guard refuses an applicant the verification and audit columns; this is
+  // the write it must NOT break. PostgREST turns the upsert into ON CONFLICT DO
+  // UPDATE over just the three columns in the payload, so every protected column
+  // is written back unchanged and the guard sees no difference.
+  if (uploadedIds.length >= 2) {
+    const documentA = uploadedIds[0];
+    const documentB = uploadedIds[1];
+    const originalLink = (await requirementLinks())[0];
+    const originalLinkId = originalLink?.id;
+
+    const toB = await upsertLink(documentB);
+    const afterB = await requirementLinks();
+    check(
+      'the applicant can re-point a requirement at a different document of their own',
+      (toB.status === 200 || toB.status === 201) && afterB[0]?.document_id === documentB,
+      `${toB.status} ${toB.text.slice(0, 160)} document_id=${afterB[0]?.document_id ?? '-'}`,
+    );
+    check(
+      're-pointing updates the existing requirement row instead of adding one',
+      afterB.length === 1 && Boolean(originalLinkId) && afterB[0]?.id === originalLinkId,
+      `rows=${afterB.length} id ${originalLinkId ?? '-'} -> ${afterB[0]?.id ?? '-'}`,
+    );
+
+    const toA = await upsertLink(documentA);
+    const afterA = await requirementLinks();
+    check(
+      'and can re-point it back again',
+      (toA.status === 200 || toA.status === 201) && afterA[0]?.document_id === documentA,
+      `${toA.status} ${toA.text.slice(0, 160)} document_id=${afterA[0]?.document_id ?? '-'}`,
+    );
+    check(
+      'the A -> B -> A round trip never changed the requirement row id',
+      afterA.length === 1 && Boolean(originalLinkId) && afterA[0]?.id === originalLinkId,
+      `rows=${afterA.length} id ${originalLinkId ?? '-'} -> ${afterA[0]?.id ?? '-'}`,
+    );
+
+    // The negative control for the same write. A uuid that does not exist proves
+    // the trigger rejects an unknown id; it does not prove the trigger rejects an
+    // id that really belongs to somebody else, because that document exists and
+    // is readable by a different principal. So this points the requirement at a
+    // genuine document owned by the second applicant rather than at a random
+    // one. The rejection has to come from set_application_document_owner()'s
+    // ownership check, which is SECURITY DEFINER and therefore not fooled by the
+    // caller being unable to SELECT that row.
+    const otherProfile = (await rest(`applicant_profiles?select=id&user_id=eq.${asOther.userId}`, T2)).json ?? [];
+    if (otherProfile.length === 1) {
+      const probe = await rest('applicant_documents', {
+        method: 'POST',
+        token: T2.token,
+        body: {
+          applicant_id: otherProfile[0].id,
+          document_type: 'e2e_cross_applicant_probe',
+          document_name: 'E2E cross-applicant probe',
+          file_name: 'probe.pdf',
+          storage_path: `${otherProfile[0].id}/e2e_cross_applicant_probe/probe.pdf`,
+          mime_type: 'application/pdf',
+          file_size: 9,
+        },
+        prefer: 'return=representation',
+      });
+      if (probe.status !== 201) {
+        check('the applicant cannot re-point a requirement at another applicant\'s document', false, `probe setup ${probe.status} ${probe.text.slice(0, 160)}`);
+      } else {
+        const probeId = probe.json[0].id;
+        const stolen = await upsertLink(probeId);
+        check(
+          'the applicant cannot re-point a requirement at another applicant\'s document',
+          stolen.status !== 200 && stolen.status !== 201,
+          `${stolen.status} ${(stolen.json?.message ?? stolen.text).slice(0, 200)}`,
+        );
+        check(
+          'the refused re-point names the ownership rule rather than a generic failure',
+          /does not belong to this applicant/i.test(stolen.json?.message ?? stolen.text),
+          (stolen.json?.message ?? stolen.text).slice(0, 200),
+        );
+
+        const afterTheft = await requirementLinks();
+        check(
+          'and the requirement still points at the applicant\'s own document afterwards',
+          afterTheft.length === 1 && afterTheft[0]?.document_id === documentA && afterTheft[0]?.id === originalLinkId,
+          `rows=${afterTheft.length} document_id=${afterTheft[0]?.document_id ?? '-'} expected ${documentA}`,
+        );
+        // The probe belongs to the second applicant, so it is their row to remove.
+        await rest(`applicant_documents?id=eq.${probeId}`, { method: 'DELETE', token: T2.token });
+      }
+    } else {
+      check('the applicant cannot re-point a requirement at another applicant\'s document', false, `the second applicant has ${otherProfile.length} profile rows, expected 1`);
+    }
+  } else {
+    check(
+      'the applicant can re-point a requirement at a different document of their own',
+      false,
+      `needs two uploaded documents to swap between, have ${uploadedIds.length}`,
+    );
+  }
 
   /* -- 7. submit ----------------------------------------------------------- */
 
@@ -622,13 +819,73 @@ async function main() {
     check('a submitted application refuses document detachment', false, 'no document links to test with');
   }
 
+  // Detaching a link is refused by guard_application_document_detach (BEFORE
+  // DELETE). Swapping which file satisfies a requirement is a different write on
+  // the same row, and it is the one that actually rewrites the evidence: same
+  // link, same requirement, different document_id. It has to be refused as well.
+  //
+  // The swap targets another document the SAME applicant owns, deliberately. A
+  // document belonging to somebody else would be turned away by
+  // set_application_document_owner() and prove nothing about submission state --
+  // that is the separate cross-applicant control in section 6. Using the
+  // applicant's own second document means ownership passes, so the only thing
+  // that can stop the write is a rule about the application being submitted.
+  const frozenLink = (await rest(
+    `application_documents?select=id,document_id&application_id=eq.${applicationId}&scheme_document_id=eq.${mandatory[0].id}`,
+    T,
+  )).json?.[0];
+  if (frozenLink && uploadedIds.length >= 2 && uploadedIds[1] !== frozenLink.document_id) {
+    const repointed = await rest(`application_documents?id=eq.${frozenLink.id}`, {
+      method: 'PATCH',
+      token: T.token,
+      body: { document_id: uploadedIds[1] },
+      prefer: 'return=representation',
+    });
+    const afterSwap = (await rest(
+      `application_documents?select=document_id&id=eq.${frozenLink.id}`,
+      T,
+    )).json?.[0];
+    check(
+      'a submitted application refuses swapping which document satisfies a requirement',
+      Boolean(afterSwap) && afterSwap.document_id === frozenLink.document_id,
+      `${repointed.status} ${(repointed.json?.message ?? '').slice(0, 200)} document_id ${frozenLink.document_id} -> ${afterSwap?.document_id ?? '-'}`,
+    );
+    if (afterSwap?.document_id !== frozenLink.document_id) {
+      // The swap went through, so the evidence on this row no longer matches
+      // what was submitted. Put it back through service_role so the run leaves
+      // the fixture consistent, and let the failed check above stand.
+      await call(URL_BASE, `rest/v1/application_documents?id=eq.${frozenLink.id}`, {
+        method: 'PATCH',
+        key: SERVICE_ROLE,
+        body: { document_id: frozenLink.document_id },
+        prefer: 'return=representation',
+      });
+    }
+  } else {
+    check(
+      'a submitted application refuses swapping which document satisfies a requirement',
+      false,
+      frozenLink ? `no spare document of the applicant's own to swap in (have ${uploadedIds.length})` : 'no document link to test with',
+    );
+  }
+
   const row = await readRow();
   check(
     'the submitted record still matches what was submitted',
     row?.status === 'submitted' && row?.declaration_accepted === true && row?.scheme_answers?.institution === 'Test College' && row?.application_number === application.application_number,
     JSON.stringify(row),
   );
-  check('the submitted_at timestamp still matches the original submission', row?.submitted_at === now, `expected ${now}, found ${row?.submitted_at}`);
+  // Postgres renders timestamptz as `...+00:00` and JSON.stringify of a JS Date
+  // as `...Z`. Both name the same instant, so the two are compared as epoch
+  // milliseconds. A literal string comparison failed on a timestamp that had not
+  // moved, which says nothing about the record.
+  const sameInstant = (a, b) =>
+    Boolean(a) && Boolean(b) && new Date(a).getTime() === new Date(b).getTime();
+  check(
+    'the submitted_at timestamp still matches the original submission',
+    sameInstant(row?.submitted_at, now),
+    `expected ${now} (${new Date(now).getTime()}), found ${row?.submitted_at} (${new Date(row?.submitted_at ?? '').getTime()})`,
+  );
 
   const stillLinked = (await rest(`application_documents?select=id&application_id=eq.${applicationId}`, T)).json ?? [];
   check('every document link survived the tamper attempts', stillLinked.length === mandatory.length, `${stillLinked.length}/${mandatory.length}`);
@@ -699,9 +956,266 @@ async function main() {
   const untouched = await rest(`applications?id=eq.${applicationId}&select=applicant_id,status`, T);
   check('the original application is intact after the cross-user attempts', untouched.json?.[0]?.applicant_id === applicantId, JSON.stringify(untouched.json));
 
+  // Keyed on the authenticated identity, not on an id. applicant_profiles.id is
+  // the uuid primary key while applicant_profiles.applicant_id is the MOTA-2026-*
+  // reference, so filtering applicant_id with the uuid selected above compared
+  // two different columns and matched nothing. The row is proved by its own
+  // primary key, and the second applicant's own reference is shown to be a
+  // reference rather than a uuid so the two cannot be confused again.
   if (otherApplicantId) {
-    const own = await rest(`applicant_profiles?select=id&applicant_id=eq.${otherApplicantId}`, T2);
-    check('each applicant still sees their own profile', (own.json?.length ?? 0) === 1, `rows=${own.json?.length ?? '-'}`);
+    const own = await rest(`applicant_profiles?select=id,applicant_id&user_id=eq.${asOther.userId}`, T2);
+    const row = own.json?.[0];
+    check(
+      'each applicant still sees their own profile',
+      (own.json?.length ?? 0) === 1 && row?.id === otherApplicantId,
+      `rows=${own.json?.length ?? '-'} id=${row?.id ?? '-'} applicant_id=${row?.applicant_id ?? '-'}`,
+    );
+    check(
+      'the second applicant reads its own profile by its own reference, not the uuid',
+      typeof row?.applicant_id === 'string' && /^[A-Za-z0-9-]+$/.test(row.applicant_id) && row.applicant_id !== row.id,
+      `applicant_id=${row?.applicant_id ?? '-'} id=${row?.id ?? '-'}`,
+    );
+  } else {
+    check('each applicant still sees their own profile', false, 'the second applicant has no applicant_profiles row');
+  }
+
+  /* -- 11. verification field protection ------------------------------------ */
+
+  // Added with 20260929120000_lock_document_verification_fields.sql.
+  //
+  // Every check in this section writes. They are therefore opt-in: run with
+  //
+  //   E2E_VERIFICATION_GUARD=1 node scripts/applicant-pipeline.e2e.mjs
+  //
+  // and only after that migration has been applied, because before it is
+  // applied most of these writes succeed and would leave forged values on the
+  // rows. The default is to record one advisory note and move on, so an
+  // ordinary pipeline run can never damage anything.
+  //
+  // The rows used are this run's throwaway applicant's own rows. PostgREST
+  // cannot hold a transaction open across requests, so rollback is not
+  // available; isolation comes from the fixture instead, and the section puts
+  // every field it touches back the way it found it.
+  group('11. Verification field protection');
+
+  if (process.env.E2E_VERIFICATION_GUARD !== '1') {
+    note(
+      'the document verification fields are protected',
+      false,
+      'skipped: set E2E_VERIFICATION_GUARD=1 after 20260929120000_lock_document_verification_fields.sql has been applied',
+    );
+  } else {
+    const serviceRest = (path, options = {}) =>
+      call(URL_BASE, `rest/v1/${path}`, { key: SERVICE_ROLE, token: SERVICE_ROLE, ...options });
+
+    const protectedFields = [
+      ['status', { status: 'verified' }],
+      ['ai_extraction', { ai_extraction: { full_name: 'Forged By Applicant' } }],
+      ['ai_confidence', { ai_confidence: 0.9999 }],
+      ['human_verified_data', { human_verified_data: { full_name: 'Forged By Applicant' } }],
+      ['human_verified_by', { human_verified_by: randomUUID() }],
+      ['human_verified_at', { human_verified_at: new Date().toISOString() }],
+      ['remarks', { remarks: 'Forged deficiency note' }],
+    ];
+
+    const readFields = [
+      'id',
+      'status',
+      'ai_extraction',
+      'ai_confidence',
+      'human_verified_data',
+      'human_verified_by',
+      'human_verified_at',
+      'remarks',
+    ].join(',');
+
+    const linkRows = (await rest(`application_documents?select=${readFields}&application_id=eq.${applicationId}`, T)).json ?? [];
+    const guardLinkId = linkRows[0]?.id;
+    const beforeState = JSON.stringify(linkRows[0] ?? null);
+
+    if (!guardLinkId) {
+      note('the document verification fields are protected', false, 'no application_documents link to test against');
+    } else {
+      // A-G: every protected column, one attempt each, then a read-back. The
+      // read-back is the actual assertion: a refused write and a silently
+      // ignored one look the same from the response alone.
+      for (const [field, body] of protectedFields) {
+        const attempt = await rest(`application_documents?id=eq.${guardLinkId}`, {
+          method: 'PATCH',
+          token: T.token,
+          body,
+        });
+        const after = (await rest(`application_documents?select=${readFields}&id=eq.${guardLinkId}`, T)).json ?? [];
+        check(
+          `an applicant cannot set application_documents.${field}`,
+          attempt.status >= 400 && JSON.stringify(after[0] ?? null) === beforeState,
+          `write ${attempt.status}, row ${JSON.stringify(after[0] ?? null) === beforeState ? 'unchanged' : 'CHANGED'}`,
+        );
+      }
+
+      // P: the refusal has to be a permission failure, not a generic 400, so a
+      // caller can tell "you may not do this" from "that was malformed".
+      const privilegeProbe = await rest(`application_documents?id=eq.${guardLinkId}`, {
+        method: 'PATCH',
+        token: T.token,
+        body: { human_verified_data: { full_name: 'Forged By Applicant' } },
+      });
+      check(
+        'a protected-field refusal carries SQLSTATE 42501',
+        privilegeProbe.json?.code === '42501',
+        `${privilegeProbe.status} code=${privilegeProbe.json?.code ?? '-'} message=${privilegeProbe.json?.message ?? '-'}`,
+      );
+      check(
+        'the refusal message is applicant-safe and names no internal detail',
+        !/guard_application|guard_applicant|application_documents|pg_|postgres|service_role|stack|plpgsql/i.test(
+          String(privilegeProbe.json?.message ?? ''),
+        ),
+        String(privilegeProbe.json?.message ?? ''),
+      );
+
+      // I: the pre-existing ownership guard is still the thing that answers this,
+      // so a regression in it would be visible rather than masked by the new one.
+      const foreignDocument = await rest(`application_documents?id=eq.${guardLinkId}`, {
+        method: 'PATCH',
+        token: T.token,
+        body: { document_id: randomUUID() },
+      });
+      check(
+        'an applicant cannot re-point a submitted link at a document that is not theirs',
+        foreignDocument.status >= 400 &&
+        /documents attached to an application cannot be changed once it has been submitted/i.test(
+          String(foreignDocument.json?.message ?? ''),
+        ),
+        `${foreignDocument.status} ${foreignDocument.json?.message ?? foreignDocument.text?.slice(0, 120)}`,
+      );
+      const afterOwnership = (await rest(`application_documents?select=${readFields}&id=eq.${guardLinkId}`, T)).json ?? [];
+      check('the link is unchanged after the ownership attempt', JSON.stringify(afterOwnership[0] ?? null) === beforeState);
+
+      // J: with both applicant UPDATE policies removed, the row no longer
+      // matches. PostgREST answers an RLS-filtered UPDATE with 200 and an empty
+      // representation rather than an error, so the assertion is the empty array
+      // plus the read-back, not the status code.
+      const ownDocumentId = uploadedIds[0];
+      const applicantUpdate = await rest(`applicant_documents?id=eq.${ownDocumentId}`, {
+        method: 'PATCH',
+        token: T.token,
+        body: { verification_notes: 'Forged note' },
+        prefer: 'return=representation',
+      });
+      const ownDocument = (await rest(`applicant_documents?select=verification_notes&id=eq.${ownDocumentId}`, T)).json ?? [];
+      check(
+        'an applicant cannot UPDATE applicant_documents at all',
+        Array.isArray(applicantUpdate.json) && applicantUpdate.json.length === 0 && !ownDocument[0]?.verification_notes,
+        `${applicantUpdate.status} rows=${Array.isArray(applicantUpdate.json) ? applicantUpdate.json.length : '-'} notes=${JSON.stringify(ownDocument[0]?.verification_notes ?? null)}`,
+      );
+
+      // K and L: INSERT and DELETE are the capabilities the workflow actually
+      // uses, and they must survive the policy removal. Both run on a row this
+      // section creates and then removes, so nothing pre-existing is touched.
+      const probePath = `${applicantId}/e2e_probe/${randomUUID()}.pdf`;
+      const probeInsert = await rest('applicant_documents', {
+        method: 'POST',
+        token: T.token,
+        body: {
+          applicant_id: applicantId,
+          document_type: 'e2e_probe',
+          document_name: 'E2E probe',
+          file_name: 'probe.pdf',
+          storage_path: probePath,
+          mime_type: 'application/pdf',
+          file_size: 1,
+        },
+        prefer: 'return=representation',
+      });
+      const probeId = probeInsert.json?.[0]?.id;
+      check('an applicant can still INSERT into applicant_documents', probeInsert.status === 201 && Boolean(probeId), `${probeInsert.status} ${probeInsert.text?.slice(0, 120)}`);
+
+      if (probeId) {
+        const probeDelete = await rest(`applicant_documents?id=eq.${probeId}`, { method: 'DELETE', token: T.token });
+        const probeGone = (await rest(`applicant_documents?select=id&id=eq.${probeId}`, T)).json ?? [];
+        check(
+          'an applicant can still DELETE their own applicant_documents row',
+          (probeDelete.status === 204 || probeDelete.status === 200) && probeGone.length === 0,
+          `delete ${probeDelete.status}, rows left=${probeGone.length}`,
+        );
+      } else {
+        check('an applicant can still DELETE their own applicant_documents row', false, 'no probe row to delete');
+      }
+
+      // M: the legitimate reviewer path. The throwaway applicant is promoted
+      // with the service role, verifies, and is demoted again, so the admin
+      // grant is proven without needing a real officer account.
+      const promote = await serviceRest(`profiles?id=eq.${applicant.userId}`, {
+        method: 'PATCH',
+        body: { role: 'admin' },
+      });
+      check('the throwaway applicant can be promoted to admin for this test', promote.status >= 200 && promote.status < 300, `${promote.status} ${promote.text?.slice(0, 120)}`);
+
+      const adminVerify = await rest(`application_documents?id=eq.${guardLinkId}`, {
+        method: 'PATCH',
+        token: T.token,
+        body: {
+          human_verified_data: { full_name: 'Verified By Officer' },
+          human_verified_by: applicant.userId,
+          human_verified_at: new Date().toISOString(),
+          status: 'verified',
+          remarks: 'Checked against the original.',
+        },
+        prefer: 'return=representation',
+      });
+      const verifiedRow = (await rest(`application_documents?select=${readFields}&id=eq.${guardLinkId}`, T)).json ?? [];
+      check(
+        'an admin can write the human verification and reviewer fields',
+        (adminVerify.status === 200 || adminVerify.status === 204) &&
+        verifiedRow[0]?.status === 'verified' &&
+        verifiedRow[0]?.human_verified_by === applicant.userId &&
+        verifiedRow[0]?.remarks === 'Checked against the original.',
+        `${adminVerify.status} status=${verifiedRow[0]?.status} by=${verifiedRow[0]?.human_verified_by ?? '-'}`,
+      );
+
+      // N and O: service_role bypasses RLS but not triggers, which is the whole
+      // reason the guard exists in the trigger rather than only in a policy.
+      const machineWrite = await serviceRest(`application_documents?id=eq.${guardLinkId}`, {
+        method: 'PATCH',
+        body: { ai_extraction: { full_name: 'Machine Read' }, ai_confidence: 0.5 },
+        prefer: 'return=representation',
+      });
+      const machineRow = (await rest(`application_documents?select=ai_extraction,ai_confidence&id=eq.${guardLinkId}`, T)).json ?? [];
+      check(
+        'service_role can still write the AI extraction fields',
+        (machineWrite.status === 200 || machineWrite.status === 204) && machineRow[0]?.ai_confidence === 0.5,
+        `${machineWrite.status} confidence=${machineRow[0]?.ai_confidence ?? '-'}`,
+      );
+
+      const machineAudit = await serviceRest(`application_documents?id=eq.${guardLinkId}`, {
+        method: 'PATCH',
+        body: { human_verified_data: { full_name: 'Machine Verified' } },
+      });
+      const afterMachineAudit = (await rest(`application_documents?select=human_verified_data&id=eq.${guardLinkId}`, T)).json ?? [];
+      check(
+        'service_role cannot write the human verification fields',
+        machineAudit.json?.code === '42501' && afterMachineAudit[0]?.human_verified_data?.full_name !== 'Machine Verified',
+        `${machineAudit.status} code=${machineAudit.json?.code ?? '-'} stored=${JSON.stringify(afterMachineAudit[0]?.human_verified_data ?? null)}`,
+      );
+
+      const machineRemarks = await serviceRest(`application_documents?id=eq.${guardLinkId}`, {
+        method: 'PATCH',
+        body: { remarks: 'Machine note' },
+      });
+      check(
+        'service_role cannot write the reviewer remarks',
+        machineRemarks.json?.code === '42501',
+        `${machineRemarks.status} code=${machineRemarks.json?.code ?? '-'}`,
+      );
+
+      // Put the throwaway account back the way it was found, so a run that is
+      // interrupted cannot leave a privileged applicant behind.
+      const demote = await serviceRest(`profiles?id=eq.${applicant.userId}`, {
+        method: 'PATCH',
+        body: { role: 'applicant' },
+      });
+      check('the throwaway applicant is demoted again afterwards', demote.status >= 200 && demote.status < 300, `${demote.status}`);
+    }
   }
 
   /* -- summary ------------------------------------------------------------- */

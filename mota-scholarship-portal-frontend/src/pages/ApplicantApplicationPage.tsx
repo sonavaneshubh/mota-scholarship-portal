@@ -3,9 +3,7 @@ import { useParams } from 'react-router-dom';
 import { useApplicantAuth } from '../context/useApplicantAuth';
 import { ApplicantPageHeader } from '../components/applicant/ApplicantPageHeader';
 import { ApplicationStatusBadge } from '../components/applicant/StatusBadge';
-import { ApplicationTimeline } from '../components/applicant/ApplicationTimeline';
-import { DocumentVerificationPanel } from '../components/applicant/DocumentVerificationPanel';
-import { DocumentStatusBadge } from '../components/applicant/StatusBadge';
+import { DeleteDraftApplicationButton } from '../components/applicant/DeleteDraftApplicationButton';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
@@ -28,7 +26,6 @@ import {
 import {
   buildDocumentRequirements,
   daysUntil,
-  documentStatusFromRecord,
   type DocumentRequirementLink,
   type DocumentRequirementView,
 } from '../lib/applicationFormView';
@@ -42,6 +39,9 @@ import {
   type ApplicationFormLoad,
 } from '../services/applicationFormService';
 import { createViewUrl, uploadDocument } from '../services/documentService';
+import { requestDocumentOcr } from '../services/ocrService';
+import { useDocumentOcrPolling } from '../hooks/useDocumentOcrPolling';
+import { summariseDocumentOcr, type DocumentCheckState, type OcrLinkColumns } from '../lib/documentOcr';
 import { toUiApplicationStatus } from '../services/applicantRecords';
 import { useApplicantApplications } from '../hooks/useApplicantRecords';
 import {
@@ -198,6 +198,29 @@ function answerText(question: SchemeQuestion, answers: SchemeAnswers): string {
 }
 
 /**
+ * Stage 2 says only whether the check ran and what it concluded, because this is
+ * the last look before submitting rather than the place to study the reading. The
+ * detail lives on the document card in Stage 1.
+ *
+ * A NEEDS_REVIEW result is phrased as a prompt to look, never as a rejection.
+ */
+const STAGE_TWO_OCR_LABEL: Record<DocumentCheckState, string> = {
+  'not-started': 'AI check not started',
+  'in-flight': '⟳ AI is processing this document…',
+  complete: '✓ Processed — matches your profile',
+  'needs-review': '⚠ Processed — information needs review',
+  failed: '⚠ Could not read this document',
+};
+
+const STAGE_TWO_OCR_TONE: Record<DocumentCheckState, string> = {
+  'not-started': 'text-slate-400',
+  'in-flight': 'text-blue-700',
+  complete: 'text-emerald-700',
+  'needs-review': 'text-amber-700',
+  failed: 'text-red-700',
+};
+
+/**
  * One document requirement, read back, with a way to open what was attached.
  *
  * The view row opens the stored file through the same short-lived signed URL the
@@ -208,7 +231,8 @@ function answerText(question: SchemeQuestion, answers: SchemeAnswers): string {
  */
 function DocumentReviewRow({ item }: { item: DocumentRequirementView }) {
   const [viewError, setViewError] = useState<string | null>(null);
-  const { requirement, attached } = item;
+  const { requirement, attached, link } = item;
+  const ocr = summariseDocumentOcr(link);
 
   const openAttached = async () => {
     if (!attached) return;
@@ -233,6 +257,11 @@ function DocumentReviewRow({ item }: { item: DocumentRequirementView }) {
         {attached ? (
           <p className="mt-0.5 break-all text-[11px] text-slate-500">
             {attached.file_name ?? attached.document_name ?? 'Attached'}
+          </p>
+        ) : null}
+        {link && ocr.state !== 'not-started' ? (
+          <p className={`mt-1 text-[11px] font-semibold ${STAGE_TWO_OCR_TONE[ocr.state]}`}>
+            {STAGE_TWO_OCR_LABEL[ocr.state]}
           </p>
         ) : null}
         {viewError ? <p className="mt-1 text-[11px] font-semibold text-red-700">{viewError}</p> : null}
@@ -407,6 +436,36 @@ export function ApplicantApplicationPage() {
   const [submitArmed, setSubmitArmed] = useState(false);
   const [busyRequirementId, setBusyRequirementId] = useState<string | null>(null);
   const [uploadErrors, setUploadErrors] = useState<Record<string, string>>({});
+  const [retryingOcrId, setRetryingOcrId] = useState<string | null>(null);
+
+  /**
+   * Folds a re-read of the reading columns back into the links already held.
+   *
+   * Only the columns this poll owns are replaced, and only on rows that are
+   * actually in the poll result, so a link the server did not return keeps
+   * everything else it carries.
+   */
+  const mergeOcrState = useCallback((rows: OcrLinkColumns[]) => {
+    if (rows.length === 0) return;
+    const byId = new Map(rows.map((row) => [row.id, row]));
+    setForm((previous) => {
+      let changed = false;
+      const links = previous.links.map((link) => {
+        const fresh = byId.get(link.id);
+        if (!fresh) return link;
+        if (
+          link.ocr_status === fresh.ocr_status &&
+          link.ai_confidence === fresh.ai_confidence &&
+          link.ocr_processed_at === fresh.ocr_processed_at
+        ) {
+          return link;
+        }
+        changed = true;
+        return { ...link, ...fresh };
+      });
+      return changed ? { ...previous, links } : previous;
+    });
+  }, []);
 
   /**
    * Which application the editable state was seeded from, tracked in a ref
@@ -418,6 +477,21 @@ export function ApplicantApplicationPage() {
   const seededIdRef = useRef<string | null>(null);
 
   const handle = applicationId ?? '';
+
+  // Reads the server's view of any document still being checked, and folds it
+  // into the links held above. Idle — no timers, no requests — once nothing is
+  // in flight, so a finished application costs nothing.
+  useDocumentOcrPolling(form.links, mergeOcrState);
+
+  const handleRetryOcr = useCallback(async (linkId: string) => {
+    setRetryingOcrId(linkId);
+    const result = await requestDocumentOcr(linkId);
+    setRetryingOcrId(null);
+
+    if (!result.ok) {
+      setActionError('The document check could not be started. Please try again in a moment.');
+    }
+  }, []);
 
   const loadForm = useCallback(async () => {
     setLoad({ status: 'loading' });
@@ -694,6 +768,14 @@ export function ApplicantApplicationPage() {
         result.link,
       ],
     }));
+
+    // Ask the server to read the document that has just been attached. Not
+    // awaited, and the result is deliberately not surfaced: the link is already
+    // written, so a failure here is about a reading service, not about the
+    // applicant's upload, and reporting it would put an error on a form they
+    // completed correctly for something they cannot act on. What the reviewer
+    // sees is the ocr_status on the row.
+    void requestDocumentOcr(result.link.id);
   };
 
   const handleDetach = async (linkId: string) => {
@@ -869,6 +951,13 @@ export function ApplicantApplicationPage() {
               <Button size="md" to={ROUTES.applicant.applications} variant="outline">
                 Back to applications
               </Button>
+              <DeleteDraftApplicationButton
+                applicationId={application.id}
+                onDeleted={reloadApplications}
+                referenceNumber={rawReference || null}
+                schemeName={schemeName}
+                status={application.status}
+              />
             </div>
           }
           description="Answer whether this is a renewal application and attach the documents it needs. Your full application form comes next."
@@ -897,6 +986,8 @@ export function ApplicantApplicationPage() {
           onAnswer={setAnswer}
           onAttach={(requirementId, documentId) => void handleAttach(requirementId, documentId)}
           onDetach={(linkId) => void handleDetach(linkId)}
+          onRetryOcr={(linkId) => void handleRetryOcr(linkId)}
+          retryingOcrId={retryingOcrId}
           onSaveAndContinue={() => void handleSaveAndContinue()}
           onSaveDraft={() => void handleSaveDraft()}
           onUpload={(requirement, file) => void handleUpload(requirement, file)}
@@ -943,6 +1034,14 @@ export function ApplicantApplicationPage() {
             <Button size="md" to={ROUTES.applicant.applications} variant="outline">
               Back to applications
             </Button>
+
+            <DeleteDraftApplicationButton
+              applicationId={application.id}
+              onDeleted={reloadApplications}
+              referenceNumber={rawReference || null}
+              schemeName={schemeName}
+              status={application.status}
+            />
           </div>
         }
         description="Everything you are submitting, read back. Check it, tick the declaration, then submit. Changes are made in Additional Information or My Profile."
@@ -1254,73 +1353,27 @@ export function ApplicantApplicationPage() {
 
         {!isDraft ? (
           <p className="mt-3 text-[12px] text-slate-600">
-            This application has already been submitted, so it is read-only. The status and verification details are
-            shown below.
+            This application has already been submitted, so the answers and documents below are read-only. Its
+            current status is shown in the card above and in My Applications.
           </p>
         ) : null}
       </Card>
 
-      {/* Once submitted, the pre-existing status view takes over. */}
-      {!isDraft ? (
-        <>
-          <ApplicationTimeline
-            application={{
-              id: application.id,
-              schemeId: application.scheme_id,
-              schemeName: scheme?.scheme.name ?? '—',
-              submittedAt: application.submitted_at ? new Date(application.submitted_at).toLocaleDateString('en-IN') : '—',
-              updatedAt: new Date(application.updated_at).toLocaleDateString('en-IN'),
-              status: listedStatus,
-              statusLabel: listedStatus.replace(/_/g, ' '),
-              nextStep: 'Your application is with the department for verification.',
-              referenceNumber: reference,
-              amountLabel: '—',
-              documentsComplete: mandatoryDone,
-              documentsTotal: mandatoryTotal,
-            }}
-          />
+      {/* The status timeline, the "AI-assisted processing" panel and the profile
+          document library that used to sit here have been removed. They repeated
+          what the applicant already has a page for: the timeline is covered by the
+          status in My Applications, and the document library by My Documents,
+          which is where a document can actually be corrected. On the form itself
+          they competed with the seven sections and the submit button for the same
+          attention, and the library box listed every document on the profile
+          rather than the ones this application needs — so it was a lot of content
+          that answered a question the applicant did not have while filling the
+          form in.
 
-          {mandatoryTotal > 0 ? (
-            <DocumentVerificationPanel
-              documentCount={mandatoryTotal}
-              needsCorrection={listedStatus === 'deficiency-raised' || listedStatus === 'resubmission-required'}
-            />
-          ) : null}
-
-          <Card className="print-flat p-5">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-gov-saffron-dark">Documents on your profile</p>
-            <h2 className="mt-1 text-lg font-bold text-gov-blue-dark">Your document library</h2>
-            {form.documents.length === 0 ? (
-              <p className="mt-4 rounded border border-dashed border-slate-300 px-3 py-6 text-center text-sm text-slate-600">
-                You have not uploaded any document yet.
-              </p>
-            ) : (
-              <ul className="mt-4 divide-y divide-slate-100">
-                {form.documents.map((document) => {
-                  const documentStatus = documentStatusFromRecord(document);
-                  return (
-                  <li className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0" key={document.id}>
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-slate-800">
-                        {document.file_name ?? document.document_name ?? document.document_type ?? 'Document'}
-                      </p>
-                      <p className="mt-1 text-xs text-slate-500">
-                        {document.mime_type ?? 'file'} ·{' '}
-                        {(document.verification_status ?? 'pending').replace(/_/g, ' ')}
-                      </p>
-                    </div>
-                    <DocumentStatusBadge status={documentStatus} />
-                  </li>
-                  );
-                })}
-              </ul>
-            )}
-            <Button className="mt-4" size="sm" to={ROUTES.applicant.documents} variant="outline">
-              Manage documents
-            </Button>
-          </Card>
-        </>
-      ) : null}
+          Deficiency is still legible here through the status badge in the
+          reference card above, which reads "Deficiency raised" or "Resubmission
+          required" and is driven by the same applications.status value the
+          verification panel used to read. */}
 
       <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm leading-relaxed text-slate-700">
         <p className="font-bold text-gov-blue-dark">Decision boundary</p>

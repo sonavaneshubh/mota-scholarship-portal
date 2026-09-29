@@ -5,12 +5,29 @@
  * a convenience, not a control: `supabase/functions/_shared/registration.ts`
  * applies the same rules to whatever actually arrived, and `registration-start`
  * rejects the request if they disagree. The numbers in `REGISTRATION_LIMITS`
- * are the same on both sides too, and `scripts/registration-otp.test.mjs` fails
- * if the two files ever drift, so this one and that one are edited together.
+ * and the `MOBILE_REQUIRED` flag are the same on both sides too, and
+ * `scripts/registration-otp.test.mjs` fails if the two files ever drift, so this
+ * one and that one are edited together.
+ *
+ * The email is the only proof registration always requires. The mobile number is
+ * optional: leave it blank and the account is created once the email code is
+ * accepted. Give one, and it is verified like it always was.
  */
 
-/** Digit count of the codes Supabase Auth sends for both email and SMS. */
-export const OTP_LENGTH = 6;
+/**
+ * Digit count of the codes Supabase Auth sends for both email and SMS.
+ *
+ * `8`, matching what this project's Supabase Auth actually issues. Verified
+ * against a real "Confirm signup" mail: the code rendered by the
+ * `{{ .Token }}` template was eight digits. The number of boxes, `maxLength`,
+ * the paste spread and the submit gate all read this one constant, so a future
+ * change to the Auth setting is a one-line edit here plus the mirrored copy in
+ * `supabase/functions/_shared/registration.ts`.
+ *
+ * The token is never padded, trimmed or sliced on its way to
+ * `auth.verifyOtp`; whatever the applicant typed, in full, is what gets sent.
+ */
+export const OTP_LENGTH = 8;
 
 /** Wait before another code may be requested, per channel. */
 export const RESEND_COOLDOWN_SECONDS = 45;
@@ -31,6 +48,19 @@ export const REGISTRATION_LIMITS = {
   MAX_VERIFY_FAILURES_PER_CHANNEL,
   ATTEMPT_TTL_MINUTES,
 } as const;
+
+/**
+ * Whether an applicant has to give a mobile number in order to register.
+ *
+ * `false`, so the form may leave the field blank and the account is created on
+ * the email verification alone. Mirrored from
+ * `supabase/functions/_shared/registration.ts`; `scripts/registration-otp.test.mjs`
+ * fails if the two copies disagree, so they are edited together.
+ *
+ * This decides whether a number is *demanded*, never whether one is *checked*:
+ * a number that is given is still verified by a code sent to it.
+ */
+export const MOBILE_REQUIRED = false;
 
 /**
  * Dialling code assumed when the applicant types a bare ten-digit number.
@@ -170,12 +200,14 @@ export function getRegistrationErrors(values: {
     errors.email = 'Enter a valid Email ID.';
   }
 
-  // Mobile is required now. It was optional while nothing verified it, which is
-  // exactly the state this flow exists to end: an unverified number is not an
-  // identity, so registration no longer accepts one it will not check.
-  if (!values.mobile.trim()) {
+  // The mobile number is optional. Leaving it blank registers the applicant on
+  // the email proof alone. Typing something is a promise that the number is
+  // theirs, so whatever is typed has to be a usable number -- a half-typed value
+  // is an error rather than something to quietly drop, which would attach a
+  // different number (or none) to the account than the applicant intended.
+  if (MOBILE_REQUIRED && !values.mobile.trim()) {
     errors.mobile = 'Enter your mobile number. We will send a verification code to it.';
-  } else if (!isValidMobile(values.mobile)) {
+  } else if (values.mobile.trim() && !isValidMobile(values.mobile)) {
     errors.mobile = 'Enter a 10-digit mobile number, or the full number with its country code.';
   }
 
