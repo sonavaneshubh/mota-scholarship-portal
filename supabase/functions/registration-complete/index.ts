@@ -1,21 +1,27 @@
 // =============================================================================
 // registration-complete
 // =============================================================================
-// Finishes a registration, and only a fully proven one.
+// Finishes a registration, and only a proven one.
 //
 //   POST { attemptId, password }
 //
 // This is the endpoint a bypass attempt targets, so its first act is to ask the
-// database whether the two proofs exist:
+// database whether the required proofs exist:
 //
 //   select ... from public.registration_attempts where id = $1
 //
-// Both `email_verified_at` and `mobile_verified_at` must be non-null. The
-// browser's opinion is not consulted, not accepted as a fallback, and there is
-// no parameter that can stand in for a proof. Each of those columns was written
-// by registration-verify, and only after GoTrue accepted the corresponding
-// one-time code, so an unverified or half-verified applicant cannot get an
-// account here however the request is shaped.
+// `email_verified_at` must always be non-null. `mobile_verified_at` must be
+// non-null too, but only when the attempt carries a number -- which is exactly
+// what `mobile_e164 is not null` says, read from the same row rather than from
+// anything the request carried. A request cannot make its own mobile proof
+// unnecessary: that column is written by registration-start from the field the
+// applicant filled in, and it is not writable from here.
+//
+// The browser's opinion is not consulted, not accepted as a fallback, and there
+// is no parameter that can stand in for a proof. Each `*_verified_at` column was
+// written by registration-verify, and only after GoTrue accepted the
+// corresponding one-time code, so an unverified or half-verified applicant
+// cannot get an account here however the request is shaped.
 //
 // What it then does, in order:
 //   1. Resolves the single auth user for this applicant. GoTrue opened one when
@@ -23,8 +29,8 @@
 //      sent the SMS; exactly one account survives, either by completing the
 //      email-side one and removing the phone-only throwaway, or -- when only the
 //      phone-side account was ever opened -- by completing that one in place.
-//   2. Sets the password, the phone number, both confirmed flags, and the
-//      applicant's name.
+//   2. Sets the password, the applicant's name, and -- only when a number was
+//      given -- the phone number and its confirmed flag.
 //   3. Ensures the `profiles` and `applicant_profiles` rows exist, without ever
 //      writing `role`. Role assignment stays where it has always been: the
 //      `handle_new_user()` trigger writes the literal 'applicant', and nothing
@@ -46,6 +52,7 @@ import {
   isValidPassword,
   json,
   logSafe,
+  hasMobile,
   normalizeEmail,
   normalizeMobile,
   readJsonBody,
@@ -57,7 +64,8 @@ const TABLE = 'registration_attempts';
 type Attempt = {
   id: string;
   email: string;
-  mobile_e164: string;
+  /** Null when the applicant gave no number, which is allowed. */
+  mobile_e164: string | null;
   full_name: string;
   username: string | null;
   auth_user_id: string | null;
@@ -122,20 +130,29 @@ Deno.serve(async (request: Request) => {
   }
 
   // ---------------------------------------------------------------------------
-  // The gate. Both proofs, read from the database, right now.
+  // The gate. The required proofs, read from the database, right now.
+  //
+  // The email is always required. The mobile proof is required only when a
+  // number is on the attempt, and the presence of that number is read from the
+  // row rather than taken from the request, so nothing in the body can talk its
+  // way past this.
   // ---------------------------------------------------------------------------
-  if (!attempt.email_verified_at || !attempt.mobile_verified_at) {
+  const mobileRequired = hasMobile(attempt.mobile_e164);
+
+  if (!attempt.email_verified_at || (mobileRequired && !attempt.mobile_verified_at)) {
     logSafe({
       fn: 'registration-complete',
       event: 'refused',
       reason: 'proof missing',
       emailVerified: Boolean(attempt.email_verified_at),
       mobileVerified: Boolean(attempt.mobile_verified_at),
+      mobileRequired,
     });
 
     return fail(FAILURE.NOT_VERIFIED, 403, {
       emailVerified: Boolean(attempt.email_verified_at),
       mobileVerified: Boolean(attempt.mobile_verified_at),
+      mobileRequired,
     });
   }
 
@@ -155,7 +172,15 @@ Deno.serve(async (request: Request) => {
 
   const users = authUsers?.users ?? [];
   const emailOwner = users.find((user) => normalizeEmail(user.email) === attempt.email) ?? null;
-  const phoneOwner = users.find((user) => normalizeMobile(user.phone ?? '') === attempt.mobile_e164) ?? null;
+
+  // There is no phone account to reconcile when no number was given. The
+  // comparison is skipped rather than run against a null, because
+  // `normalizeMobile('')` is an empty string and an account with an unset phone
+  // column would match it -- which would put an unrelated account in scope for
+  // deletion.
+  const phoneOwner = mobileRequired
+    ? users.find((user) => normalizeMobile(user.phone ?? '') === attempt.mobile_e164) ?? null
+    : null;
 
   // The email side is the account: it is the identifier the applicant signs in
   // with. A second, phone-only user can exist because GoTrue's phone sign-up
@@ -240,22 +265,31 @@ Deno.serve(async (request: Request) => {
 
   const metadata: Record<string, string> = {
     full_name: attempt.full_name,
-    mobile: attempt.mobile_e164,
   };
 
   if (attempt.username) {
     metadata.username = attempt.username;
   }
 
+  if (mobileRequired) {
+    metadata.mobile = attempt.mobile_e164 as string;
+  }
+
+  // Every phone field is set only when there is a number to set. GoTrue rejects
+  // an empty `phone` and would refuse the whole update, and `phone_confirm: true`
+  // on an account with no phone would assert a confirmation that never happened.
+  const phoneFields = mobileRequired
+    ? { phone: attempt.mobile_e164 as string, phone_confirm: true }
+    : {};
+
   if (userId) {
     // Reusing the account GoTrue opened at the email step. It has no password
     // yet, which is why nobody could have signed into it in the meantime.
     const { error: updateError } = await env.admin.auth.admin.updateUserById(userId, {
       password,
-      phone: attempt.mobile_e164,
       email_confirm: true,
-      phone_confirm: true,
       user_metadata: metadata,
+      ...phoneFields,
     });
 
     if (updateError) {
@@ -270,11 +304,10 @@ Deno.serve(async (request: Request) => {
     // has to be clicked.
     const { data: created, error: createError } = await env.admin.auth.admin.createUser({
       email: attempt.email,
-      phone: attempt.mobile_e164,
       password,
       email_confirm: true,
-      phone_confirm: true,
       user_metadata: metadata,
+      ...phoneFields,
     });
 
     if (createError || !created?.user) {
@@ -320,13 +353,20 @@ Deno.serve(async (request: Request) => {
     .eq('id', userId)
     .maybeSingle();
 
+  // `mobile_number` is left null for an applicant who gave no number. The
+  // column is already nullable, and the applicant profile form asks for the
+  // number later, so a blank here is an incomplete profile rather than a
+  // broken one.
   if (existingApplicant) {
-    await env.admin.from('applicant_profiles').update({ mobile_number: attempt.mobile_e164 }).eq('id', userId);
+    await env.admin
+      .from('applicant_profiles')
+      .update(mobileRequired ? { mobile_number: attempt.mobile_e164 } : {})
+      .eq('id', userId);
   } else {
     await env.admin.from('applicant_profiles').insert({
       id: userId,
       profile_status: 'incomplete',
-      mobile_number: attempt.mobile_e164,
+      ...(mobileRequired ? { mobile_number: attempt.mobile_e164 } : {}),
     });
   }
 

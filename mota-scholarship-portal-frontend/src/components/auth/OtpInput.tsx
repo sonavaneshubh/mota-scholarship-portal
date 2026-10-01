@@ -17,9 +17,12 @@ interface OtpInputProps {
 }
 
 /**
- * One-time-code entry, as six single-character boxes.
+ * One-time-code entry, as one single-character box per digit.
  *
- * Splitting the field is what makes a six-digit code feel right on a phone, and
+ * The digit count is the caller's `length` prop, which comes from the shared
+ * `OTP_LENGTH`; nothing here assumes a particular number of boxes.
+ *
+ * Splitting the field is what makes a short code feel right on a phone, and
  * it costs a set of behaviours that a single input gets for free. All of them
  * are here:
  *
@@ -29,8 +32,10 @@ interface OtpInputProps {
  *     people expect and the one that otherwise strands them.
  *   - Arrow keys move between boxes.
  *   - A pasted code is spread across the boxes from wherever the caret is, so
- *     pasting a full six-digit code into the first box works, and pasting into
- *     the third box fills the last four.
+ *     pasting a whole code into the first box works, and pasting into a later box
+ *     fills the remaining ones.
+ *   - Anything past `length` is dropped rather than refused, and non-digits are
+ *     stripped, so the value can only ever be digits.
  *   - `autoComplete="one-time-code"` on the first box lets iOS and Android
  *     offer the code from the SMS or the mail app.
  *

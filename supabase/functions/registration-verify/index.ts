@@ -10,6 +10,11 @@
 // `*_verified_at` column written. There is no request shape that sets a verified
 // flag, so the browser cannot assert its own verification.
 //
+// The email channel is always available. The mobile channel exists only when the
+// applicant gave a number: an attempt whose `mobile_e164` is null never had a
+// code sent to it, so asking to verify one is refused rather than passed to
+// GoTrue with no number to check it against.
+//
 // The session GoTrue returns on a successful verifyOtp is read for its user id
 // and then dropped. Handing it to the browser would be a hole: the applicant's
 // password has not been set at this point, and a valid session would let them
@@ -38,6 +43,7 @@ import {
   isValidOtpToken,
   json,
   logSafe,
+  hasMobile,
   readJsonBody,
   CORS_HEADERS,
 } from '../_shared/registration.ts';
@@ -62,7 +68,8 @@ const EMAIL_OTP_TYPES = ['email', 'signup', 'magiclink'] as const;
 type Attempt = {
   id: string;
   email: string;
-  mobile_e164: string;
+  /** Null when the applicant gave no number, which is allowed. */
+  mobile_e164: string | null;
   status: string;
   email_verified_at: string | null;
   mobile_verified_at: string | null;
@@ -128,6 +135,15 @@ Deno.serve(async (request: Request) => {
     return fail(FAILURE.ATTEMPT_EXPIRED, 410);
   }
 
+  // An attempt with no number has no mobile code, because none was ever sent.
+  // Refusing the channel outright -- rather than letting the attempt fall
+  // through to GoTrue with a null phone -- means there is no shape of this
+  // request that puts an unverified number anywhere near this attempt.
+  if (channel === 'mobile' && !hasMobile(record.mobile_e164)) {
+    logSafe({ fn: 'registration-verify', event: 'refused', channel, reason: 'no number on this attempt' });
+    return fail(FAILURE.BAD_REQUEST, 400);
+  }
+
   const alreadyVerified = channel === 'email' ? record.email_verified_at : record.mobile_verified_at;
   const failures = channel === 'email' ? record.email_verify_failures : record.mobile_verify_failures;
   const sentAt = channel === 'email' ? record.email_otp_sent_at : record.mobile_otp_sent_at;
@@ -138,6 +154,27 @@ Deno.serve(async (request: Request) => {
   const resendCountField = channel === 'email' ? 'email_resend_count' : 'mobile_resend_count';
   const failuresField = channel === 'email' ? 'email_verify_failures' : 'mobile_verify_failures';
 
+  // Checked once, after the guard above, so the two dispatch and verify paths
+  // below can pass a plain string to GoTrue without re-deciding this.
+  const mobileE164 = record.mobile_e164 as string;
+
+  // Whether this attempt owes a mobile proof at all. Reported so the form does
+  // not have to infer it, and because "verified" and "not required" are
+  // different states that would otherwise look identical.
+  const mobileRequired = hasMobile(record.mobile_e164);
+
+  // `bothVerified` is kept under its old name because it is a field the browser
+  // already reads. It means "every proof this attempt requires is in", which for
+  // a mobile-less attempt is the email proof alone. The proof just written is
+  // passed in rather than re-read, because `record` still holds the values the
+  // row had before this call.
+  const allRequiredVerified = (justProved = false) => {
+    const emailVerified = justProved ? channel === 'email' || Boolean(record.email_verified_at) : Boolean(record.email_verified_at);
+    const mobileVerified = justProved && channel === 'mobile' ? true : Boolean(record.mobile_verified_at);
+
+    return emailVerified && (!mobileRequired || mobileVerified);
+  };
+
   const state = (extra: Record<string, unknown> = {}) =>
     json(
       {
@@ -145,7 +182,8 @@ Deno.serve(async (request: Request) => {
         channel,
         emailVerified: Boolean(record.email_verified_at),
         mobileVerified: Boolean(record.mobile_verified_at),
-        bothVerified: Boolean(record.email_verified_at && record.mobile_verified_at),
+        bothVerified: allRequiredVerified(),
+        mobileRequired,
         resendCooldownSeconds: RESEND_COOLDOWN_SECONDS,
         expiresAt: record.expires_at,
         ...extra,
@@ -182,7 +220,7 @@ Deno.serve(async (request: Request) => {
       channel === 'email'
         ? await env.publicClient.auth.signInWithOtp({ email: record.email, options: { shouldCreateUser: true } })
         : await env.publicClient.auth.signInWithOtp({
-            phone: record.mobile_e164,
+            phone: mobileE164,
             options: { shouldCreateUser: true, channel: 'sms' },
           });
 
@@ -225,7 +263,7 @@ Deno.serve(async (request: Request) => {
   let lastClassification: { code: string; status: number } | null = null;
 
   if (channel === 'mobile') {
-    const { data, error } = await env.publicClient.auth.verifyOtp({ phone: record.mobile_e164, token, type: 'sms' });
+    const { data, error } = await env.publicClient.auth.verifyOtp({ phone: mobileE164, token, type: 'sms' });
 
     if (error) {
       lastClassification = classifyAuthError(error);
@@ -270,14 +308,11 @@ Deno.serve(async (request: Request) => {
 
   // The proof. This write is the only way `verified_at` ever becomes non-null.
   const now = new Date().toISOString();
-  const nextStatus: string =
-    channel === 'email'
-      ? record.mobile_verified_at
-        ? 'mobile_verified'
-        : 'email_verified'
-      : record.email_verified_at
-        ? 'mobile_verified'
-        : 'email_verified';
+
+  // 'email_verified' on its own is also the resting state of a mobile-less
+  // attempt: there is no second channel to move on to, and the value has to stay
+  // inside the check constraint in the schema.
+  const nextStatus: string = record.email_verified_at ? 'mobile_verified' : 'email_verified';
 
   const patch: Record<string, unknown> = {
     [verifiedAtField]: now,
@@ -300,15 +335,13 @@ Deno.serve(async (request: Request) => {
 
   logSafe({ fn: 'registration-verify', event: 'verified', channel });
 
-  const bothVerified = channel === 'email' ? Boolean(record.mobile_verified_at) : Boolean(record.email_verified_at);
-
   return state({
     verified: true,
     // Reported so the form can show both channels' state side by side. The
     // server decides; this is only what to draw.
     emailVerified: channel === 'email' ? true : Boolean(record.email_verified_at),
     mobileVerified: channel === 'mobile' ? true : Boolean(record.mobile_verified_at),
-    bothVerified,
+    bothVerified: allRequiredVerified(true),
     otpLength: OTP_LENGTH,
   });
 });

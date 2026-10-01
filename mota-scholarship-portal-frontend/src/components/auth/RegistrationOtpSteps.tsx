@@ -30,6 +30,8 @@ interface ResumeState {
   maskedMobile: string;
   emailVerified: boolean;
   mobileVerified: boolean;
+  /** Whether this attempt owes a mobile proof. Decides which screen to draw. */
+  mobileRequired: boolean;
 }
 
 interface RegistrationOtpStepsProps {
@@ -41,10 +43,19 @@ interface RegistrationOtpStepsProps {
 
 export function RegistrationOtpSteps({ attempt, password: initialPassword, onRestart }: RegistrationOtpStepsProps) {
   const navigate = useNavigate();
+  // The server decides which channels this attempt has. With no mobile number
+  // there is no SMS to wait for, so the email step is the only step and the
+  // flow is not parked on a screen for a code that was never sent.
+  const mobileRequired = attempt.mobileRequired;
+  const mobileSent = attempt.channels.mobile?.sent ?? false;
+
+  // Starts on whichever channel is actually outstanding. With no number on the
+  // attempt there is no mobile channel, so the email one is the only candidate
+  // and is not left to default to 'mobile'.
   const [channel, setChannel] = useState<RegistrationChannel>(() =>
-    attempt.channels.email.sent ? 'email' : 'mobile',
+    attempt.channels.email.sent || !attempt.mobileRequired ? 'email' : 'mobile',
   );
-  const [emailVerified, setEmailVerified] = useState(attempt.channels.email.sent ? false : false);
+  const [emailVerified, setEmailVerified] = useState(false);
   const [mobileVerified, setMobileVerified] = useState(false);
   const [otp, setOtp] = useState('');
   const [error, setError] = useState('');
@@ -64,14 +75,15 @@ export function RegistrationOtpSteps({ attempt, password: initialPassword, onRes
   const attemptId = attempt.attemptId;
 
   // A dispatch that failed is reported once, on the step it belongs to, rather
-  // than as a generic failure on the form the applicant has already left.
+  // than as a generic failure on the form the applicant has already left. Only
+  // reachable when a number was given, since no SMS is attempted otherwise.
   useEffect(() => {
-    if (channel === 'mobile' && attempt.channels.mobile.sent === false) {
+    if (channel === 'mobile' && mobileRequired && !mobileSent) {
       setError(
         'We could not send a code to your mobile number. You can try again from this screen, but registration cannot be completed until this number is verified.',
       );
     }
-  }, [attempt.channels.mobile.sent, channel]);
+  }, [mobileRequired, mobileSent, channel]);
 
   useEffect(() => {
     if (cooldownUntil <= Date.now()) {
@@ -118,28 +130,36 @@ export function RegistrationOtpSteps({ attempt, password: initialPassword, onRes
     }
 
     try {
-      const next: ResumeState = { attemptId, maskedEmail, maskedMobile, emailVerified, mobileVerified };
+      const next: ResumeState = {
+        attemptId,
+        maskedEmail,
+        maskedMobile,
+        emailVerified,
+        mobileVerified,
+        mobileRequired,
+      };
       window.sessionStorage.setItem(RESUME_KEY, JSON.stringify(next));
     } catch {
       // A browser with storage disabled still completes the flow; it just
       // cannot be resumed after a refresh.
     }
-  }, [attemptId, completed, emailVerified, maskedEmail, maskedMobile, mobileVerified]);
+  }, [attemptId, completed, emailVerified, maskedEmail, maskedMobile, mobileRequired, mobileVerified]);
 
   // Move to the outstanding step whenever the current one is already proven, so
   // returning to the tab after a refresh lands on the work that is left rather
-  // than on a finished screen.
+  // than on a finished screen. With no number on the attempt there is no mobile
+  // step to move to, so the email proof alone finishes the flow.
   useEffect(() => {
-    if (channel === 'email' && emailVerified && !mobileVerified) {
+    if (channel === 'email' && emailVerified && mobileRequired && !mobileVerified) {
       setChannel('mobile');
       // The code that was just entered belongs to the email step, so it is
       // cleared here rather than left sitting in the box for the next one.
       setOtp('');
       setError('');
     }
-  }, [channel, emailVerified, mobileVerified]);
+  }, [channel, emailVerified, mobileRequired, mobileVerified]);
 
-  const bothVerified = emailVerified && mobileVerified;
+  const bothVerified = emailVerified && (!mobileRequired || mobileVerified);
 
   const startCooldown = useCallback((seconds?: number) => {
     const wait = seconds && seconds > 0 ? seconds : RESEND_COOLDOWN_SECONDS;
@@ -182,9 +202,11 @@ export function RegistrationOtpSteps({ attempt, password: initialPassword, onRes
         if (result.mobileVerified) {
           setMobileVerified(true);
           setStatus('Email verified. Mobile number verified.');
-        } else {
+        } else if (mobileRequired) {
           setChannel('mobile');
           setStatus('Email verified. Now verify your mobile number.');
+        } else {
+          setStatus('Email verified. Enter your password to finish registration.');
         }
 
         return;
@@ -331,10 +353,12 @@ export function RegistrationOtpSteps({ attempt, password: initialPassword, onRes
           <span aria-hidden="true">{emailVerified ? '✓' : '1'}</span> Email
           {emailVerified ? ': verified' : ''}
         </li>
-        <li className={badgeClass(mobileVerified)}>
-          <span aria-hidden="true">{mobileVerified ? '✓' : '2'}</span> Mobile
-          {mobileVerified ? ': verified' : mobileVerified === false && emailVerified ? ': verification required' : ''}
-        </li>
+        {mobileRequired ? (
+          <li className={badgeClass(mobileVerified)}>
+            <span aria-hidden="true">{mobileVerified ? '✓' : '2'}</span> Mobile
+            {mobileVerified ? ': verified' : mobileVerified === false && emailVerified ? ': verification required' : ''}
+          </li>
+        ) : null}
       </ol>
 
       <p className="text-xs leading-relaxed text-slate-600">

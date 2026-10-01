@@ -21,6 +21,14 @@
 --   in the applicant's browser only for the lifetime of the form and is sent
 --   once, over TLS, to `registration-complete`.
 --
+-- Later change to this table
+--   `mobile_e164` is now nullable and the mobile OTP is optional. An applicant
+--   who leaves the number blank is stored here with `mobile_e164` set to NULL,
+--   no SMS is sent, and `registration-complete` accepts the email proof on its
+--   own. A number that *is* given is still verified exactly as described here.
+--   See 20260929160000_registration_attempts_optional_mobile.sql. The rest of
+--   this file is unchanged.
+--
 -- Lifecycle
 --   A row is created by `registration-start`, moved forward by
 --   `registration-verify`, and *deleted* by `registration-complete`. On

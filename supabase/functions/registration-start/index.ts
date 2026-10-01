@@ -1,26 +1,31 @@
 // =============================================================================
 // registration-start
 // =============================================================================
-// Opens an Email OTP + Mobile OTP registration.
+// Opens an Email OTP registration, with a Mobile OTP when a number was given.
 //
-//   POST { email, mobile, fullName, username, password }
+//   POST { email, mobile?, fullName, username, password }
 //
 // Sequence
 //   1. Re-validate every field server-side. The browser's checks are for the
 //      applicant's benefit and are not trusted.
-//   2. Reject the address and the mobile number if either already belongs to a
-//      registered applicant, and throttle repeat attempts per address.
+//   2. Reject the address, and the mobile number if one was given, when either
+//      already belongs to a registered applicant, and throttle repeat attempts
+//      per address.
 //   3. Open a row in public.registration_attempts, which is the only place the
 //      flow's state is kept. No OTP and no password are written to it.
-//   4. Ask Supabase Auth to send the email code and the SMS code. GoTrue
-//      generates both, so neither code ever passes through this repository.
+//   4. Ask Supabase Auth to send the email code, and the SMS code as well when
+//      the applicant gave a number. GoTrue generates both, so neither code ever
+//      passes through this repository.
 //
-// The two channels are dispatched independently and reported independently. If
-// the SMS provider is not configured, the email code is still sent and the
-// response says so, so the applicant is not locked out of a flow they cannot
-// finish for a reason they can read. Registration still cannot be completed
-// until the mobile number is verified -- an unconfigured provider must not
-// become a way round the requirement.
+// The email is the one proof that is always required. The mobile number is
+// optional: `mobile` may be blank, and then `mobile_e164` is stored as NULL, no
+// SMS is sent, and no mobile proof is owed before completion. A number that *is*
+// given is still verified, because a stored but unverified number is not an
+// identity -- so the two channels are dispatched and reported independently here,
+// and an SMS provider that is not configured still leaves the email code sent and
+// the registration completable, but only for an applicant who never asked for a
+// number. An unconfigured provider must not become a way round the requirement
+// for someone who did.
 //
 // The password is accepted here only to be validated. It is used at no point in
 // this function, never logged, and is required again by registration-complete.
@@ -37,6 +42,7 @@ import {
   classifyAuthError,
   fail,
   getEnv,
+  hasMobile,
   isValidEmail,
   isValidName,
   isValidPassword,
@@ -48,6 +54,7 @@ import {
   normalizeName,
   normalizeUsername,
   readJsonBody,
+  readOptionalMobile,
   CORS_HEADERS,
 } from '../_shared/registration.ts';
 import type { FunctionEnv } from '../_shared/registration.ts';
@@ -76,7 +83,7 @@ Deno.serve(async (request: Request) => {
   }
 
   const email = normalizeEmail(body.email);
-  const mobileE164 = normalizeMobile(body.mobile);
+  const { given: mobileGiven, e164: mobileE164 } = readOptionalMobile(body.mobile);
   const fullName = normalizeName(body.fullName);
   const username = normalizeUsername(body.username);
   const password = body.password;
@@ -87,7 +94,11 @@ Deno.serve(async (request: Request) => {
     return fail(FAILURE.INVALID_EMAIL, 400);
   }
 
-  if (!mobileE164) {
+  // A blank mobile field is accepted, because the field is optional. A field
+  // with something in it that is not a usable number is not: that is a
+  // mistyped number, and quietly registering without it would leave the
+  // applicant believing a number was attached to their account when none was.
+  if (mobileGiven && !mobileE164) {
     return fail(FAILURE.INVALID_MOBILE, 400);
   }
 
@@ -112,8 +123,14 @@ Deno.serve(async (request: Request) => {
 
   // The applicant is not holding anything yet. Recording that a registration
   // was started from here, and nothing that identifies them, is the point of
-  // this log line.
-  logSafe({ fn: 'registration-start', event: 'received', hasMobile: Boolean(mobileE164), hasUsername: Boolean(username) });
+  // this log line. `hasMobile` rather than the value, so no number is logged.
+  logSafe({ fn: 'registration-start', event: 'received', hasMobile: hasMobile(mobileE164), hasUsername: Boolean(username) });
+
+  // Every "this address, or this number" filter below is built from this, so a
+  // mobile-less registration narrows to the address instead of matching a row
+  // whose number happens to be null.
+  const emailOrMobile = (column: string) =>
+    hasMobile(mobileE164) ? `email.eq.${email},${column}.eq.${mobileE164}` : `email.eq.${email}`;
 
   // 2. Clear out anything stale for this address or number, so an abandoned
   //    attempt neither blocks a fresh one nor keeps dead rows around.
@@ -127,7 +144,8 @@ Deno.serve(async (request: Request) => {
     .from(TABLE)
     .delete()
     .lte('expires_at', new Date().toISOString())
-    .or(`email.eq.${email},mobile_e164.eq.${mobileE164}`);
+    .or(emailOrMobile('mobile_e164'));
+
 
   // 3. Throttle. Counted from rows rather than a counter. Expired rows for this
   //    address were just removed, so an applicant who abandoned an attempt and
@@ -178,7 +196,10 @@ Deno.serve(async (request: Request) => {
 
   for (const user of authUsers?.users ?? []) {
     const sameEmail = normalizeEmail(user.email) === email;
-    const sameMobile = normalizeMobile(user.phone ?? '') === mobileE164;
+    // Only a real, non-null number can match. With no number given there is
+    // nothing to compare, and an applicant must never be told their number is
+    // taken on the strength of somebody else's empty phone column.
+    const sameMobile = hasMobile(mobileE164) && normalizeMobile(user.phone ?? '') === mobileE164;
 
     if (!sameEmail && !sameMobile) {
       continue;
@@ -205,13 +226,24 @@ Deno.serve(async (request: Request) => {
   // The stored address is compared again here rather than trusting the SQL
   // match, because the case-insensitive operator is the one place a stray
   // wildcard character in a typed address could produce a false hit.
+  //
+  // The number lookup is skipped entirely when none was given. Querying
+  // `eq('mobile_number', '')` would match rows holding an empty string rather
+  // than null, and would report another applicant's number as taken for an
+  // applicant who never asked for a number.
+  const mobileLookup = hasMobile(mobileE164)
+    ? excludingAbandoned(env.admin.from('applicant_profiles').select('id').eq('mobile_number', mobileE164)).maybeSingle()
+    : // Typed as the same shape the query resolves to, so the destructuring
+      // below does not depend on which branch ran.
+      Promise.resolve({ data: null, error: null, count: null, status: 200, statusText: '' });
+
   const [{ data: profileEmails }, { data: profileByMobile }, { data: activeAttempt }] = await Promise.all([
     excludingAbandoned(env.admin.from('profiles').select('id, email')).ilike('email', email),
-    excludingAbandoned(env.admin.from('applicant_profiles').select('id').eq('mobile_number', mobileE164)).maybeSingle(),
+    mobileLookup,
     env.admin
       .from(TABLE)
       .select('id')
-      .or(`email.eq.${email},mobile_e164.eq.${mobileE164}`)
+      .or(emailOrMobile('mobile_e164'))
       .neq('status', 'expired')
       .limit(1)
       .maybeSingle(),
@@ -246,7 +278,11 @@ Deno.serve(async (request: Request) => {
     .from(TABLE)
     .insert({
       email,
-      mobile_e164: mobileE164,
+      // NULL, not an empty string, for an applicant who gave no number. The
+      // column is nullable for exactly this, and `hasMobile` reads the
+      // difference. The E.164 check constraint is satisfied by a NULL, so it
+      // does not reject the row.
+      mobile_e164: mobileE164 || null,
       full_name: fullName,
       username: username || null,
       expires_at: expiresAt,
@@ -268,8 +304,12 @@ Deno.serve(async (request: Request) => {
     return fail(FAILURE.INTERNAL, 500);
   }
 
-  // 7. Dispatch the two codes. Independent outcomes, reported independently.
-  const channels: Record<string, { sent: boolean; code: string | null }> = {};
+  // 7. Dispatch the codes. The email always goes; the SMS only when a number was
+  //    given. Independent outcomes, reported independently.
+  const channels: { email: { sent: boolean; code: string | null }; mobile: { sent: boolean; code: string | null } | null } = {
+    email: { sent: false, code: null },
+    mobile: null,
+  };
 
   const { error: emailError } = await env.publicClient.auth.signInWithOtp({
     email,
@@ -296,17 +336,19 @@ Deno.serve(async (request: Request) => {
 
   channels.email = { sent: true, code: null };
 
-  const { error: smsError } = await env.publicClient.auth.signInWithOtp({
-    phone: mobileE164,
-    options: { shouldCreateUser: true, channel: 'sms' },
-  });
+  if (hasMobile(mobileE164)) {
+    const { error: smsError } = await env.publicClient.auth.signInWithOtp({
+      phone: mobileE164,
+      options: { shouldCreateUser: true, channel: 'sms' },
+    });
 
-  if (smsError) {
-    const classified = classifyAuthError(smsError);
-    console.error('registration-start: SMS OTP dispatch failed:', smsError.code, smsError.message);
-    channels.mobile = { sent: false, code: classified.code };
-  } else {
-    channels.mobile = { sent: true, code: null };
+    if (smsError) {
+      const classified = classifyAuthError(smsError);
+      console.error('registration-start: SMS OTP dispatch failed:', smsError.code, smsError.message);
+      channels.mobile = { sent: false, code: classified.code };
+    } else {
+      channels.mobile = { sent: true, code: null };
+    }
   }
 
   const now = new Date().toISOString();
@@ -315,7 +357,7 @@ Deno.serve(async (request: Request) => {
     .from(TABLE)
     .update({
       email_otp_sent_at: channels.email.sent ? now : null,
-      mobile_otp_sent_at: channels.mobile.sent ? now : null,
+      mobile_otp_sent_at: channels.mobile?.sent ? now : null,
     })
     .eq('id', attempt.id);
 
@@ -323,7 +365,10 @@ Deno.serve(async (request: Request) => {
     fn: 'registration-start',
     event: 'dispatched',
     emailSent: channels.email.sent,
-    smsSent: channels.mobile.sent,
+    // Whether a number was given at all, not merely whether the SMS went out:
+    // `null` here means no number was asked for and none is owed.
+    smsSent: channels.mobile?.sent ?? false,
+    mobileRequested: hasMobile(mobileE164),
   });
 
   return json(
@@ -335,11 +380,17 @@ Deno.serve(async (request: Request) => {
       // from the client so a tampered clock cannot shorten the wait.
       resendCooldownSeconds: RESEND_COOLDOWN_SECONDS,
       expiresAt,
+      // Whether this attempt owes a mobile proof. Sent as data so the form never
+      // has to infer it from whether a number happens to be on screen, and
+      // never from the shape of a masked string.
+      mobileRequired: hasMobile(mobileE164),
       // Enough to render "we sent a code to u***@example.com" and the masked
       // number. The unmasked values are already known to this browser, which
-      // typed them, so nothing new is exposed.
+      // typed them, so nothing new is exposed. Both masks are empty rather than
+      // absent when they have nothing to mask, so the response shape does not
+      // change with the shape of the form.
       maskedEmail: maskEmail(email),
-      maskedMobile: maskMobile(mobileE164),
+      maskedMobile: hasMobile(mobileE164) ? maskMobile(mobileE164) : '',
     },
     200,
   );

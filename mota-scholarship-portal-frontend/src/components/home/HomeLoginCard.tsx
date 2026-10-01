@@ -14,6 +14,7 @@ import {
 } from '../../lib/registrationConfig';
 import { completeRegistration, resendOtp, startRegistration, verifyOtp } from '../../services/auth/registrationOtpService';
 import type { RegistrationChannel, StartRegistrationData } from '../../services/auth/registrationOtpService';
+import { signInDemoApplicant } from '../../services/demoApplicantAuth';
 import type { HomeAuthMode, HomeAuthNavigationState } from '../../types';
 import { Button } from '../ui/Button';
 import { OtpInput } from '../auth/OtpInput';
@@ -320,6 +321,10 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [isDemoSubmitting, setIsDemoSubmitting] = useState(false);
   const [demoAdminError, setDemoAdminError] = useState('');
+  // Separate from isDemoSubmitting: the two demo buttons are independent of each
+  // other, and one being busy must not grey out the other.
+  const [isDemoApplicantSubmitting, setIsDemoApplicantSubmitting] = useState(false);
+  const [demoApplicantError, setDemoApplicantError] = useState('');
   const headingRef = useRef<HTMLHeadingElement>(null);
   const loginUsernameRef = useRef<HTMLInputElement>(null);
   const loginPasswordRef = useRef<HTMLInputElement>(null);
@@ -380,6 +385,8 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
     setStatusTone('info');
     setDemoAdminError('');
     setIsDemoSubmitting(false);
+    setDemoApplicantError('');
+    setIsDemoApplicantSubmitting(false);
     setPendingAttempt(null);
     setPendingPassword('');
   }, []);
@@ -780,14 +787,18 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
   }
 
   /**
-   * Checks both codes on this page, then finishes the registration, then sends
-   * the applicant straight to the login page.
+   * Checks the outstanding codes on this page, then finishes the registration,
+   * then sends the applicant straight to the login page.
    *
-   * Both channels are verified in one pass, in the order they appear on the
-   * form, and the account is completed only once the server has recorded both
-   * proofs. The local "already verified" flags decide which codes still need
-   * checking; they never decide the outcome, because `completeRegistration` is
-   * refused by the server unless the database agrees.
+   * The channels are verified in one pass, in the order they appear on the form,
+   * and the account is completed only once the server has recorded every proof
+   * the attempt needs. The local "already verified" flags decide which codes
+   * still need checking; they never decide the outcome, because
+   * `completeRegistration` is refused by the server unless the database agrees.
+   *
+   * Which proofs are needed comes from `attempt.mobileRequired`, which the
+   * server sent. An applicant who gave no number has one proof to give, and this
+   * form asks for exactly that one.
    */
   async function handleOtpSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -809,7 +820,10 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
     }
 
     // Every channel that is not already proven needs a well-formed code, and the
-    // applicant is told which box is at fault before anything is sent.
+    // applicant is told which box is at fault before anything is sent. The mobile
+    // box is only in play when the attempt owes a mobile proof, so a
+    // registration with no number on it is never held up waiting for a code that
+    // was never sent.
     const nextErrors: { email?: string; mobile?: string } = {};
     let firstInvalidChannel: RegistrationChannel | null = null;
 
@@ -818,7 +832,7 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
       firstInvalidChannel = firstInvalidChannel ?? 'email';
     }
 
-    if (!mobileOtpVerified && !isValidOtp(mobileOtp)) {
+    if (attempt.mobileRequired && !mobileOtpVerified && !isValidOtp(mobileOtp)) {
       nextErrors.mobile = `Enter the ${OTP_LENGTH}-digit code sent to ${attempt.maskedMobile}.`;
       firstInvalidChannel = firstInvalidChannel ?? 'mobile';
     }
@@ -846,7 +860,7 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
         }
       }
 
-      if (!mobileOtpVerified) {
+      if (attempt.mobileRequired && !mobileOtpVerified) {
         const failure = await verifyOtpChannel(attempt, 'mobile', mobileOtp.trim());
 
         if (failure) {
@@ -857,7 +871,9 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
 
       setIsVerifyingOtp(false);
       setIsCompletingRegistration(true);
-      setOtpNotice('Both codes accepted. Creating your account…');
+      setOtpNotice(
+        attempt.mobileRequired ? 'Both codes accepted. Creating your account…' : 'Code accepted. Creating your account…',
+      );
 
       const result = await completeRegistration(attempt.attemptId, password);
 
@@ -870,6 +886,13 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
           // this form.
           setEmailOtpVerified(Boolean((result as { emailVerified?: boolean }).emailVerified));
           setMobileOtpVerified(Boolean((result as { mobileVerified?: boolean }).mobileVerified));
+
+          // It also says whether a mobile proof is owed at all. Taken from the
+          // server so a form that somehow believes a mobile is required is
+          // corrected rather than left waiting for a code that was never sent.
+          if (!(result as { mobileRequired?: boolean }).mobileRequired) {
+            setOtpErrors((current) => ({ ...current, mobile: '' }));
+          }
         }
 
         setOtpErrors({ email: result.message, mobile: '' });
@@ -923,6 +946,34 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
    * no credential is collected here, so nothing secret reaches the card. On
    * failure only the one generic message is shown.
    */
+  /**
+   * One-click sign-in as the seeded demo applicant.
+   *
+   * The session is established through the broker, which holds the credential,
+   * so the browser is never given a password. The applicant context listens to
+   * Supabase's auth state, so the new session is already in place by the time
+   * this navigates -- there is nothing to hand over explicitly.
+   */
+  async function handleOpenDemoApplicant() {
+    setStatus('');
+    setStatusTone('info');
+    setDemoApplicantError('');
+    setIsDemoApplicantSubmitting(true);
+
+    try {
+      const result = await signInDemoApplicant();
+
+      if (!result.ok) {
+        setDemoApplicantError(result.error);
+        return;
+      }
+
+      navigate(ROUTES.applicant.dashboard);
+    } finally {
+      setIsDemoApplicantSubmitting(false);
+    }
+  }
+
   async function handleOpenDemoAdmin() {
     setStatus('');
     setStatusTone('info');
@@ -1192,7 +1243,7 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
 
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-0.5" htmlFor="home-registration-mobile">
-              Mobile Number <span className="font-normal text-slate-500">(Required)</span>
+              Mobile Number <span className="font-normal text-slate-500">(Optional)</span>
             </label>
             <input
               ref={mobileRef}
@@ -1204,8 +1255,6 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
               autoComplete="tel"
               inputMode="tel"
               maxLength={18}
-              required
-              disabled={Boolean(pendingAttempt)}
               aria-invalid={Boolean(registrationErrors.mobile)}
               aria-describedby={describeIds(
                 'home-registration-mobile-help',
@@ -1215,8 +1264,10 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
               className={getInputClass(Boolean(registrationErrors.mobile))}
             />
             <p className="mt-1 text-[11px] leading-relaxed text-slate-500" id="home-registration-mobile-help">
-              We will send a verification code to this number by SMS and will not create your account until
-              it is entered. Enter a 10-digit number, or the full number with its country code.
+              Optional. Your account is created once your email is verified, so you can leave this blank. If
+              you do enter a number we will send a verification code to it by SMS and will not create your
+              account until it is entered. Enter a 10-digit number, or the full number with its country
+              code.
             </p>
             {registrationErrors.mobile ? (
               <p className="mt-1 text-[11px] font-medium text-red-700" id="home-registration-mobile-error">
@@ -1249,8 +1300,9 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
             {pendingAttempt ? (
               <div className="space-y-3 rounded border border-blue-200 bg-blue-50 p-2.5 md:col-span-2">
                 <p className="text-[11px] leading-relaxed text-slate-700">
-                  Enter both codes here. Your account is created as soon as the email and the mobile
-                  code are accepted, and you will go straight to the login page.
+                  {pendingAttempt.mobileRequired
+                    ? 'Enter both codes here. Your account is created as soon as the email and the mobile code are accepted, and you will go straight to the login page.'
+                    : 'Enter the code sent to your email. Your account is created as soon as it is accepted, and you will go straight to the login page.'}
                 </p>
 
                 {pendingPassword ? null : (
@@ -1310,40 +1362,48 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
                   </div>
                 </div>
 
-                <div>
-                  <OtpInput
-                    id="home-registration-mobile-otp"
-                    label={`Mobile code sent to ${pendingAttempt.maskedMobile}`}
-                    value={mobileOtp}
-                    onChange={(value) => {
-                      setMobileOtp(value);
-                      clearOtpError('mobile');
-                    }}
-                    length={OTP_LENGTH}
-                    invalid={Boolean(otpErrors.mobile)}
-                    disabled={isOtpBusy}
-                    describedBy={otpErrors.mobile ? 'home-registration-mobile-otp-error' : undefined}
-                  />
-                  {otpErrors.mobile ? (
-                    <p className="mt-1 text-[11px] font-medium text-red-700" id="home-registration-mobile-otp-error">
-                      {otpErrors.mobile}
-                    </p>
-                  ) : null}
-                  {mobileOtpVerified ? (
-                    <p className="mt-1 text-[11px] font-semibold text-emerald-700">Mobile code accepted</p>
-                  ) : null}
-                  <div className="mt-1 flex items-center justify-end">
-                    <Button
-                      className="rounded"
-                      size="sm"
-                      variant="outline"
-                      disabled={isOtpBusy || resendSecondsLeft > 0}
-                      onClick={() => handleResendOtp('mobile')}
-                    >
-                      Resend mobile code
-                    </Button>
+                {/*
+                 * Only drawn when the attempt actually owes a mobile proof. When
+                 * no number was given, no SMS was sent, so a box here would ask
+                 * for a code that can never arrive and block a registration the
+                 * server is willing to complete.
+                 */}
+                {pendingAttempt.mobileRequired ? (
+                  <div>
+                    <OtpInput
+                      id="home-registration-mobile-otp"
+                      label={`Mobile code sent to ${pendingAttempt.maskedMobile}`}
+                      value={mobileOtp}
+                      onChange={(value) => {
+                        setMobileOtp(value);
+                        clearOtpError('mobile');
+                      }}
+                      length={OTP_LENGTH}
+                      invalid={Boolean(otpErrors.mobile)}
+                      disabled={isOtpBusy}
+                      describedBy={otpErrors.mobile ? 'home-registration-mobile-otp-error' : undefined}
+                    />
+                    {otpErrors.mobile ? (
+                      <p className="mt-1 text-[11px] font-medium text-red-700" id="home-registration-mobile-otp-error">
+                        {otpErrors.mobile}
+                      </p>
+                    ) : null}
+                    {mobileOtpVerified ? (
+                      <p className="mt-1 text-[11px] font-semibold text-emerald-700">Mobile code accepted</p>
+                    ) : null}
+                    <div className="mt-1 flex items-center justify-end">
+                      <Button
+                        className="rounded"
+                        size="sm"
+                        variant="outline"
+                        disabled={isOtpBusy || resendSecondsLeft > 0}
+                        onClick={() => handleResendOtp('mobile')}
+                      >
+                        Resend mobile code
+                      </Button>
+                    </div>
                   </div>
-                </div>
+                ) : null}
 
                 {resendSecondsLeft > 0 ? (
                   <p className="text-[11px] leading-relaxed text-slate-500" role="status">
@@ -1358,8 +1418,9 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
                 ) : null}
 
                 <p className="text-[11px] leading-relaxed text-slate-500">
-                  Each code expires shortly and can only be used once. Your account is created only after
-                  both are accepted.
+                  {pendingAttempt.mobileRequired
+                    ? 'Each code expires shortly and can only be used once. Your account is created only after both are accepted.'
+                    : 'This code expires shortly and can only be used once.'}
                 </p>
 
                 <button
@@ -1463,9 +1524,55 @@ export function HomeLoginCard({ onModeChange }: HomeLoginCardProps = {}) {
             </p>
           ) : null}
 
-          <Button className="w-full justify-center rounded" disabled={isSubmitting || isAuthenticating} size="md" type="submit">
-            {isSubmitting || isAuthenticating ? 'Signing in…' : loginLabel}
-          </Button>
+          {/*
+            The sign-in row, split into two halves of one control.
+
+            The left half is the real sign-in and stays a submit button, so the
+            form still works by pressing Enter in any field. The right half is the
+            seeded demo applicant, which must NOT submit: it takes no credential
+            and must not run the form's own handler, so it is type="button".
+
+            They share one rounded container with a divider rather than sitting as
+            two separate buttons, because they are alternatives to each other --
+            "sign in as yourself, or look around as a demo applicant" -- and a
+            shared edge makes that relationship legible. Each half is still a real
+            <button>, so both are keyboard reachable and independently focusable;
+            a single button with a click handler inspecting a coordinate would have
+            thrown that away.
+          */}
+          <div className="flex overflow-hidden rounded shadow">
+            <Button
+              className="min-w-0 flex-1 justify-center rounded-none"
+              disabled={isSubmitting || isAuthenticating || isDemoApplicantSubmitting}
+              size="md"
+              type="submit"
+            >
+              {isSubmitting || isAuthenticating ? 'Signing in…' : loginLabel}
+            </Button>
+
+            {!isAdmin ? (
+              <Button
+                aria-label="Open the applicant demo account without signing in"
+                className="min-w-0 flex-1 justify-center rounded-none border-l-2 border-white/40"
+                disabled={isSubmitting || isAuthenticating || isDemoApplicantSubmitting}
+                onClick={handleOpenDemoApplicant}
+                size="md"
+                type="button"
+                variant="accent"
+              >
+                {isDemoApplicantSubmitting ? 'Opening…' : 'Demo Applicant'}
+              </Button>
+            ) : null}
+          </div>
+
+          {demoApplicantError && !isAdmin ? (
+            <p
+              className="rounded border border-red-300 bg-red-50 px-2 py-1.5 text-[11px] font-medium leading-relaxed text-red-800"
+              role="alert"
+            >
+              {demoApplicantError}
+            </p>
+          ) : null}
 
           {isAdmin ? (
             <p className="pt-2 border-t border-slate-200 text-xs text-slate-500">

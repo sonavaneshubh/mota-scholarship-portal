@@ -62,6 +62,7 @@ export type RegistrationResult<T> = ({ ok: true } & T) | RegistrationFailure;
 
 export interface StartRegistrationInput {
   email: string;
+  /** Optional. Blank means the applicant gave no number and no SMS is sent. */
   mobile: string;
   fullName: string;
   username: string;
@@ -70,10 +71,21 @@ export interface StartRegistrationInput {
 
 export interface StartRegistrationData {
   attemptId: string;
-  channels: Record<RegistrationChannel, { sent: boolean; code: string | null }>;
+  /**
+   * `mobile` is null when the applicant gave no number, which is the only case
+   * in which no SMS was ever sent. The form must not offer a mobile code box
+   * for it, and must not ask for a code that will never arrive.
+   */
+  channels: {
+    email: { sent: boolean; code: string | null };
+    mobile: { sent: boolean; code: string | null } | null;
+  };
+  /** Whether this attempt owes a mobile proof before it can be completed. */
+  mobileRequired: boolean;
   resendCooldownSeconds: number;
   expiresAt: string;
   maskedEmail: string;
+  /** Empty when no number was given. */
   maskedMobile: string;
 }
 
@@ -81,7 +93,10 @@ export interface VerifyChannelData {
   channel: RegistrationChannel;
   emailVerified: boolean;
   mobileVerified: boolean;
+  /** Every proof this attempt requires is in. The email alone, if that is all it needs. */
   bothVerified: boolean;
+  /** False for a mobile-less attempt, where the mobile proof is not owed. */
+  mobileRequired: boolean;
   verified?: boolean;
   alreadyVerified?: boolean;
   resent?: boolean;
@@ -165,6 +180,21 @@ async function call<T>(functionName: string, payload: Record<string, unknown>): 
         status: response.status,
         code,
       });
+    } else {
+      // A 4xx is the server's considered answer, and the message on screen is
+      // only its rendering, so the two failure modes look identical there: a code
+      // that is genuinely wrong, and a code the deployed function is too old to
+      // accept. The reason code is what separates them, so it is logged for
+      // every 4xx.
+      //
+      // `code` is a fixed vocabulary -- never the applicant's token, never their
+      // email, and never a body field that could carry either. `attemptsRemaining`
+      // is a count, so it is safe for the same reason.
+      diagnosticError('registration', `${functionName} refused the request`, {
+        status: response.status,
+        code,
+        attemptsRemaining: typeof body?.attemptsRemaining === 'number' ? body.attemptsRemaining : undefined,
+      });
     }
 
     const failure: RegistrationFailure = { ok: false, code, message };
@@ -183,7 +213,7 @@ async function call<T>(functionName: string, payload: Record<string, unknown>): 
   return body as { ok: true } & T;
 }
 
-/** Validates, rejects duplicates, opens the attempt, sends both codes. */
+/** Validates, rejects duplicates, opens the attempt, sends the email code and, if a number was given, the SMS. */
 export function startRegistration(input: StartRegistrationInput) {
   return call<StartRegistrationData>('registration-start', { ...input });
 }
@@ -199,9 +229,10 @@ export function verifyOtp(attemptId: string, channel: RegistrationChannel, token
 }
 
 /**
- * Activates the account. Refused by the server unless both codes were already
- * accepted, so a caller that skips a step gets `NOT_VERIFIED` rather than an
- * account.
+ * Activates the account. Refused by the server unless every proof the attempt
+ * needs was already accepted -- the email code always, and the mobile code too
+ * when a number was given -- so a caller that skips a step gets `NOT_VERIFIED`
+ * rather than an account.
  */
 export function completeRegistration(attemptId: string, password: string) {
   return call<CompleteRegistrationData>('registration-complete', { attemptId, password });

@@ -48,3 +48,17 @@ supabase/config.toml.backup
 supabase/config.toml.before-fix
 supabase/config.toml.broken
 supabase/config.toml.full-backup
+
+# Timestamped live-schema dumps captured before applying a batch of migrations.
+# Point-in-time safety net for manual rollback only — the schema they describe is
+# reproduced by the tracked supabase/migrations/ files, so committing them would
+# just add a large, permanently stale second copy of the schema.
+/.snapshot_ts
+/migration_safety_snapshot_*.md
+/migration_safety_snapshot_*/
+/ocr_verification_*/
+/ocr_document_processing_report.md
+
+# Scratch folder for migration drafts under review before they are renamed into
+# supabase/migrations/. Nothing here has been applied or signed off yet.
+/review/

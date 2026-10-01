@@ -206,6 +206,10 @@ function answerText(question: SchemeQuestion, answers: SchemeAnswers): string {
  */
 const STAGE_TWO_OCR_LABEL: Record<DocumentCheckState, string> = {
   'not-started': 'AI check not started',
+  'in-flight': '⟳ AI is processing this document…',
+  complete: '✓ Processed — matches your profile',
+  'needs-review': '⚠ Processed — information needs review',
+  failed: '⚠ Could not read this document',
   'in-flight': 'Γƒ│ AI is processing this documentΓÇª',
   complete: 'Γ£ô Processed ΓÇö matches your profile',
   'needs-review': 'ΓÜá Processed ΓÇö information needs review',
@@ -479,6 +483,7 @@ export function ApplicantApplicationPage() {
   const handle = applicationId ?? '';
 
   // Reads the server's view of any document still being checked, and folds it
+  // into the links held above. Idle — no timers, no requests — once nothing is
   // into the links held above. Idle ΓÇö no timers, no requests ΓÇö once nothing is
   // in flight, so a finished application costs nothing.
   useDocumentOcrPolling(form.links, mergeOcrState);
@@ -1366,6 +1371,9 @@ export function ApplicantApplicationPage() {
           which is where a document can actually be corrected. On the form itself
           they competed with the seven sections and the submit button for the same
           attention, and the library box listed every document on the profile
+          rather than the ones this application needs — so it was a lot of content
+          that answered a question the applicant did not have while filling the
+          form in.
           rather than the ones this application needs, so it answered a question
           the applicant did not have while filling the form in.
 
